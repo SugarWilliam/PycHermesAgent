@@ -67,7 +67,7 @@ class ArtifactEngine:
         if target_dir.exists():
             raise FileExistsError(f"Artifact already exists: {target_dir}")
 
-        staging_dir = self.artifacts_dir / ".staging" / storage_task_id / f"{storage_artifact_id}-{uuid4().hex}"
+        staging_dir = self.artifacts_dir / ".staging" / uuid4().hex
         checksum = f"sha256:{hashlib.sha256(payload).hexdigest()}"
         created_at_ns = time.time_ns()
         metadata = {

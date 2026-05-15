@@ -168,10 +168,7 @@ class AssetManager:
             raise ValueError("Existing installed asset size does not match the requested manifest.")
 
     def _create_staging_dir(self, manifest: ModelAssetManifest) -> Path:
-        return self.downloads_dir / "model-staging" / Path(*_normalize_asset_id(manifest.asset_id)) / _normalize_segment(
-            manifest.version,
-            label="version",
-        ) / f"stage-{uuid4().hex}"
+        return self.downloads_dir / "model-staging" / f"stage-{uuid4().hex}"
 
     def _promote(self, staging_dir: Path, target_dir: Path) -> None:
         if target_dir.exists():

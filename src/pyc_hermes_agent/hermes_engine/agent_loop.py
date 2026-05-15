@@ -19,6 +19,7 @@ from pyc_hermes_agent.contracts import (
 )
 from pyc_hermes_agent.hermes_engine.memory_injection import build_prompt_messages
 from pyc_hermes_agent.hermes_engine.planner import build_agent_plan
+from pyc_hermes_agent.hermes_engine.session_context import bind_session_context
 from pyc_hermes_agent.hermes_engine.session_store import AgentSessionStore
 from pyc_hermes_agent.hermes_engine.tool_registry import ToolRegistry
 from pyc_hermes_agent.llm_gateway import LLMChatChunk, LLMChatRequest, LLMChatResponse, LLMMessage, execute_chat, stream_chat
@@ -113,7 +114,8 @@ class AgentLoop:
             raise ValueError("Agent loop retry_budget cannot be negative.")
 
         resolved_session_id = (session_id or "").strip() or str(uuid4())
-        existing_session = self._session_store.load(resolved_session_id)
+        with bind_session_context(resolved_session_id):
+            existing_session = self._session_store.load(resolved_session_id)
         existing_messages = [_normalize_chat_message(message) for message in existing_session.messages] if existing_session else []
         new_messages = [_normalize_chat_message(message) for message in request.messages]
         if not new_messages:
@@ -183,11 +185,12 @@ class AgentLoop:
         try:
             for iteration in range(1, max_iterations + 1):
                 current_iteration = iteration
-                prompt_messages = build_prompt_messages(
-                    messages,
-                    plan=plan,
-                    extra_system_messages=[recovery_message] if recovery_message is not None else None,
-                )
+                with bind_session_context(resolved_session_id):
+                    prompt_messages = build_prompt_messages(
+                        messages,
+                        plan=plan,
+                        extra_system_messages=[recovery_message] if recovery_message is not None else None,
+                    )
                 recovery_message = None
                 llm_request = LLMChatRequest(
                     model=active_model,
@@ -208,7 +211,8 @@ class AgentLoop:
                         emit_event=emit,
                     )
                 else:
-                    last_response = self._llm_executor(llm_request, self._root)
+                    with bind_session_context(resolved_session_id):
+                        last_response = self._llm_executor(llm_request, self._root)
                 if last_response.model:
                     active_model = last_response.model
 
@@ -259,7 +263,8 @@ class AgentLoop:
                 )
 
                 if not last_response.tool_calls:
-                    self._persist_session(resolved_session_id, active_model, messages, existing_session)
+                    with bind_session_context(resolved_session_id):
+                        self._persist_session(resolved_session_id, active_model, messages, existing_session)
                     result = AgentLoopResult(
                         session_id=resolved_session_id,
                         model=active_model,
@@ -288,7 +293,8 @@ class AgentLoop:
 
                 turn_tool_results: list[ToolCallResult] = []
                 for tool_call in last_response.tool_calls:
-                    tool_result = registry.dispatch(tool_call)
+                    with bind_session_context(resolved_session_id):
+                        tool_result = registry.dispatch(tool_call)
                     tool_results.append(tool_result)
                     turn_tool_results.append(tool_result)
                     messages.append(
@@ -330,7 +336,8 @@ class AgentLoop:
                             },
                         )
         except Exception as exc:
-            self._persist_session(resolved_session_id, active_model, messages, existing_session)
+            with bind_session_context(resolved_session_id):
+                self._persist_session(resolved_session_id, active_model, messages, existing_session)
             yield emit(
                 "error",
                 model=active_model,
@@ -356,7 +363,8 @@ class AgentLoop:
         emit_event: Callable[..., AgentLoopEvent],
     ) -> Iterator[AgentLoopEvent]:
         if self._llm_stream_executor is None:
-            return self._llm_executor(request, self._root), False
+            with bind_session_context(session_id):
+                return self._llm_executor(request, self._root), False
 
         saw_chunk = False
         emitted_text_deltas = False
@@ -369,7 +377,16 @@ class AgentLoop:
         raw_response: dict[str, Any] = {}
         tool_call_state_key: tuple[tuple[str, str, str, str], ...] = ()
 
-        for chunk in self._llm_stream_executor(request, self._root):
+        with bind_session_context(session_id):
+            stream_iterator = iter(self._llm_stream_executor(request, self._root))
+
+        while True:
+            try:
+                with bind_session_context(session_id):
+                    chunk = next(stream_iterator)
+            except StopIteration:
+                break
+
             saw_chunk = True
             if chunk.event == "error":
                 raise RuntimeError(_stream_error_message(chunk))
@@ -421,7 +438,8 @@ class AgentLoop:
                 )
 
         if not saw_chunk:
-            return self._llm_executor(request, self._root), False
+            with bind_session_context(session_id):
+                return self._llm_executor(request, self._root), False
 
         return (
             LLMChatResponse(

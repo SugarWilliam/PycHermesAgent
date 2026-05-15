@@ -13,6 +13,25 @@ from typing import Any, Dict, Iterator, Optional
 import numpy as np
 
 
+# Keep the MVP bridge limited to legacy surfaces with stable local contracts or
+# explicit numpy fallbacks. Heavier legacy families stay degraded until the
+# harness models their dependency availability more explicitly.
+_RUNTIME_DISABLED_MODULE_ERRORS = {
+    "org_personal_adapters": (
+        "Legacy org_personal_adapters execution is disabled in the current MVP bridge "
+        "because it depends on optional pandas/scipy stacks."
+    ),
+    "complex_systems_adapters": (
+        "Legacy complex_systems_adapters execution is disabled in the current MVP bridge "
+        "because it depends on optional pandas/scipy stacks."
+    ),
+    "stats_module": (
+        "Legacy stats_module execution is disabled in the current MVP bridge; "
+        "use statistical_rigor or method-specific routes instead."
+    ),
+}
+
+
 @dataclass(slots=True)
 class LegacyModuleStatus:
     module_name: str
@@ -56,6 +75,16 @@ class LegacyMetaBridge:
                 path=None,
                 available=False,
                 error=f"Legacy module not found: {module_name}",
+            )
+
+        disabled_error = _RUNTIME_DISABLED_MODULE_ERRORS.get(module_name)
+        if disabled_error is not None:
+            return LegacyModuleStatus(
+                module_name=module_name,
+                module=None,
+                path=module_path,
+                available=False,
+                error=disabled_error,
             )
 
         cached = sys.modules.get(module_name)

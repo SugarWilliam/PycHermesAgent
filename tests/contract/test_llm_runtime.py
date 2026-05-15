@@ -8,6 +8,7 @@ import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from unittest.mock import patch
 from urllib.request import Request, urlopen
 
 from pyc_hermes_agent.contracts import ChatCompletionRequest, ChatMessage, ToolDefinition
@@ -18,7 +19,11 @@ from pyc_hermes_agent import SidecarClient
 
 class _FakeOpenAIHandler(BaseHTTPRequestHandler):
     last_request_payload = None
+    last_request_headers = None
+    request_payload_history = None
+    request_headers_history = None
     stream_response_chunks = None
+    response_sequence = None
     response_payload = {
         "id": "chatcmpl-demo",
         "choices": [
@@ -34,9 +39,16 @@ class _FakeOpenAIHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802
         content_length = int(self.headers.get("Content-Length", "0"))
         _body = self.rfile.read(content_length)
-        self.__class__.last_request_payload = json.loads(_body.decode("utf-8"))
-        if self.path.endswith("/chat/completions") and self.__class__.last_request_payload.get("stream") is True:
-            chunks = self.stream_response_chunks or []
+        cls = self.__class__
+        cls.last_request_payload = json.loads(_body.decode("utf-8"))
+        cls.last_request_headers = {key.lower(): value for key, value in self.headers.items()}
+        cls.request_payload_history.append(cls.last_request_payload)
+        cls.request_headers_history.append(cls.last_request_headers)
+
+        response_spec = cls.response_sequence.pop(0) if cls.response_sequence else {}
+        status = response_spec.get("status", HTTPStatus.OK)
+        if self.path.endswith("/chat/completions") and cls.last_request_payload.get("stream") is True and status == HTTPStatus.OK:
+            chunks = response_spec.get("stream_chunks", self.stream_response_chunks or [])
             body_parts = [f"data: {json.dumps(chunk)}\n\n" for chunk in chunks]
             body_parts.append("data: [DONE]\n\n")
             body = "".join(body_parts).encode("utf-8")
@@ -46,8 +58,9 @@ class _FakeOpenAIHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
-        body = json.dumps(self.response_payload).encode("utf-8")
-        self.send_response(HTTPStatus.OK)
+
+        body = json.dumps(response_spec.get("body", self.response_payload)).encode("utf-8")
+        self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
@@ -59,7 +72,11 @@ class _FakeOpenAIHandler(BaseHTTPRequestHandler):
 
 def _start_fake_openai_server():
     _FakeOpenAIHandler.last_request_payload = None
+    _FakeOpenAIHandler.last_request_headers = None
+    _FakeOpenAIHandler.request_payload_history = []
+    _FakeOpenAIHandler.request_headers_history = []
     _FakeOpenAIHandler.stream_response_chunks = []
+    _FakeOpenAIHandler.response_sequence = []
     _FakeOpenAIHandler.response_payload = {
         "id": "chatcmpl-demo",
         "choices": [
@@ -77,18 +94,27 @@ def _start_fake_openai_server():
     return server, thread
 
 
-def _make_runtime_root(tmp_path, base_url: str):
+def _make_runtime_root(
+    tmp_path,
+    base_url: str | None,
+    *,
+    provider_id: str = "openai-compatible",
+    model_name: str = "demo-model",
+    options: dict[str, str] | None = None,
+):
+    provider_options = dict(options or {})
+    if base_url:
+        provider_options.setdefault("baseURL", base_url)
+    if provider_id == "openai-compatible":
+        provider_options.setdefault("apiKey", "demo-token")
     config_text = json.dumps(
         {
-            "model": "openai-compatible/demo-model",
+            "model": f"{provider_id}/{model_name}",
             "provider": {
-                "openai-compatible": {
-                    "options": {
-                        "baseURL": base_url,
-                        "apiKey": "demo-token",
-                    },
+                provider_id: {
+                    "options": provider_options,
                     "models": {
-                        "demo-model": {
+                        model_name: {
                             "name": "Demo Model",
                             "supports_reasoning": True,
                         }
@@ -263,34 +289,110 @@ def test_sidecar_http_transport_returns_error_payload_for_chat_failures(tmp_path
     assert response["error"]["code"] == "LLM_CHAT_FAILED"
 
 
-def test_llm_gateway_rejects_unsupported_provider_runtime(tmp_path) -> None:
-    config_text = json.dumps(
-        {
-            "model": "github-copilot/demo-model",
-            "provider": {
-                "github-copilot": {
-                    "models": {
-                        "demo-model": {
-                            "name": "Demo Unsupported Model"
-                        }
-                    }
-                }
-            },
-        }
+def test_llm_gateway_executes_github_copilot_chat(tmp_path) -> None:
+    provider_server, provider_thread = _start_fake_openai_server()
+    runtime_root = _make_runtime_root(
+        tmp_path,
+        f"http://127.0.0.1:{provider_server.server_address[1]}/v1",
+        provider_id="github-copilot",
+        model_name="gpt-4.1",
     )
-    (tmp_path / "opencode.json").write_text(config_text, encoding="utf-8")
+
+    try:
+        with patch.dict(
+            os.environ,
+            {
+                "COPILOT_GITHUB_TOKEN": "",
+                "GH_TOKEN": "gho_demo-token",
+                "GITHUB_TOKEN": "",
+            },
+            clear=False,
+        ):
+            response = invoke_chat_completion(
+                ChatCompletionRequest(
+                    model="github-copilot/gpt-4.1",
+                    messages=[ChatMessage(role="user", content="Say hello")],
+                ),
+                root=runtime_root,
+            )
+    finally:
+        provider_server.shutdown()
+        provider_server.server_close()
+        provider_thread.join(timeout=5)
+
+    assert response["provider_id"] == "github-copilot"
+    assert response["content"] == "Hello from fake model."
+    assert _FakeOpenAIHandler.last_request_payload["model"] == "gpt-4.1"
+    assert _FakeOpenAIHandler.last_request_headers["authorization"] == "Bearer gho_demo-token"
+    assert _FakeOpenAIHandler.last_request_headers["editor-version"] == "vscode/1.104.1"
+    assert _FakeOpenAIHandler.last_request_headers["copilot-integration-id"] == "vscode-chat"
+    assert _FakeOpenAIHandler.last_request_headers["openai-intent"] == "conversation-edits"
+    assert _FakeOpenAIHandler.last_request_headers["x-initiator"] == "agent"
+
+
+def test_llm_gateway_refreshes_github_copilot_credentials_after_401(tmp_path) -> None:
+    provider_server, provider_thread = _start_fake_openai_server()
+    _FakeOpenAIHandler.response_sequence = [
+        {
+            "status": HTTPStatus.UNAUTHORIZED,
+            "body": {"error": {"message": "expired"}},
+        },
+        {
+            "status": HTTPStatus.OK,
+            "body": _FakeOpenAIHandler.response_payload,
+        },
+    ]
+    runtime_root = _make_runtime_root(
+        tmp_path,
+        f"http://127.0.0.1:{provider_server.server_address[1]}/v1",
+        provider_id="github-copilot",
+        model_name="gpt-4.1",
+    )
+
+    try:
+        with patch(
+            "pyc_hermes_agent.llm_gateway.runtime._resolve_github_copilot_token",
+            side_effect=["gho_first-token", "gho_second-token"],
+        ):
+            result = execute_chat(
+                LLMChatRequest(
+                    model="github-copilot/gpt-4.1",
+                    messages=[LLMMessage(role="user", content="Say hello")],
+                ),
+                runtime_root,
+            )
+    finally:
+        provider_server.shutdown()
+        provider_server.server_close()
+        provider_thread.join(timeout=5)
+
+    assert result.provider_id == "github-copilot"
+    assert result.content == "Hello from fake model."
+    assert len(_FakeOpenAIHandler.request_headers_history) == 2
+    assert _FakeOpenAIHandler.request_headers_history[0]["authorization"] == "Bearer gho_first-token"
+    assert _FakeOpenAIHandler.request_headers_history[1]["authorization"] == "Bearer gho_second-token"
+
+
+def test_llm_gateway_rejects_classic_pat_for_github_copilot(tmp_path) -> None:
+    runtime_root = _make_runtime_root(
+        tmp_path,
+        "http://127.0.0.1:9/v1",
+        provider_id="github-copilot",
+        model_name="gpt-4.1",
+        options={"apiKey": "ghp_legacy-token"},
+    )
 
     response = invoke_chat_completion(
         ChatCompletionRequest(
-            model="github-copilot/demo-model",
+            model="github-copilot/gpt-4.1",
             messages=[ChatMessage(role="user", content="Say hello")],
         ),
-        root=tmp_path,
+        root=runtime_root,
     )
 
     assert response["status"] == "error"
     assert response["error"]["code"] == "LLM_CHAT_FAILED"
-    assert "not enabled for runtime execution" in response["error"]["message"]
+    assert "does not support classic GitHub PATs" in response["error"]["message"]
 
 
 def test_sidecar_process_smoke_llm_chat(tmp_path) -> None:

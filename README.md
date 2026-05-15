@@ -78,6 +78,8 @@ print(result["content"])
 
 - `docs/architecture/PycHermesAgent_Architecture_v0.2.0.md`
 - `docs/architecture/PycHermesAgent_Solution_Architecture_v0.2.0.md`
+- `docs/architecture/Execution_Blueprint_v0.2.0.md`
+- `docs/architecture/Hermes_Mixed_Integration_Mapping_v0.2.0.md`
 - `docs/architecture/Phase1_Roadmap_v0.2.0.md`
 - `docs/design/PycHermesAgent_Detailed_Design_v0.2.0.md`
 - `docs/features/PycHermesAgent_Feature_Details_v0.2.0.md`

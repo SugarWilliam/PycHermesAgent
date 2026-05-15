@@ -239,6 +239,8 @@ The architecture should not be considered fully delivered until all of the follo
 
 ## Related Documents
 
+- `docs/architecture/Hermes_Mixed_Integration_Mapping_v0.2.0.md`
+- `docs/architecture/Execution_Blueprint_v0.2.0.md`
 - `docs/architecture/PycHermesAgent_Architecture_v0.2.0.md`
 - `docs/architecture/Phase1_Roadmap_v0.2.0.md`
 - `docs/design/PycHermesAgent_Detailed_Design_v0.2.0.md`

@@ -38,13 +38,14 @@ class AgentSessionStore:
             return None
 
         payload = _read_json(session_path)
-        return AgentSessionRecord(
-            session_id=str(payload.get("session_id", normalized_session_id)),
-            model=str(payload.get("model", "")),
-            created_at=str(payload.get("created_at", "")),
-            updated_at=str(payload.get("updated_at", "")),
-            messages=[_message_from_payload(item) for item in payload.get("messages", []) if isinstance(item, dict)],
-        )
+        return _record_from_payload(payload, fallback_session_id=normalized_session_id)
+
+    def list_records(self) -> list[AgentSessionRecord]:
+        records: list[AgentSessionRecord] = []
+        for session_path in self._sessions_root.glob("*.json"):
+            records.append(_record_from_payload(_read_json(session_path), fallback_session_id=""))
+        records.sort(key=lambda record: (record.updated_at, record.created_at, record.session_id), reverse=True)
+        return records
 
     def save(self, *, session_id: str, model: str, messages: list[ChatMessage], created_at: str | None = None) -> AgentSessionRecord:
         normalized_session_id = session_id.strip()
@@ -105,6 +106,16 @@ def _message_from_payload(payload: dict[str, Any]) -> ChatMessage:
         content=str(payload.get("content", "")),
         tool_call_id=str(tool_call_id) if tool_call_id is not None else None,
         tool_calls=tool_calls,
+    )
+
+
+def _record_from_payload(payload: dict[str, Any], *, fallback_session_id: str) -> AgentSessionRecord:
+    return AgentSessionRecord(
+        session_id=str(payload.get("session_id", fallback_session_id)),
+        model=str(payload.get("model", "")),
+        created_at=str(payload.get("created_at", "")),
+        updated_at=str(payload.get("updated_at", "")),
+        messages=[_message_from_payload(item) for item in payload.get("messages", []) if isinstance(item, dict)],
     )
 
 

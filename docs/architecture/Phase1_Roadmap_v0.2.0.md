@@ -43,6 +43,7 @@ The following claims from the review are now partially outdated:
 3. Runtime path helpers now align the codebase more closely with the documented `%APPDATA%` and `%LOCALAPPDATA%` boundary model.
 4. `numpy` is now declared as a core dependency and the broader scientific stack is modeled as optional extras.
 5. There is now a minimal synchronous OpenAI-compatible LLM execution path.
+6. There is now a direct GitHub Copilot runtime path inside `llm_gateway`.
 
 The following review conclusions remain materially true:
 
@@ -101,6 +102,7 @@ Status:
 
 1. Config and discovery layer exists
 2. Minimal OpenAI-compatible synchronous execution path exists
+3. Minimal direct GitHub Copilot sync and streaming execution paths exist
 
 Next implementation target:
 
@@ -114,6 +116,7 @@ Current progress additions:
 
 1. Runtime execution now uses explicit provider gating rather than implicit provider enablement.
 2. Sync execution path is covered by both in-process and HTTP tests.
+3. GitHub Copilot runtime now resolves supported GitHub tokens, sends Copilot-specific headers, and retries once after `401` with refreshed credentials.
 
 ### Workstream D: MetaHarness Reliability
 
@@ -216,6 +219,8 @@ Current implementation state:
 
 ## Related Documents
 
+- `docs/architecture/Hermes_Mixed_Integration_Mapping_v0.2.0.md`
+- `docs/architecture/Execution_Blueprint_v0.2.0.md`
 - `docs/architecture/PycHermesAgent_Solution_Architecture_v0.2.0.md`
 - `docs/design/PycHermesAgent_Detailed_Design_v0.2.0.md`
 - `docs/features/PycHermesAgent_Feature_Details_v0.2.0.md`

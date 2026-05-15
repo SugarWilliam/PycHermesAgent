@@ -211,16 +211,16 @@ What it resolves today:
 
 What it does not yet own:
 
-1. Broad provider coverage beyond the minimal OpenAI-compatible sync path
+1. Broad provider coverage beyond the minimal OpenAI-compatible and direct GitHub Copilot sync paths
 2. Rich authentication flows
-3. Broad provider streaming execution beyond the minimal OpenAI-compatible SSE path
+3. Broad provider streaming execution beyond the minimal OpenAI-compatible and GitHub Copilot SSE path
 4. Production-grade retries and rate limiting
 5. Runtime model fallback
 
 Current implementation additions:
 
-1. `src/pyc_hermes_agent/llm_gateway/runtime.py` provides a minimal synchronous OpenAI-compatible execution path plus a minimal OpenAI-compatible SSE streaming path.
-2. The initial runtime path supports `model`, `messages`, timeout, retry count, configured base URL, API key/header injection, and SSE chunk parsing.
+1. `src/pyc_hermes_agent/llm_gateway/runtime.py` provides minimal synchronous execution paths for OpenAI-compatible providers and direct GitHub Copilot plus minimal SSE streaming paths for the same surface.
+2. The initial runtime path supports `model`, `messages`, timeout, retry count, configured base URL, API key/header injection, Copilot token resolution, Copilot request headers, one-shot credential refresh on `401`, and SSE chunk parsing.
 3. The runtime remains intentionally narrow and does not yet change the architectural rule that `llm_gateway` is the sole LLM execution boundary.
 4. Runtime execution is explicitly gated to a small provider allowlist rather than implicitly enabling all discovered providers.
 
@@ -379,6 +379,8 @@ The most important design gaps before production are:
 
 ## Related Documents
 
+- `docs/architecture/Hermes_Mixed_Integration_Mapping_v0.2.0.md`
+- `docs/architecture/Execution_Blueprint_v0.2.0.md`
 - `docs/architecture/PycHermesAgent_Solution_Architecture_v0.2.0.md`
 - `docs/architecture/Phase1_Roadmap_v0.2.0.md`
 - `docs/features/PycHermesAgent_Feature_Details_v0.2.0.md`

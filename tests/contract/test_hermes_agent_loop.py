@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from pyc_hermes_agent.contracts import ChatCompletionRequest, ChatMessage, ToolCall
-from pyc_hermes_agent.hermes_engine import AgentLoop, AgentSessionStore, ToolRegistry, create_meta_harness_tool_registry
+from pyc_hermes_agent.hermes_engine import AgentLoop, AgentSessionStore, ToolRegistry, create_meta_harness_tool_registry, get_current_session_id
 from pyc_hermes_agent.llm_gateway import LLMChatChunk, LLMChatResponse
 
 
@@ -399,6 +399,50 @@ def test_agent_loop_retries_after_tool_failure_with_reflection_hint(tmp_path: Pa
     assert result.content == "I could not complete the tool call, so here is a direct answer."
 
 
+def test_agent_loop_binds_session_context_for_sync_llm_and_tool_dispatch(tmp_path: Path) -> None:
+    registry = ToolRegistry()
+    observed_llm_sessions = []
+    observed_tool_sessions = []
+
+    def echo_handler(args):
+        observed_tool_sessions.append(get_current_session_id())
+        return {"echo": args["text"]}
+
+    registry.register_function("echo_text", echo_handler)
+
+    def fake_llm_executor(request, _root):
+        observed_llm_sessions.append(get_current_session_id())
+        if len(observed_llm_sessions) == 1:
+            return LLMChatResponse(
+                model="openai-compatible/demo-model",
+                provider_id="openai-compatible",
+                content="",
+                finish_reason="tool_calls",
+                tool_calls=[ToolCall(id="call-1", name="echo_text", arguments='{"text": "hello"}')],
+            )
+        return LLMChatResponse(
+            model="openai-compatible/demo-model",
+            provider_id="openai-compatible",
+            content="Echoed hello.",
+            finish_reason="stop",
+        )
+
+    loop = AgentLoop(root=tmp_path, llm_executor=fake_llm_executor, tool_registry=registry)
+    result = loop.run(
+        ChatCompletionRequest(
+            model="openai-compatible/demo-model",
+            messages=[ChatMessage(role="user", content="Echo hello")],
+        ),
+        session_id="session-context",
+        planning_enabled=False,
+    )
+
+    assert result.content == "Echoed hello."
+    assert observed_llm_sessions == ["session-context", "session-context"]
+    assert observed_tool_sessions == ["session-context"]
+    assert get_current_session_id() is None
+
+
 def test_agent_loop_stream_emits_events_for_tool_roundtrip(tmp_path: Path) -> None:
     registry = ToolRegistry()
     registry.register_function("echo_text", lambda args: {"echo": args["text"]})
@@ -490,6 +534,48 @@ def test_agent_loop_stream_emits_token_level_assistant_deltas(tmp_path: Path) ->
     assert events[-2].content == "Hello world"
     assert events[-1].event == "done"
     assert events[-1].payload["result"].content == "Hello world"
+
+
+def test_agent_loop_stream_binds_session_context_for_streaming_llm(tmp_path: Path) -> None:
+    observed_stream_sessions = []
+
+    def fake_llm_executor(request, _root):
+        raise AssertionError("Synchronous executor should not be used for streaming session-context test.")
+
+    def fake_llm_stream_executor(request, _root):
+        observed_stream_sessions.append(get_current_session_id())
+        yield LLMChatChunk(
+            event="delta",
+            model="openai-compatible/demo-model",
+            provider_id="openai-compatible",
+            delta="Hello",
+            content="Hello",
+        )
+        observed_stream_sessions.append(get_current_session_id())
+        yield LLMChatChunk(
+            event="done",
+            model="openai-compatible/demo-model",
+            provider_id="openai-compatible",
+            content="Hello",
+            finish_reason="stop",
+        )
+
+    loop = AgentLoop(root=tmp_path, llm_executor=fake_llm_executor, llm_stream_executor=fake_llm_stream_executor)
+    events = list(
+        loop.stream(
+            ChatCompletionRequest(
+                model="openai-compatible/demo-model",
+                messages=[ChatMessage(role="user", content="Say hello")],
+            ),
+            session_id="stream-session",
+            planning_enabled=False,
+        )
+    )
+
+    assert observed_stream_sessions == ["stream-session", "stream-session"]
+    assert events[-1].event == "done"
+    assert events[-1].payload["result"].content == "Hello"
+    assert get_current_session_id() is None
 
 
 def test_agent_loop_stream_emits_tool_call_delta_events(tmp_path: Path) -> None:

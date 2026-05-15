@@ -1,12 +1,12 @@
-"""Minimal OpenAI-compatible execution path for the LLM gateway."""
+"""Minimal runtime execution paths for the LLM gateway."""
 
 from __future__ import annotations
 
 import json
 import os
+import subprocess
 import time
 from collections.abc import Iterator
-from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -17,21 +17,32 @@ from pyc_hermes_agent.llm_gateway.config import resolve_opencode_like_config
 from pyc_hermes_agent.llm_gateway.types import LLMChatChunk, LLMChatRequest, LLMChatResponse, LLMMessage, ProviderConfig, ResolvedLLMConfig
 
 
-_SUPPORTED_EXECUTION_PROVIDERS = {"openai-compatible", "openrouter"}
+_SUPPORTED_EXECUTION_PROVIDERS = {"github-copilot", "openai-compatible", "openrouter"}
+_API_KEY_OPTION_KEYS = (
+    "apiKey",
+    "api_key",
+    "token",
+    "accessToken",
+    "access_token",
+)
+_COPILOT_BASE_URL = "https://api.githubcopilot.com"
+_COPILOT_ENV_VARS = ("COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN")
+_COPILOT_CLASSIC_PAT_PREFIX = "ghp_"
+_COPILOT_EDITOR_VERSION = "vscode/1.104.1"
+_COPILOT_INTEGRATION_ID = "vscode-chat"
+_COPILOT_OPENAI_INTENT = "conversation-edits"
 
 
 def execute_chat(request: LLMChatRequest, root: Path) -> LLMChatResponse:
     resolved = resolve_opencode_like_config(root)
     model_id = request.model or resolved.default_model
     provider_id, provider_config, base_url, provider_headers = _resolve_provider_execution(resolved, model_id)
-    payload = _build_chat_payload(model_id, request)
-    headers = {
-        "Content-Type": "application/json",
-        **provider_headers,
-    }
-    api_key = _resolve_api_key(provider_id, provider_config)
-    if api_key and "Authorization" not in headers:
-        headers["Authorization"] = f"Bearer {api_key}"
+    payload = _build_chat_payload(model_id, request, provider_id=provider_id)
+    headers = _apply_authorization_header(
+        _build_request_headers(provider_id, provider_headers, stream=False),
+        provider_id=provider_id,
+        provider_config=provider_config,
+    )
 
     raw_response = _post_with_retry(
         url=f"{base_url.rstrip('/')}/chat/completions",
@@ -39,6 +50,8 @@ def execute_chat(request: LLMChatRequest, root: Path) -> LLMChatResponse:
         payload=payload,
         timeout_seconds=request.timeout_seconds,
         retry_attempts=max(1, request.retry_attempts),
+        provider_id=provider_id,
+        provider_config=provider_config,
     )
     return _parse_chat_response(raw_response, model_id=model_id, provider_id=provider_id)
 
@@ -47,16 +60,13 @@ def stream_chat(request: LLMChatRequest, root: Path) -> Iterator[LLMChatChunk]:
     resolved = resolve_opencode_like_config(root)
     model_id = request.model or resolved.default_model
     provider_id, provider_config, base_url, provider_headers = _resolve_provider_execution(resolved, model_id)
-    payload = _build_chat_payload(model_id, request)
+    payload = _build_chat_payload(model_id, request, provider_id=provider_id)
     payload["stream"] = True
-    headers = {
-        "Content-Type": "application/json",
-        "Accept": "text/event-stream",
-        **provider_headers,
-    }
-    api_key = _resolve_api_key(provider_id, provider_config)
-    if api_key and "Authorization" not in headers:
-        headers["Authorization"] = f"Bearer {api_key}"
+    headers = _apply_authorization_header(
+        _build_request_headers(provider_id, provider_headers, stream=True),
+        provider_id=provider_id,
+        provider_config=provider_config,
+    )
 
     yield from _stream_chat_completion(
         url=f"{base_url.rstrip('/')}/chat/completions",
@@ -65,6 +75,7 @@ def stream_chat(request: LLMChatRequest, root: Path) -> Iterator[LLMChatChunk]:
         timeout_seconds=request.timeout_seconds,
         provider_id=provider_id,
         model_id=model_id,
+        provider_config=provider_config,
     )
 
 
@@ -86,6 +97,8 @@ def _resolve_base_url(provider_id: str, provider_config: ProviderConfig | None) 
     configured_base_url = provider_config.base_url if provider_config is not None else None
     if configured_base_url:
         return configured_base_url
+    if provider_id == "github-copilot":
+        return _COPILOT_BASE_URL
     if provider_id == "openai-compatible":
         raise ValueError("Provider 'openai-compatible' requires options.baseURL or options.base_url.")
     if provider_id == "openrouter":
@@ -94,18 +107,11 @@ def _resolve_base_url(provider_id: str, provider_config: ProviderConfig | None) 
 
 
 def _resolve_api_key(provider_id: str, provider_config: ProviderConfig | None) -> str | None:
-    option_keys = [
-        "apiKey",
-        "api_key",
-        "token",
-        "accessToken",
-        "access_token",
-    ]
-    if provider_config is not None:
-        for key in option_keys:
-            value = provider_config.options.get(key)
-            if isinstance(value, str) and value:
-                return value
+    configured_api_key = _resolve_configured_api_key(provider_config)
+    if provider_id == "github-copilot":
+        return _resolve_github_copilot_token(provider_config, configured_api_key)
+    if configured_api_key:
+        return configured_api_key
 
     env_candidates = [
         f"{provider_id.upper().replace('-', '_')}_API_KEY",
@@ -125,6 +131,72 @@ def _resolve_api_key(provider_id: str, provider_config: ProviderConfig | None) -
     return None
 
 
+def _resolve_configured_api_key(provider_config: ProviderConfig | None) -> str | None:
+    if provider_config is None:
+        return None
+    for key in _API_KEY_OPTION_KEYS:
+        value = provider_config.options.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
+def _resolve_github_copilot_token(provider_config: ProviderConfig | None, configured_api_key: str | None = None) -> str:
+    if configured_api_key:
+        return _validate_github_copilot_token(configured_api_key, source="provider options")
+
+    for env_name in _COPILOT_ENV_VARS:
+        value = os.environ.get(env_name, "").strip()
+        if not value:
+            continue
+        if value.startswith(_COPILOT_CLASSIC_PAT_PREFIX):
+            continue
+        return _validate_github_copilot_token(value, source=env_name)
+
+    gh_token = _try_gh_auth_token()
+    if gh_token:
+        return _validate_github_copilot_token(gh_token, source="gh auth token")
+
+    raise ValueError(
+        "Provider 'github-copilot' requires a supported GitHub token in COPILOT_GITHUB_TOKEN, GH_TOKEN, GITHUB_TOKEN, or `gh auth token`."
+    )
+
+
+def _validate_github_copilot_token(token: str, *, source: str) -> str:
+    normalized = token.strip()
+    if not normalized:
+        raise ValueError(f"Provider 'github-copilot' received an empty token from {source}.")
+    if normalized.startswith(_COPILOT_CLASSIC_PAT_PREFIX):
+        raise ValueError(
+            "Provider 'github-copilot' does not support classic GitHub PATs (ghp_*). "
+            f"Got an unsupported token from {source}."
+        )
+    return normalized
+
+
+def _try_gh_auth_token() -> str:
+    hostname = os.environ.get("COPILOT_GH_HOST", "").strip()
+    command = ["gh", "auth", "token"]
+    if hostname:
+        command.extend(["--hostname", hostname])
+
+    clean_env = {key: value for key, value in os.environ.items() if key not in {"GH_TOKEN", "GITHUB_TOKEN"}}
+    try:
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            timeout=5,
+            env=clean_env,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return ""
+
+    if result.returncode == 0:
+        return result.stdout.strip()
+    return ""
+
+
 def _normalize_headers(raw_headers: dict[str, Any]) -> dict[str, str]:
     normalized: dict[str, str] = {}
     for key, value in raw_headers.items():
@@ -133,7 +205,54 @@ def _normalize_headers(raw_headers: dict[str, Any]) -> dict[str, str]:
     return normalized
 
 
-def _build_chat_payload(model_id: str, request: LLMChatRequest) -> dict[str, Any]:
+def _build_request_headers(provider_id: str, provider_headers: dict[str, str], *, stream: bool) -> dict[str, str]:
+    headers: dict[str, str] = {"Content-Type": "application/json"}
+    if stream:
+        headers["Accept"] = "text/event-stream"
+    if provider_id == "github-copilot":
+        headers.update(
+            {
+                "Editor-Version": _COPILOT_EDITOR_VERSION,
+                "Copilot-Integration-Id": _COPILOT_INTEGRATION_ID,
+                "Openai-Intent": _COPILOT_OPENAI_INTENT,
+                "x-initiator": "agent",
+            }
+        )
+    headers.update(provider_headers)
+    return headers
+
+
+def _apply_authorization_header(
+    headers: dict[str, str],
+    *,
+    provider_id: str,
+    provider_config: ProviderConfig | None,
+) -> dict[str, str]:
+    if any(key.lower() == "authorization" for key in headers):
+        return headers
+    api_key = _resolve_api_key(provider_id, provider_config)
+    if not api_key:
+        return headers
+    return {
+        **headers,
+        "Authorization": f"Bearer {api_key}",
+    }
+
+
+def _refresh_authorization_header(
+    headers: dict[str, str],
+    *,
+    provider_id: str,
+    provider_config: ProviderConfig | None,
+) -> dict[str, str]:
+    refreshed_headers = {key: value for key, value in headers.items() if key.lower() != "authorization"}
+    api_key = _resolve_api_key(provider_id, provider_config)
+    if api_key:
+        refreshed_headers["Authorization"] = f"Bearer {api_key}"
+    return refreshed_headers
+
+
+def _build_chat_payload(model_id: str, request: LLMChatRequest, *, provider_id: str) -> dict[str, Any]:
     if not request.messages:
         raise ValueError("Chat request must include at least one message.")
     for message in request.messages:
@@ -144,7 +263,7 @@ def _build_chat_payload(model_id: str, request: LLMChatRequest) -> dict[str, Any
         payload_messages.append(_serialize_chat_message(message))
 
     payload: dict[str, Any] = {
-        "model": model_id,
+        "model": _resolve_execution_model_id(provider_id, model_id),
         "messages": payload_messages,
     }
     if request.tools:
@@ -156,6 +275,12 @@ def _build_chat_payload(model_id: str, request: LLMChatRequest) -> dict[str, Any
     return payload
 
 
+def _resolve_execution_model_id(provider_id: str, model_id: str) -> str:
+    if provider_id == "github-copilot" and "/" in model_id:
+        return model_id.split("/", 1)[1]
+    return model_id
+
+
 def _post_with_retry(
     *,
     url: str,
@@ -163,15 +288,29 @@ def _post_with_retry(
     payload: dict[str, Any],
     timeout_seconds: float,
     retry_attempts: int,
+    provider_id: str,
+    provider_config: ProviderConfig | None,
 ) -> dict[str, Any]:
     encoded = json.dumps(payload).encode("utf-8")
     last_error: Exception | None = None
-    for attempt in range(retry_attempts):
-        request = Request(url, data=encoded, headers=headers, method="POST")
+    request_headers = dict(headers)
+    attempt = 0
+    retried_after_auth_refresh = False
+    while attempt < retry_attempts:
+        request = Request(url, data=encoded, headers=request_headers, method="POST")
         try:
             with urlopen(request, timeout=timeout_seconds) as response:
                 return json.loads(response.read().decode("utf-8"))
         except HTTPError as exc:
+            if exc.code == 401 and provider_id == "github-copilot" and not retried_after_auth_refresh:
+                request_headers = _refresh_authorization_header(
+                    request_headers,
+                    provider_id=provider_id,
+                    provider_config=provider_config,
+                )
+                retried_after_auth_refresh = True
+                last_error = exc
+                continue
             if 400 <= exc.code < 500 and exc.code != 429:
                 detail = exc.read().decode("utf-8", errors="replace")
                 raise ValueError(f"LLM provider rejected request: {exc.code} {detail}") from exc
@@ -179,7 +318,8 @@ def _post_with_retry(
         except URLError as exc:
             last_error = exc
 
-        if attempt + 1 < retry_attempts:
+        attempt += 1
+        if attempt < retry_attempts:
             time.sleep(min(0.25 * (attempt + 1), 1.0))
 
     raise RuntimeError(f"LLM request failed after {retry_attempts} attempt(s): {last_error}") from last_error
@@ -193,47 +333,60 @@ def _stream_chat_completion(
     timeout_seconds: float,
     provider_id: str,
     model_id: str,
+    provider_config: ProviderConfig | None,
 ) -> Iterator[LLMChatChunk]:
     encoded = json.dumps(payload).encode("utf-8")
-    request = Request(url, data=encoded, headers=headers, method="POST")
-    try:
-        with urlopen(request, timeout=timeout_seconds) as response:
-            content_parts: list[str] = []
-            pending_tool_calls: dict[int, dict[str, Any]] = {}
-            saw_done = False
-            for event_payload in _iter_sse_data_lines(response):
-                if event_payload == "[DONE]":
-                    saw_done = True
-                    break
-                parsed = json.loads(event_payload)
-                chunk = _parse_stream_chunk(
-                    parsed,
-                    provider_id=provider_id,
-                    model_id=model_id,
-                    content_parts=content_parts,
-                    pending_tool_calls=pending_tool_calls,
-                )
-                if chunk is not None:
-                    yield chunk
+    request_headers = dict(headers)
+    retried_after_auth_refresh = False
+    while True:
+        request = Request(url, data=encoded, headers=request_headers, method="POST")
+        try:
+            with urlopen(request, timeout=timeout_seconds) as response:
+                content_parts: list[str] = []
+                pending_tool_calls: dict[int, dict[str, Any]] = {}
+                saw_done = False
+                for event_payload in _iter_sse_data_lines(response):
+                    if event_payload == "[DONE]":
+                        saw_done = True
+                        break
+                    parsed = json.loads(event_payload)
+                    chunk = _parse_stream_chunk(
+                        parsed,
+                        provider_id=provider_id,
+                        model_id=model_id,
+                        content_parts=content_parts,
+                        pending_tool_calls=pending_tool_calls,
+                    )
+                    if chunk is not None:
+                        yield chunk
 
-            finish_reason = None
-            usage: dict[str, Any] = {}
-            tool_calls = _materialize_stream_tool_calls(pending_tool_calls)
-            if content_parts or tool_calls or saw_done:
-                yield LLMChatChunk(
-                    event="done",
-                    model=model_id,
+                finish_reason = None
+                usage: dict[str, Any] = {}
+                tool_calls = _materialize_stream_tool_calls(pending_tool_calls)
+                if content_parts or tool_calls or saw_done:
+                    yield LLMChatChunk(
+                        event="done",
+                        model=model_id,
+                        provider_id=provider_id,
+                        content="".join(content_parts),
+                        tool_calls=tool_calls,
+                        finish_reason=finish_reason,
+                        usage=usage,
+                    )
+                return
+        except HTTPError as exc:
+            if exc.code == 401 and provider_id == "github-copilot" and not retried_after_auth_refresh:
+                request_headers = _refresh_authorization_header(
+                    request_headers,
                     provider_id=provider_id,
-                    content="".join(content_parts),
-                    tool_calls=tool_calls,
-                    finish_reason=finish_reason,
-                    usage=usage,
+                    provider_config=provider_config,
                 )
-    except HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")
-        raise ValueError(f"LLM streaming request failed: {exc.code} {detail}") from exc
-    except URLError as exc:
-        raise RuntimeError(f"LLM streaming request failed: {exc}") from exc
+                retried_after_auth_refresh = True
+                continue
+            detail = exc.read().decode("utf-8", errors="replace")
+            raise ValueError(f"LLM streaming request failed: {exc.code} {detail}") from exc
+        except URLError as exc:
+            raise RuntimeError(f"LLM streaming request failed: {exc}") from exc
 
 
 def _iter_sse_data_lines(response: Any) -> Iterator[str]:
@@ -287,7 +440,7 @@ def _parse_stream_chunk(
 
     return LLMChatChunk(
         event="delta",
-        model=str(raw_chunk.get("model") or model_id),
+        model=model_id,
         provider_id=provider_id,
         delta=delta_text,
         content="".join(content_parts),
