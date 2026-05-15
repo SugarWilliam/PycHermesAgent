@@ -1,0 +1,1 @@
+"""Registry for methodology capabilities."""
