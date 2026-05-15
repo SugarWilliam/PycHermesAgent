@@ -103,7 +103,7 @@
 | Feature | Status | Notes |
 | --- | --- | --- |
 | Windows directory policy | Partial | Runtime path helpers and MRAG storage layout exist, but full packaging flow is not implemented |
-| Asset manager | Partial | Local manifest validation, checksum verification, version/index compatibility checks, and atomic promotion are implemented for local installs; remote download and upgrade orchestration are still missing |
+| Asset manager | Partial | Local manifest validation, checksum verification, version/index compatibility checks, and staging-directory rename promotion foundation are implemented for local installs; no fsync, durability, or locking guarantee is provided yet, and remote download/upgrade orchestration is still missing |
 | Artifact engine | Partial | Local text/JSON artifact export and `TaskResult.artifacts`-compatible metadata helpers are implemented; richer export pipelines and sidecar integration are still missing |
 | Electron desktop shell | Planned | Not present in repo |
 

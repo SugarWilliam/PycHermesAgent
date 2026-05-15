@@ -25,7 +25,7 @@
 | `pyc_hermes_agent.meta_harness` | Method selection, judgment, quality checks, legacy bridge | Implemented as MVP |
 | `pyc_hermes_agent.llm_gateway` | Config/model/provider/rule/skill compatibility and minimal sync execution | Implemented as minimal runtime boundary |
 | `pyc_hermes_agent.mrag_core` | Knowledge ingestion and retrieval | Implemented as local-first JSON-backed MVP |
-| `pyc_hermes_agent.asset_manager` | Model and runtime assets | Partial: local manifest validation, checksum verification, and atomic promotion foundation |
+| `pyc_hermes_agent.asset_manager` | Model and runtime assets | Partial: local manifest validation, checksum verification, and staging-directory rename promotion foundation; no fsync, durability, or locking guarantee yet |
 | `pyc_hermes_agent.artifact_engine` | Exported artifacts | Partial: local artifact export and task-artifact metadata foundation |
 
 ## Public Runtime Contracts
@@ -289,7 +289,7 @@ Target rules:
 2. `%APPDATA%` stores configuration.
 3. `%LOCALAPPDATA%` stores mutable runtime assets.
 4. MRAG indexes, sources, and artifacts remain physically separate.
-5. Model downloads require checksum validation and atomic promotion.
+5. Model downloads require checksum validation and staging-directory rename promotion foundation; current code does not provide fsync, crash-durability, or cross-process locking guarantees.
 
 Current implementation additions:
 

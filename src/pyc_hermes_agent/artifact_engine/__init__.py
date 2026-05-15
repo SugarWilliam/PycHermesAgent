@@ -61,6 +61,7 @@ class ArtifactEngine:
     ) -> ArtifactRecord:
         storage_task_id = _sanitize_segment(task_id, fallback="task")
         storage_name = _sanitize_segment(name, fallback="artifact.bin")
+        _reject_reserved_payload_name(storage_name)
         storage_artifact_id = _sanitize_segment(artifact_id or uuid4().hex, fallback=uuid4().hex)
         target_dir = self.artifacts_dir / storage_task_id / storage_artifact_id
         if target_dir.exists():
@@ -148,22 +149,7 @@ class ArtifactEngine:
 
         records: list[ArtifactRecord] = []
         for metadata_path in sorted(task_dir.glob(f"*/{_ARTIFACT_METADATA_FILENAME}")):
-            payload = json.loads(metadata_path.read_text(encoding="utf-8"))
-            parent = metadata_path.parent
-            records.append(
-                ArtifactRecord(
-                    artifact_id=str(payload["artifact_id"]),
-                    task_id=str(payload["task_id"]),
-                    name=str(payload["name"]),
-                    media_type=str(payload["media_type"]),
-                    path=parent / str(payload["path"]),
-                    metadata_path=metadata_path,
-                    size_bytes=int(payload["size_bytes"]),
-                    checksum=str(payload["checksum"]),
-                    created_at_ns=int(payload.get("created_at_ns", 0)),
-                    artifact_format_version=int(payload["artifact_format_version"]),
-                )
-            )
+            records.append(_read_artifact_record(metadata_path))
         return sorted(records, key=lambda record: (record.created_at_ns, record.artifact_id))
 
 
@@ -173,6 +159,71 @@ def _sanitize_segment(value: str, *, fallback: str) -> str:
     if not cleaned:
         return fallback
     return cleaned
+
+
+def _read_artifact_record(metadata_path: Path) -> ArtifactRecord:
+    payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+    artifact_dir = metadata_path.parent.resolve()
+
+    format_version = int(payload["artifact_format_version"])
+    if format_version != _ARTIFACT_FORMAT_VERSION:
+        raise ValueError(
+            f"Unsupported artifact format version in {metadata_path}: "
+            f"expected {_ARTIFACT_FORMAT_VERSION}, got {format_version}"
+        )
+
+    relative_payload_path = Path(str(payload["path"]))
+    if relative_payload_path.is_absolute():
+        raise ValueError(f"Artifact metadata payload path is outside artifact directory: {metadata_path}")
+    if relative_payload_path.as_posix() == _ARTIFACT_METADATA_FILENAME:
+        raise ValueError(f"Artifact metadata payload path uses reserved metadata file: {_ARTIFACT_METADATA_FILENAME}")
+    payload_path = (artifact_dir / relative_payload_path).resolve()
+    if not payload_path.is_relative_to(artifact_dir):
+        raise ValueError(f"Artifact metadata payload path is outside artifact directory: {metadata_path}")
+    if not payload_path.is_file():
+        raise ValueError(f"Artifact metadata references missing payload: {payload_path}")
+
+    size_bytes = int(payload["size_bytes"])
+    actual_size = payload_path.stat().st_size
+    if actual_size != size_bytes:
+        raise ValueError(
+            f"Artifact metadata payload size mismatch for {payload_path}: expected {size_bytes}, got {actual_size}"
+        )
+
+    checksum = str(payload["checksum"])
+    actual_checksum = _calculate_file_checksum(payload_path)
+    if actual_checksum != checksum:
+        raise ValueError(
+            f"Artifact metadata payload checksum mismatch for {payload_path}: expected {checksum}, got {actual_checksum}"
+        )
+
+    return ArtifactRecord(
+        artifact_id=str(payload["artifact_id"]),
+        task_id=str(payload["task_id"]),
+        name=str(payload["name"]),
+        media_type=str(payload["media_type"]),
+        path=payload_path,
+        metadata_path=metadata_path,
+        size_bytes=size_bytes,
+        checksum=checksum,
+        created_at_ns=int(payload.get("created_at_ns", 0)),
+        artifact_format_version=format_version,
+    )
+
+
+def _calculate_file_checksum(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        while True:
+            chunk = handle.read(1024 * 1024)
+            if not chunk:
+                return f"sha256:{digest.hexdigest()}"
+            digest.update(chunk)
+
+
+def _reject_reserved_payload_name(name: str) -> None:
+    if name == _ARTIFACT_METADATA_FILENAME:
+        raise ValueError(f"Artifact payload name uses reserved metadata file: {_ARTIFACT_METADATA_FILENAME}")
 
 
 __all__ = ["ArtifactEngine", "ArtifactRecord"]

@@ -12,7 +12,7 @@
 - Configuration lives in `%APPDATA%`.
 - Logs, cache, downloads, indexes, and models live in `%LOCALAPPDATA%`.
 - Models must use `model-id/revision-or-sha` directory layout.
-- Downloads must be promoted atomically after checksum validation.
+- Downloads must use checksum validation plus a staging-directory rename promotion foundation; this does not yet imply fsync, crash-durability, or locking guarantees.
 
 ## Upgrade Rules
 

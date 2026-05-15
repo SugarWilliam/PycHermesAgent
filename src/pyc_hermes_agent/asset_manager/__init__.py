@@ -74,6 +74,7 @@ class AssetManager:
         filename: str = "asset.bin",
     ) -> InstalledModelAsset:
         normalized_filename = _normalize_segment(filename, label="filename")
+        _reject_reserved_payload_filename(normalized_filename)
         checksum = calculate_asset_checksum(payload)
         self._validate_install(manifest, checksum=checksum, size_bytes=len(payload))
         target_dir = self.get_asset_directory(manifest.asset_id, manifest.version)
@@ -103,6 +104,8 @@ class AssetManager:
             raise FileNotFoundError(source)
         if source.is_dir() and (source / _ASSET_MANIFEST_FILENAME).exists():
             raise ValueError(f"Source directory already contains reserved metadata file: {_ASSET_MANIFEST_FILENAME}")
+        if source.is_file():
+            _reject_reserved_payload_filename(source.name)
 
         checksum = calculate_asset_checksum(source)
         size_bytes = calculate_asset_size(source)
@@ -288,6 +291,11 @@ def _normalize_segment(value: str, *, label: str) -> str:
     if normalized in {"", ".", ".."} or not _SAFE_SEGMENT_RE.fullmatch(normalized):
         raise ValueError(f"Invalid {label}: {value!r}")
     return normalized
+
+
+def _reject_reserved_payload_filename(filename: str) -> None:
+    if filename == _ASSET_MANIFEST_FILENAME:
+        raise ValueError(f"Asset payload filename uses reserved metadata file: {_ASSET_MANIFEST_FILENAME}")
 
 
 def _normalize_checksum(value: str) -> str:

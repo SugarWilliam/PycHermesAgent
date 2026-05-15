@@ -282,7 +282,7 @@ Current implementation progress:
 Not yet implemented end to end:
 
 1. Model manifest and checksum workflow
-2. Atomic download promotion
+2. Staging-directory rename promotion foundation without fsync, durability, or locking guarantees
 3. Production-grade MRAG storage layout
 4. Desktop-to-sidecar production transport hardening
 5. Production installer workflow

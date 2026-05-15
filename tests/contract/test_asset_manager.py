@@ -92,3 +92,22 @@ def test_asset_manager_installs_directory_payloads_atomically(tmp_path) -> None:
     assert (installed.asset_dir / "config.json").read_text(encoding="utf-8") == '{"dim": 384}'
     assert installed.asset_dir.parent == manager.models_dir / "demo" / "multi-file-model"
     assert not any(path.name.startswith("stage-") for path in manager.downloads_dir.rglob("*"))
+
+
+def test_asset_manager_rejects_single_file_source_with_reserved_manifest_name_before_promotion(tmp_path) -> None:
+    source = tmp_path / "pyc_asset_manifest.json"
+    source.write_bytes(b"model-bytes")
+    manager = AssetManager(root=tmp_path)
+    manifest = ModelAssetManifest(
+        asset_id="demo/reserved-name-model",
+        version="revision-1",
+        checksum=calculate_asset_checksum(source),
+        size_bytes=source.stat().st_size,
+    )
+    target_dir = manager.get_asset_directory(manifest.asset_id, manifest.version)
+
+    with pytest.raises(ValueError) as excinfo:
+        manager.install_path(manifest, source)
+
+    assert not target_dir.exists()
+    assert "reserved metadata file" in str(excinfo.value)
