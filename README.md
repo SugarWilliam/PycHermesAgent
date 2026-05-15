@@ -17,7 +17,8 @@ Current repository status:
 3. Hermes read-only bridge snapshots are implemented.
 4. A minimal local HTTP sidecar transport is implemented.
 5. A minimal OpenAI-compatible synchronous LLM execution path is implemented.
-6. Electron desktop and production runtime flows are not yet complete.
+6. Minimal local model-asset promotion and artifact export helpers are implemented.
+7. Electron desktop and production runtime flows are not yet complete.
 
 ## Quick Start
 

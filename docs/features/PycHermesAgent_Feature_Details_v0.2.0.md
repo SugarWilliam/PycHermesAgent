@@ -103,8 +103,8 @@
 | Feature | Status | Notes |
 | --- | --- | --- |
 | Windows directory policy | Partial | Runtime path helpers and MRAG storage layout exist, but full packaging flow is not implemented |
-| Asset manager | Stub | No model download or manifest workflow implemented |
-| Artifact engine | Stub | No export pipeline implemented |
+| Asset manager | Partial | Local manifest validation, checksum verification, version/index compatibility checks, and atomic promotion are implemented for local installs; remote download and upgrade orchestration are still missing |
+| Artifact engine | Partial | Local text/JSON artifact export and `TaskResult.artifacts`-compatible metadata helpers are implemented; richer export pipelines and sidecar integration are still missing |
 | Electron desktop shell | Planned | Not present in repo |
 
 ## Test Coverage Map
@@ -121,6 +121,7 @@
 | MetaHarness | Implemented | `tests/contract/test_meta_harness.py`, `test_extended_bridge.py`, `test_legacy_bridge.py` |
 | LLM compatibility | Implemented | `tests/contract/test_llm_gateway.py`, `test_opencode_compat.py` |
 | MRAG MVP | Implemented | `tests/contract/test_mrag_core.py` |
+| Asset and artifact helpers | Implemented | `tests/contract/test_asset_manager.py`, `test_artifact_engine.py` |
 | Desktop end-to-end | Planned | Not present |
 | Packaging/install | Planned | Not present |
 

@@ -25,8 +25,8 @@
 | `pyc_hermes_agent.meta_harness` | Method selection, judgment, quality checks, legacy bridge | Implemented as MVP |
 | `pyc_hermes_agent.llm_gateway` | Config/model/provider/rule/skill compatibility and minimal sync execution | Implemented as minimal runtime boundary |
 | `pyc_hermes_agent.mrag_core` | Knowledge ingestion and retrieval | Implemented as local-first JSON-backed MVP |
-| `pyc_hermes_agent.asset_manager` | Model and runtime assets | Stub |
-| `pyc_hermes_agent.artifact_engine` | Exported artifacts | Stub |
+| `pyc_hermes_agent.asset_manager` | Model and runtime assets | Partial: local manifest validation, checksum verification, and atomic promotion foundation |
+| `pyc_hermes_agent.artifact_engine` | Exported artifacts | Partial: local artifact export and task-artifact metadata foundation |
 
 ## Public Runtime Contracts
 

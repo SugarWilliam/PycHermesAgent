@@ -26,7 +26,7 @@ The most accurate current description of PycHermesAgent is:
 - A minimal synchronous Agent runtime foundation with sidecar exposure
 - Not yet a standalone full production agent runtime or desktop product
 
-This positioning matters because the repository still lacks a production-grade LLM execution runtime, Electron shell, and asset/artifact subsystems.
+This positioning matters because the repository still lacks a production-grade LLM execution runtime, Electron shell, and production-grade asset/artifact subsystems.
 
 ## System Overview
 
@@ -47,8 +47,8 @@ flowchart TB
         Meta["meta_harness\nminimum viable harness"]
         LLM["llm_gateway\nconfig/discovery + minimal sync tool-capable execution"]
         MRAG["mrag_core\ntext MRAG MVP with local JSON persistence"]
-        Assets["asset_manager\nstub"]
-        Artifacts["artifact_engine\nstub"]
+        Assets["asset_manager\nminimal local install/promotion"]
+        Artifacts["artifact_engine\nminimal local export"]
 
         Client --> API
         API --> Hermes
@@ -84,8 +84,8 @@ flowchart TB
 | `meta_harness` | Method routing, logic review, reasonableness review, degraded-state output | Implemented as minimum viable harness | `src/pyc_hermes_agent/meta_harness/kernel/framework.py` |
 | `llm_gateway` | Provider/model/config compatibility and synchronous model execution | Implemented for config/catalog plus minimal OpenAI-compatible sync execution | `src/pyc_hermes_agent/llm_gateway/*.py` |
 | `mrag_core` | Knowledge-base ingest, chunking, retrieval, evidence packaging | Implemented as text MVP with minimal local JSON persistence | `src/pyc_hermes_agent/mrag_core/service.py`, `src/pyc_hermes_agent/mrag_core/persistence.py` |
-| `asset_manager` | Model/runtime asset install and promotion | Stub only | `src/pyc_hermes_agent/asset_manager/__init__.py` |
-| `artifact_engine` | Artifact generation and export | Stub only | `src/pyc_hermes_agent/artifact_engine/__init__.py` |
+| `asset_manager` | Model/runtime asset install and promotion | Partial: checksum-validated local install and atomic promotion foundation | `src/pyc_hermes_agent/asset_manager/__init__.py` |
+| `artifact_engine` | Artifact generation and export | Partial: local artifact export and task-artifact metadata foundation | `src/pyc_hermes_agent/artifact_engine/__init__.py` |
 
 ## Current Runtime Shape
 
