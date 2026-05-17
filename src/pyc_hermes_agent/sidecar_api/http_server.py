@@ -82,6 +82,7 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
         return None
 
     def _dispatch(self, method: str) -> None:
+        self._request_id = self._resolve_request_id()
         path = self._normalized_path()
         request_id = self._request_id
         log_event("http.request.started", request_id=request_id, method=method, path=path)
@@ -302,6 +303,12 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path.rstrip("/")
         return path or "/"
 
+    def _resolve_request_id(self) -> str:
+        incoming = self.headers.get("X-Pyc-Request-Id", "").strip()
+        if incoming and len(incoming) <= 128:
+            return incoming
+        return self._request_id
+
     def _read_json_body(self) -> dict[str, Any]:
         content_length = int(self.headers.get("Content-Length", "0"))
         if content_length <= 0:
@@ -352,6 +359,7 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
             payload = asdict(event) if is_dataclass(event) else event
             if not isinstance(payload, dict):
                 continue
+            payload.setdefault("request_id", self._request_id)
             body = f"data: {json.dumps(payload)}\n\n".encode("utf-8")
             self.wfile.write(body)
             self.wfile.flush()

@@ -41,6 +41,12 @@ def _get_json_with_headers(url: str) -> tuple[int, dict, dict[str, str]]:
         return response.status, json.loads(response.read().decode("utf-8")), dict(response.headers.items())
 
 
+def _get_json_with_request_id(url: str, request_id: str) -> tuple[int, dict, dict[str, str]]:
+    request = Request(url, headers={"X-Pyc-Request-Id": request_id}, method="GET")
+    with urlopen(request, timeout=5) as response:
+        return response.status, json.loads(response.read().decode("utf-8")), dict(response.headers.items())
+
+
 def _post_json_with_headers(url: str, payload: dict) -> tuple[int, dict, dict[str, str]]:
     request = Request(
         url,
@@ -89,6 +95,24 @@ def _post_sse_with_headers(url: str, payload: dict) -> tuple[int, list[dict], di
         url,
         data=json.dumps(payload).encode("utf-8"),
         headers={"Content-Type": "application/json", "Accept": "text/event-stream"},
+        method="POST",
+    )
+    with urlopen(request, timeout=5) as response:
+        chunks: list[str] = []
+        for raw_line in response:
+            line = raw_line.decode("utf-8").rstrip("\r\n")
+            if not line:
+                continue
+            if line.startswith("data:"):
+                chunks.append(line[5:].lstrip())
+        return response.status, [json.loads(chunk) for chunk in chunks], dict(response.headers.items())
+
+
+def _post_sse_with_request_id(url: str, payload: dict, request_id: str) -> tuple[int, list[dict], dict[str, str]]:
+    request = Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json", "Accept": "text/event-stream", "X-Pyc-Request-Id": request_id},
         method="POST",
     )
     with urlopen(request, timeout=5) as response:
@@ -339,6 +363,33 @@ def test_sidecar_http_server_correlates_request_logs_and_response_header(tmp_pat
     assert finished["status"] == 200
 
 
+def test_sidecar_http_server_honors_incoming_request_id(tmp_path, monkeypatch) -> None:
+    from pyc_hermes_agent.sidecar_api import http_server as sidecar_http_server
+
+    log_calls: list[tuple[str, dict]] = []
+
+    monkeypatch.setattr(sidecar_http_server, "log_event", lambda event, **fields: log_calls.append((event, fields)))
+    _make_fake_hermes_checkout(tmp_path)
+    server, thread = _start_server(root=tmp_path)
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+    request_id = "req-from-client-123"
+
+    try:
+        status_code, _payload, headers = _get_json_with_request_id(f"{base_url}/health", request_id)
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    started = next(fields for event, fields in log_calls if event == "http.request.started")
+    finished = next(fields for event, fields in log_calls if event == "http.request.finished")
+
+    assert status_code == 200
+    assert headers["X-Pyc-Request-Id"] == request_id
+    assert started["request_id"] == request_id
+    assert finished["request_id"] == request_id
+
+
 def test_sidecar_http_server_sets_request_id_header_on_sse(tmp_path, monkeypatch) -> None:
     from pyc_hermes_agent.sidecar_api import service as sidecar_service
 
@@ -381,6 +432,56 @@ def test_sidecar_http_server_sets_request_id_header_on_sse(tmp_path, monkeypatch
     assert status_code == 200
     assert headers["X-Pyc-Request-Id"]
     assert events[-1]["event"] == "done"
+
+
+def test_sidecar_http_server_adds_request_id_to_sse_events(tmp_path, monkeypatch) -> None:
+    from pyc_hermes_agent.sidecar_api import service as sidecar_service
+
+    class _FakeAgentLoop:
+        def __init__(self, *, root=None):
+            self.root = root
+
+        def stream(self, request, *, max_iterations=8, session_id=None, planning_enabled=True, retry_budget=1):
+            from pyc_hermes_agent.contracts import AgentLoopEvent
+
+            yield AgentLoopEvent(
+                event_id="event-1",
+                trace_id="trace-1",
+                sequence=1,
+                event="start",
+                session_id=session_id or "session-1",
+                model=request.model,
+            )
+            yield AgentLoopEvent(
+                event_id="event-2",
+                trace_id="trace-1",
+                sequence=2,
+                event="done",
+                is_terminal=True,
+                session_id=session_id or "session-1",
+                model=request.model,
+            )
+
+    monkeypatch.setattr(sidecar_service, "AgentLoop", _FakeAgentLoop)
+    server, thread = _start_server(root=tmp_path)
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+    request_id = "req-sse-client-456"
+
+    try:
+        status_code, events, headers = _post_sse_with_request_id(
+            f"{base_url}/agent/run/stream",
+            {"model": "openai-compatible/demo-model", "messages": [{"role": "user", "content": "stream"}]},
+            request_id,
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert status_code == 200
+    assert headers["X-Pyc-Request-Id"] == request_id
+    assert [event["request_id"] for event in events] == [request_id, request_id]
+    assert all(event["trace_id"] == "trace-1" for event in events)
 
 
 def test_sidecar_http_server_runs_agent_loop(tmp_path, monkeypatch) -> None:
