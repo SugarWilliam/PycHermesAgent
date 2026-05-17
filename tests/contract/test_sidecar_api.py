@@ -14,7 +14,9 @@ from pyc_hermes_agent.sidecar_api import (
     get_hermes_tools_snapshot,
     get_meta_harness_benchmark_smoke,
     get_meta_harness_dependency_snapshot,
+    ingest_file_document,
     ingest_text_document,
+    ingest_url_document,
     invoke_formal_analysis,
     list_knowledge_bases,
     list_models,
@@ -656,3 +658,23 @@ def test_sidecar_mrag_ingest_and_search(tmp_path: Path) -> None:
     assert result["citations"]
     all_bases = list_knowledge_bases(root=tmp_path)
     assert any(item["knowledge_base_id"] == kb["knowledge_base_id"] for item in all_bases)
+
+
+def test_sidecar_mrag_ingests_file_and_url_documents(tmp_path: Path) -> None:
+    source_path = tmp_path / "note.md"
+    source_path.write_text("# Source\nFile and URL MRAG ingest should be searchable.", encoding="utf-8")
+    kb = create_knowledge_base("sources", root=tmp_path)
+
+    file_document = ingest_file_document(kb["knowledge_base_id"], source_path, root=tmp_path)
+    url_document = ingest_url_document(
+        kb["knowledge_base_id"],
+        "https://example.invalid/source",
+        "URL MRAG ingest should also be searchable evidence.",
+        title="URL Source",
+        root=tmp_path,
+    )
+    result = search_knowledge_base(kb["knowledge_base_id"], RetrievalRequest(query="searchable evidence", top_k=5), root=tmp_path)
+
+    assert file_document["source_type"] == "markdown"
+    assert url_document["source_type"] == "url"
+    assert {citation["source_uri"] for citation in result["citations"]} >= {str(source_path), "https://example.invalid/source"}

@@ -80,6 +80,9 @@ def test_mrag_persistence_writes_manifest_and_index_versions(tmp_path) -> None:
     chunks_payload = json.loads((storage_root / "indexes" / kb.knowledge_base_id / "chunks.json").read_text(encoding="utf-8"))
 
     assert manifest["manifest_version"] == MRAG_MANIFEST_VERSION
+    assert manifest["index_format_version"] == MRAG_INDEX_FORMAT_VERSION
+    assert manifest["document_count"] == 1
+    assert manifest["chunk_count"] == len(chunks_payload["chunks"])
     assert chunks_payload["index_format_version"] == MRAG_INDEX_FORMAT_VERSION
     assert chunks_payload["chunks"]
 
@@ -106,6 +109,27 @@ def test_mrag_loads_legacy_chunk_index_list_shape(tmp_path) -> None:
     assert persisted is not None
     assert persisted.chunks
     assert result.hits
+
+
+def test_mrag_ingests_file_and_url_text(tmp_path) -> None:
+    storage_root = tmp_path / "mrag-store"
+    source_path = tmp_path / "source.md"
+    source_path.write_text("# File Source\nMRAG file ingest preserves source evidence.", encoding="utf-8")
+    service = MRAGService(storage_root=storage_root)
+    kb = service.create_knowledge_base("sources")
+
+    file_document = service.ingest_file(kb.knowledge_base_id, source_path)
+    url_document = service.ingest_url_text(
+        kb.knowledge_base_id,
+        "https://example.invalid/mrag",
+        "URL ingest preserves remote evidence text for retrieval.",
+        title="Remote Source",
+    )
+    result = service.search(kb.knowledge_base_id, RetrievalRequest(query="evidence retrieval", top_k=5))
+
+    assert file_document.source_type == "markdown"
+    assert url_document.source_type == "url"
+    assert {citation.source_uri for citation in result.citations} >= {str(source_path), "https://example.invalid/mrag"}
 
 
 def test_mrag_rejects_storage_root_locked_by_unknown_owner(tmp_path) -> None:

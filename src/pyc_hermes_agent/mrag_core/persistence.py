@@ -65,8 +65,11 @@ def persist_knowledge_base(storage_root: Path, knowledge_base: KnowledgeBase) ->
         manifest_dir / "manifest.json",
         {
             "manifest_version": MRAG_MANIFEST_VERSION,
+            "index_format_version": MRAG_INDEX_FORMAT_VERSION,
             "knowledge_base_id": knowledge_base.knowledge_base_id,
             "name": knowledge_base.name,
+            "document_count": len(knowledge_base.documents),
+            "chunk_count": len(knowledge_base.chunks),
         },
     )
 

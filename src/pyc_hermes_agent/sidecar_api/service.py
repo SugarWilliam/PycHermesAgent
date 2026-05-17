@@ -710,6 +710,23 @@ def ingest_text_document(
     return _serialize(document)
 
 
+def ingest_file_document(knowledge_base_id: str, path: Path | str, *, root: Path | None = None) -> Dict[str, Any]:
+    document = _get_mrag_service(root).ingest_file(knowledge_base_id, Path(path).expanduser())
+    return _serialize(document)
+
+
+def ingest_url_document(
+    knowledge_base_id: str,
+    url: str,
+    text: str,
+    *,
+    title: str = "",
+    root: Path | None = None,
+) -> Dict[str, Any]:
+    document = _get_mrag_service(root).ingest_url_text(knowledge_base_id, url, text, title=title)
+    return _serialize(document)
+
+
 def search_knowledge_base(knowledge_base_id: str, request: RetrievalRequest, root: Path | None = None) -> Dict[str, Any]:
     result = _get_mrag_service(root).search(knowledge_base_id, request)
     return _serialize(result)

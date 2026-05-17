@@ -592,6 +592,46 @@ def test_sidecar_http_server_creates_and_searches_knowledge_bases(tmp_path) -> N
     assert result["citations"]
 
 
+def test_sidecar_http_server_ingests_file_and_url_documents(tmp_path) -> None:
+    source_path = tmp_path / "source.md"
+    source_path.write_text("# Source\nHTTP file and URL ingest should be searchable evidence.", encoding="utf-8")
+    server, thread = _start_server(root=tmp_path)
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+
+    try:
+        _create_status, knowledge_base = _post_json(f"{base_url}/knowledge-bases", {"name": "http-sources"})
+        knowledge_base_id = knowledge_base["knowledge_base_id"]
+        file_status, file_payload = _post_json(
+            f"{base_url}/knowledge-bases/{knowledge_base_id}/documents/file",
+            {"path": str(source_path)},
+        )
+        url_status, url_payload = _post_json(
+            f"{base_url}/knowledge-bases/{knowledge_base_id}/documents/url",
+            {
+                "url": "https://example.invalid/source",
+                "text": "HTTP URL ingest should also be searchable evidence.",
+                "title": "HTTP URL Source",
+            },
+        )
+        _search_status, result_payload = _post_json(
+            f"{base_url}/knowledge-bases/{knowledge_base_id}/search",
+            {"query": "searchable evidence", "top_k": 5},
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert file_status == 201
+    assert url_status == 201
+    assert file_payload["source_type"] == "markdown"
+    assert url_payload["source_type"] == "url"
+    assert {citation["source_uri"] for citation in result_payload["citations"]} >= {
+        str(source_path),
+        "https://example.invalid/source",
+    }
+
+
 def test_sidecar_client_supports_core_http_api_calls(tmp_path) -> None:
     _make_fake_hermes_checkout(tmp_path)
     server, thread = _start_server(root=tmp_path)
@@ -615,7 +655,16 @@ def test_sidecar_client_supports_core_http_api_calls(tmp_path) -> None:
             "MetaHarness selects methods and MRAG packages evidence with citations.",
             title="HTTP client note",
         )
-        result = client.search_knowledge_base(kb["knowledge_base_id"], RetrievalRequest(query="evidence citations", top_k=2))
+        source_path = tmp_path / "client-source.md"
+        source_path.write_text("# Client Source\nClient file ingest keeps searchable evidence.", encoding="utf-8")
+        client.ingest_file_document(kb["knowledge_base_id"], source_path)
+        client.ingest_url_document(
+            kb["knowledge_base_id"],
+            "https://example.invalid/client",
+            "Client URL ingest keeps searchable evidence.",
+            title="Client URL Source",
+        )
+        result = client.search_knowledge_base(kb["knowledge_base_id"], RetrievalRequest(query="searchable evidence", top_k=5))
     finally:
         server.shutdown()
         server.server_close()
@@ -626,6 +675,10 @@ def test_sidecar_client_supports_core_http_api_calls(tmp_path) -> None:
     assert any(provider["id"] == "github-copilot" for provider in providers)
     assert analysis["analysis"]["selected_method"] == "A-22"
     assert result["hits"]
+    assert {citation["source_uri"] for citation in result["citations"]} >= {
+        str(tmp_path / "client-source.md"),
+        "https://example.invalid/client",
+    }
 
 
 def test_sidecar_client_supports_agent_loop_over_http(tmp_path, monkeypatch) -> None:

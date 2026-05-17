@@ -27,7 +27,9 @@ from pyc_hermes_agent.sidecar_api.service import (
     get_hermes_sessions_snapshot,
     get_hermes_skills_snapshot,
     get_hermes_tools_snapshot,
+    ingest_file_document,
     ingest_text_document,
+    ingest_url_document,
     invoke_chat_completion,
     invoke_formal_analysis,
     list_knowledge_bases,
@@ -305,6 +307,23 @@ class SidecarClient:
             source_type=source_type,
             root=self._root,
         )
+
+    def ingest_file_document(self, knowledge_base_id: str, path: Path | str) -> dict[str, Any]:
+        resolved_path = Path(path)
+        if self._base_url is not None:
+            return self._http_post(
+                f"/knowledge-bases/{quote(knowledge_base_id, safe='')}/documents/file",
+                {"path": str(resolved_path)},
+            )
+        return ingest_file_document(knowledge_base_id, resolved_path, root=self._root)
+
+    def ingest_url_document(self, knowledge_base_id: str, url: str, text: str, *, title: str = "") -> dict[str, Any]:
+        if self._base_url is not None:
+            return self._http_post(
+                f"/knowledge-bases/{quote(knowledge_base_id, safe='')}/documents/url",
+                {"url": url, "text": text, "title": title},
+            )
+        return ingest_url_document(knowledge_base_id, url, text, title=title, root=self._root)
 
     def search_knowledge_base(self, knowledge_base_id: str, request: RetrievalRequest | Mapping[str, Any]) -> dict[str, Any]:
         serialized_request = _serialize_payload(request)

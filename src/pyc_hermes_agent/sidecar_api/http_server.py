@@ -30,7 +30,9 @@ from pyc_hermes_agent.sidecar_api.service import (
     get_hermes_tools_snapshot,
     get_meta_harness_benchmark_smoke,
     get_meta_harness_dependency_snapshot,
+    ingest_file_document,
     ingest_text_document,
+    ingest_url_document,
     invoke_chat_completion,
     invoke_formal_analysis,
     list_knowledge_bases,
@@ -47,6 +49,8 @@ from pyc_hermes_agent.sidecar_api.service import (
 
 
 _KB_DOCUMENT_TEXT_PATTERN = re.compile(r"^/knowledge-bases/([^/]+)/documents/text$")
+_KB_DOCUMENT_FILE_PATTERN = re.compile(r"^/knowledge-bases/([^/]+)/documents/file$")
+_KB_DOCUMENT_URL_PATTERN = re.compile(r"^/knowledge-bases/([^/]+)/documents/url$")
 _KB_SEARCH_PATTERN = re.compile(r"^/knowledge-bases/([^/]+)/search$")
 
 
@@ -217,6 +221,8 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
                     "/meta-harness/benchmark-smoke",
                     "/knowledge-bases",
                     "/knowledge-bases/{id}/documents/text",
+                    "/knowledge-bases/{id}/documents/file",
+                    "/knowledge-bases/{id}/documents/url",
                     "/knowledge-bases/{id}/search",
                 ],
             }, HTTPStatus.OK
@@ -295,6 +301,42 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
                     title=title if isinstance(title, str) else "",
                     source_uri=source_uri if isinstance(source_uri, str) else "",
                     source_type=source_type if isinstance(source_type, str) else "text",
+                    root=self._server_root(),
+                ),
+                HTTPStatus.CREATED,
+            )
+
+        file_match = _KB_DOCUMENT_FILE_PATTERN.fullmatch(path)
+        if file_match:
+            knowledge_base_id = unquote(file_match.group(1))
+            raw_path = payload.get("path", "")
+            if not isinstance(raw_path, str) or not raw_path.strip():
+                raise ValueError("Field 'path' is required.")
+            return (
+                ingest_file_document(
+                    knowledge_base_id,
+                    raw_path.strip(),
+                    root=self._server_root(),
+                ),
+                HTTPStatus.CREATED,
+            )
+
+        url_match = _KB_DOCUMENT_URL_PATTERN.fullmatch(path)
+        if url_match:
+            knowledge_base_id = unquote(url_match.group(1))
+            url = payload.get("url", "")
+            text = payload.get("text", "")
+            title = payload.get("title", "")
+            if not isinstance(url, str) or not url.strip():
+                raise ValueError("Field 'url' is required.")
+            if not isinstance(text, str) or not text:
+                raise ValueError("Field 'text' is required.")
+            return (
+                ingest_url_document(
+                    knowledge_base_id,
+                    url.strip(),
+                    text,
+                    title=title if isinstance(title, str) else "",
                     root=self._server_root(),
                 ),
                 HTTPStatus.CREATED,
