@@ -289,6 +289,67 @@ def test_agent_loop_sanitizes_nested_memory_tags(tmp_path: Path) -> None:
     )
 
 
+def test_agent_loop_binds_explicit_skill_context(tmp_path: Path) -> None:
+    skill_dir = tmp_path / ".opencode" / "skills" / "demo-skill"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text(
+        """---
+name: demo-skill
+description: Demo skill instructions
+---
+
+# Demo Skill
+
+Use this skill only when explicitly activated.
+""",
+        encoding="utf-8",
+    )
+    calls = []
+
+    def fake_llm_executor(request, _root):
+        calls.append(request)
+        assert request.messages[0].role == "system"
+        assert "<skill-context>" in request.messages[0].content
+        assert "Active skill: demo-skill" in request.messages[0].content
+        assert "Use this skill only when explicitly activated." in request.messages[0].content
+        assert "Script execution is disabled" in request.messages[0].content
+        return LLMChatResponse(
+            model="openai-compatible/demo-model",
+            provider_id="openai-compatible",
+            content="Skill-bound reply.",
+            finish_reason="stop",
+        )
+
+    loop = AgentLoop(root=tmp_path, llm_executor=fake_llm_executor)
+    result = loop.run(
+        ChatCompletionRequest(
+            model="openai-compatible/demo-model",
+            messages=[ChatMessage(role="user", content="Use the skill")],
+        ),
+        activated_skills=["demo-skill"],
+    )
+
+    assert len(calls) == 1
+    assert result.content == "Skill-bound reply."
+
+
+def test_agent_loop_rejects_unknown_activated_skill(tmp_path: Path) -> None:
+    loop = AgentLoop(root=tmp_path, llm_executor=lambda request, root: LLMChatResponse())
+
+    try:
+        loop.run(
+            ChatCompletionRequest(
+                model="openai-compatible/demo-model",
+                messages=[ChatMessage(role="user", content="Use missing skill")],
+            ),
+            activated_skills=["missing-skill"],
+        )
+    except ValueError as exc:
+        assert "Unknown activated skill" in str(exc)
+    else:
+        assert False, "Expected unknown skill activation to fail"
+
+
 def test_agent_loop_injects_execution_plan_into_prompt(tmp_path: Path) -> None:
     def fake_llm_executor(request, _root):
         assert request.messages[0].role == "system"

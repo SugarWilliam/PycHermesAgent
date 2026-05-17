@@ -21,6 +21,7 @@ from pyc_hermes_agent.hermes_engine.memory_injection import build_prompt_message
 from pyc_hermes_agent.hermes_engine.planner import build_agent_plan
 from pyc_hermes_agent.hermes_engine.session_context import bind_session_context
 from pyc_hermes_agent.hermes_engine.session_store import AgentSessionStore
+from pyc_hermes_agent.hermes_engine.skill_context import build_skill_context_messages
 from pyc_hermes_agent.hermes_engine.tool_registry import ToolRegistry
 from pyc_hermes_agent.llm_gateway import LLMChatChunk, LLMChatRequest, LLMChatResponse, LLMMessage, execute_chat, stream_chat
 from pyc_hermes_agent.meta_harness import MetaFramework
@@ -58,6 +59,7 @@ class AgentLoop:
         session_id: str | None = None,
         planning_enabled: bool = True,
         retry_budget: int = _DEFAULT_RETRY_BUDGET,
+        activated_skills: list[str] | None = None,
     ) -> AgentLoopResult:
         generator = self._run_generator(
             request,
@@ -67,6 +69,7 @@ class AgentLoop:
             planning_enabled=planning_enabled,
             retry_budget=retry_budget,
             stream_llm_tokens=False,
+            activated_skills=activated_skills,
         )
         while True:
             try:
@@ -86,6 +89,7 @@ class AgentLoop:
         session_id: str | None = None,
         planning_enabled: bool = True,
         retry_budget: int = _DEFAULT_RETRY_BUDGET,
+        activated_skills: list[str] | None = None,
     ) -> Iterator[AgentLoopEvent]:
         yield from self._run_generator(
             request,
@@ -95,6 +99,7 @@ class AgentLoop:
             planning_enabled=planning_enabled,
             retry_budget=retry_budget,
             stream_llm_tokens=True,
+            activated_skills=activated_skills,
         )
 
     def _run_generator(
@@ -107,6 +112,7 @@ class AgentLoop:
         planning_enabled: bool,
         retry_budget: int,
         stream_llm_tokens: bool,
+        activated_skills: list[str] | None,
     ) -> Iterator[AgentLoopEvent]:
         if max_iterations < 1:
             raise ValueError("Agent loop max_iterations must be at least 1.")
@@ -125,6 +131,7 @@ class AgentLoop:
         registry = tool_registry or self._tool_registry
         tools = _resolve_loop_tools(request, registry)
         plan = build_agent_plan(messages, tools) if planning_enabled else None
+        skill_messages = build_skill_context_messages(self._root, activated_skills)
         tool_results: list[ToolCallResult] = []
         last_response = LLMChatResponse()
         active_model = request.model or (existing_session.model if existing_session is not None else "")
@@ -186,10 +193,13 @@ class AgentLoop:
             for iteration in range(1, max_iterations + 1):
                 current_iteration = iteration
                 with bind_session_context(resolved_session_id):
+                    extra_system_messages = [*skill_messages]
+                    if recovery_message is not None:
+                        extra_system_messages.append(recovery_message)
                     prompt_messages = build_prompt_messages(
                         messages,
                         plan=plan,
-                        extra_system_messages=[recovery_message] if recovery_message is not None else None,
+                        extra_system_messages=extra_system_messages,
                     )
                 recovery_message = None
                 llm_request = LLMChatRequest(

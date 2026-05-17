@@ -131,6 +131,7 @@ def _normalize_agent_loop_request(request: AgentLoopRequest) -> AgentLoopRequest
         model=normalized_chat.model,
         messages=normalized_chat.messages,
         tools=normalized_chat.tools,
+        activated_skills=list(request.activated_skills),
         planning_enabled=request.planning_enabled,
         retry_budget=request.retry_budget,
         temperature=normalized_chat.temperature,
@@ -557,6 +558,8 @@ def run_agent_loop(request: AgentLoopRequest, root: Path | None = None) -> Dict[
             "max_iterations": normalized_request.max_iterations,
             "session_id": normalized_request.session_id,
         }
+        if normalized_request.activated_skills:
+            run_kwargs["activated_skills"] = normalized_request.activated_skills
         if normalized_request.planning_enabled is False:
             run_kwargs["planning_enabled"] = False
         if normalized_request.retry_budget != 1:
@@ -602,6 +605,8 @@ def stream_agent_loop(request: AgentLoopRequest, root: Path | None = None) -> It
         "max_iterations": normalized_request.max_iterations,
         "session_id": normalized_request.session_id,
     }
+    if normalized_request.activated_skills:
+        run_kwargs["activated_skills"] = normalized_request.activated_skills
     if normalized_request.planning_enabled is False:
         run_kwargs["planning_enabled"] = False
     if normalized_request.retry_budget != 1:

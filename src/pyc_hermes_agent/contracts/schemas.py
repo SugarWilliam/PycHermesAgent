@@ -98,6 +98,7 @@ class AgentLoopRequest:
     model: str = ""
     messages: List[ChatMessage] = field(default_factory=list)
     tools: List[ToolDefinition] = field(default_factory=list)
+    activated_skills: List[str] = field(default_factory=list)
     planning_enabled: bool = True
     retry_budget: int = 1
     temperature: Optional[float] = None

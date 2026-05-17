@@ -434,6 +434,43 @@ def test_sidecar_agent_loop_runs_formal_analysis_tool() -> None:
     assert response["tool_results"][0]["structured_content"]["selected_method"] == "A-22"
 
 
+def test_sidecar_passes_activated_skills_to_agent_loop() -> None:
+    class _FakeAgentLoop:
+        def __init__(self, *, root=None):
+            self.root = root
+
+        def run(self, request, *, max_iterations=8, session_id=None, planning_enabled=True, retry_budget=1, activated_skills=None):
+            from pyc_hermes_agent.contracts import AgentLoopResult
+
+            assert activated_skills == ["demo-skill"]
+            return AgentLoopResult(
+                session_id=session_id or "session-1",
+                model=request.model or "openai-compatible/demo-model",
+                provider_id="openai-compatible",
+                content="Skill active.",
+                finish_reason="stop",
+                iterations=1,
+            )
+
+    from pyc_hermes_agent.sidecar_api import service as sidecar_service
+
+    original = sidecar_service.AgentLoop
+    sidecar_service.AgentLoop = _FakeAgentLoop
+    try:
+        response = run_agent_loop(
+            AgentLoopRequest(
+                session_id="session-1",
+                model="openai-compatible/demo-model",
+                messages=[{"role": "user", "content": "Use skill"}],
+                activated_skills=["demo-skill"],
+            )
+        )
+    finally:
+        sidecar_service.AgentLoop = original
+
+    assert response["content"] == "Skill active."
+
+
 def test_sidecar_agent_loop_streams_events() -> None:
     class _FakeAgentLoop:
         def __init__(self, *, root=None):
