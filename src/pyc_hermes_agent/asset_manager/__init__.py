@@ -66,6 +66,41 @@ class AssetManager:
             return None
         return _read_installed_asset(asset_dir)
 
+    def list_installed_assets(self) -> list[dict[str, object]]:
+        """Return inventory entries for every installed model asset under ``models_dir``."""
+        models_root = self.models_dir
+        if not models_root.exists():
+            return []
+
+        inventory: list[dict[str, object]] = []
+        for manifest_path in sorted(models_root.rglob(_ASSET_MANIFEST_FILENAME)):
+            asset_dir = manifest_path.parent
+            try:
+                rel = asset_dir.relative_to(models_root)
+            except ValueError:  # pragma: no cover - defensive boundary
+                continue
+            parts = rel.parts
+            if len(parts) < 2:
+                continue
+            version = parts[-1]
+            asset_id = "/".join(parts[:-1])
+            try:
+                installed = _read_installed_asset(asset_dir)
+            except ValueError:
+                continue
+            inventory.append(
+                {
+                    "asset_id": asset_id,
+                    "version": version,
+                    "checksum": installed.checksum,
+                    "size_bytes": installed.size_bytes,
+                    "payload_kind": installed.payload_kind,
+                    "primary_path": str(installed.primary_path) if installed.primary_path else None,
+                    "manifest": asdict(installed.manifest),
+                }
+            )
+        return inventory
+
     def install_bytes(
         self,
         manifest: ModelAssetManifest,

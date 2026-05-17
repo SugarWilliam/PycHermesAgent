@@ -152,6 +152,22 @@ class ArtifactEngine:
             records.append(_read_artifact_record(metadata_path))
         return sorted(records, key=lambda record: (record.created_at_ns, record.artifact_id))
 
+    def list_all_artifacts(self) -> list[ArtifactRecord]:
+        """List artifact records for every task directory under ``artifacts_dir``."""
+        root = self.artifacts_dir
+        if not root.exists():
+            return []
+
+        records: list[ArtifactRecord] = []
+        for metadata_path in sorted(root.glob(f"*/*/{_ARTIFACT_METADATA_FILENAME}")):
+            if ".staging" in metadata_path.parts:
+                continue
+            try:
+                records.append(_read_artifact_record(metadata_path))
+            except ValueError:
+                continue
+        return sorted(records, key=lambda record: (record.created_at_ns, record.artifact_id))
+
 
 def _sanitize_segment(value: str, *, fallback: str) -> str:
     cleaned = re.sub(r"[^A-Za-z0-9._-]+", "-", value.strip())

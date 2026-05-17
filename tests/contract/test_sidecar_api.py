@@ -1,7 +1,9 @@
 from pathlib import Path
 
 from pyc_hermes_agent.contracts import AgentLoopRequest, MetaAnalysisRequest
-from pyc_hermes_agent.contracts import RetrievalRequest
+from pyc_hermes_agent.contracts import ModelAssetManifest, RetrievalRequest
+from pyc_hermes_agent.asset_manager import AssetManager, calculate_asset_checksum
+from pyc_hermes_agent.artifact_engine import ArtifactEngine
 from pyc_hermes_agent.sidecar_api import (
     create_knowledge_base,
     get_config_snapshot,
@@ -21,7 +23,9 @@ from pyc_hermes_agent.sidecar_api import (
     list_knowledge_bases,
     list_models,
     list_providers,
+    list_asset_inventory,
     list_rules,
+    list_sidecar_artifacts,
     list_skills,
     run_agent_loop,
     search_knowledge_base,
@@ -255,7 +259,37 @@ def test_sidecar_lists_rules_and_skills() -> None:
     rules = list_rules(root)
     skills = list_skills(root)
     assert any(rule["name"] == "AGENTS.md" for rule in rules)
-    assert any(skill["name"] == "meta-harness-governance" for skill in skills)
+    skill = next(item for item in skills if item["name"] == "meta-harness-governance")
+    assert skill["runtime"]["policy"]["activation_mode"] == "explicit_only"
+    assert skill["runtime"]["policy"]["script_execution"] == "disabled"
+    assert skill["runtime"]["source"]["kind"] == "SKILL.md"
+    assert "mtime_ns" in skill["runtime"]["source"]
+
+
+def test_sidecar_lists_asset_inventory_and_artifacts(tmp_path: Path) -> None:
+    payload = b"local-weights"
+    manifest = ModelAssetManifest(
+        asset_id="demo/asset",
+        version="v1",
+        checksum=calculate_asset_checksum(payload),
+        size_bytes=len(payload),
+    )
+    AssetManager(root=tmp_path).install_bytes(manifest, payload, filename="w.bin")
+    ArtifactEngine(root=tmp_path).export_text("task-a", "note.txt", "hello", media_type="text/plain")
+
+    assets = list_asset_inventory(tmp_path)
+    assert len(assets["items"]) == 1
+    assert assets["items"][0]["asset_id"] == "demo/asset"
+    assert assets["items"][0]["version"] == "v1"
+
+    all_arts = list_sidecar_artifacts(tmp_path)
+    assert all_arts["task_id"] is None
+    assert len(all_arts["items"]) == 1
+    assert all_arts["items"][0]["task_id"] == "task-a"
+
+    scoped = list_sidecar_artifacts(tmp_path, task_id="task-a")
+    assert scoped["task_id"] == "task-a"
+    assert len(scoped["items"]) == 1
 
 
 def test_sidecar_config_snapshot() -> None:

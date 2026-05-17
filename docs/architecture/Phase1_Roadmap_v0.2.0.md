@@ -28,7 +28,7 @@ Completed and contract-tested surfaces include:
 | C: Skill lifecycle | explicit skill activation and context binding | no implicit execution; metadata visible |
 | D: MetaHarness value | dependency-aware capability status and benchmark foundation | benchmark smoke passes |
 | E: MRAG productization | file/url ingestion and index version behavior | retrieval and migration tests pass |
-| F: Release gates | documented and executable preview release process | dry-run release checklist passes |
+| F: Release gates | documented checklist + `scripts/release_gates.py` | script passes locally |
 
 ## 4. Workstream A: MRAG Ownership
 
@@ -83,6 +83,6 @@ Phase 1 exits when:
 2. MRAG persistence is protected and restart-tested.
 3. Skill lifecycle supports explicit activation without unsafe execution.
 4. MetaHarness has dependency-aware routing and benchmark smoke coverage.
-5. Release gates can produce a preview tag without manual reconstruction of the process.
+5. Release gates can produce a preview tag without manual reconstruction of the process (`scripts/release_gates.py` is the automated subset; human review remains required for secrets and policy).
 
 The repository must still state clearly whether it is engineering preview, release candidate, or production release.

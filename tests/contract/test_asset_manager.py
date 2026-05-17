@@ -26,6 +26,23 @@ def test_asset_manager_installs_bytes_under_model_id_and_version_layout(tmp_path
     assert installed.checksum == manifest.checksum
 
 
+def test_asset_manager_lists_installed_assets(tmp_path) -> None:
+    manager = AssetManager(root=tmp_path)
+    payload = b"inv"
+    manifest = ModelAssetManifest(
+        asset_id="org/pack",
+        version="2.0.0",
+        checksum=calculate_asset_checksum(payload),
+        size_bytes=len(payload),
+    )
+    manager.install_bytes(manifest, payload, filename="blob.bin")
+    items = manager.list_installed_assets()
+    assert len(items) == 1
+    assert items[0]["asset_id"] == "org/pack"
+    assert items[0]["version"] == "2.0.0"
+    assert items[0]["manifest"]["asset_id"] == "org/pack"
+
+
 def test_asset_manager_reuses_existing_verified_install(tmp_path) -> None:
     manager = AssetManager(root=tmp_path)
     payload = b"demo-model-weights"

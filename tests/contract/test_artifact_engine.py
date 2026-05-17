@@ -32,6 +32,15 @@ def test_artifact_engine_lists_task_artifacts_and_builds_task_result_entries(tmp
     assert records[1].as_task_artifact()["media_type"] == "application/json"
 
 
+def test_artifact_engine_list_all_artifacts_across_tasks(tmp_path) -> None:
+    engine = ArtifactEngine(root=tmp_path)
+    engine.export_text("alpha", "a.txt", "a")
+    engine.export_text("beta", "b.txt", "b")
+    records = engine.list_all_artifacts()
+    assert len(records) == 2
+    assert {record.task_id for record in records} == {"alpha", "beta"}
+
+
 def test_artifact_engine_rejects_tampered_metadata_format_version(tmp_path) -> None:
     engine = ArtifactEngine(root=tmp_path)
     record = engine.export_text("formal-analysis", "summary.txt", "done")

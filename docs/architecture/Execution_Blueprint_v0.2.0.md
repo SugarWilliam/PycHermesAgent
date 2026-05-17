@@ -87,7 +87,20 @@ Acceptance:
 - File and URL text ingestion are exposed as stable local sidecar contracts.
 - Index format versions are checked.
 - Retrieval results preserve citations.
-- JSON vs SQLite/FTS5/vector decision is recorded.
+- JSON vs SQLite/FTS5/vector decision is recorded in `docs/design/MRAG_Index_Strategy_Decision_v0.2.0.md`.
+
+### Slice 2A: Asset and Artifact Inventory (Sidecar)
+
+Contract surfaces:
+
+- `GET /assets` lists installed assets discovered under the runtime models directory.
+- `GET /artifacts` lists all artifacts; `GET /artifacts/task/{task_id}` scopes to one task.
+
+Acceptance:
+
+- Responses are JSON objects with an `items` array and stable field names.
+- `SidecarClient` covers local and HTTP modes.
+- Contract suite passes; `sidecar_api_version` reflects the contract bump.
 
 ## 5. Release Gates
 

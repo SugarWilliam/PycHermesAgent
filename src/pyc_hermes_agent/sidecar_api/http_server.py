@@ -38,7 +38,9 @@ from pyc_hermes_agent.sidecar_api.service import (
     list_knowledge_bases,
     list_models,
     list_providers,
+    list_asset_inventory,
     list_rules,
+    list_sidecar_artifacts,
     list_skills,
     make_error_response,
     run_agent_loop,
@@ -47,6 +49,8 @@ from pyc_hermes_agent.sidecar_api.service import (
     stream_chat_completion,
 )
 
+
+_ARTIFACTS_PATTERN = re.compile(r"^/artifacts(?:/task/(.+))?$")
 
 _KB_DOCUMENT_TEXT_PATTERN = re.compile(r"^/knowledge-bases/([^/]+)/documents/text$")
 _KB_DOCUMENT_FILE_PATTERN = re.compile(r"^/knowledge-bases/([^/]+)/documents/file$")
@@ -206,6 +210,9 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
                     "/models",
                     "/rules",
                     "/skills",
+                    "/assets",
+                    "/artifacts",
+                    "/artifacts/task/{task_id}",
                     "/hermes/capability",
                     "/hermes/bridge-health",
                     "/hermes/sessions",
@@ -240,6 +247,13 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
             return {"items": list_rules(root)}, HTTPStatus.OK
         if path == "/skills":
             return {"items": list_skills(root)}, HTTPStatus.OK
+        if path == "/assets":
+            return list_asset_inventory(root), HTTPStatus.OK
+        artifacts_match = _ARTIFACTS_PATTERN.fullmatch(path)
+        if artifacts_match:
+            raw_task = artifacts_match.group(1)
+            task_id = unquote(raw_task) if raw_task else None
+            return list_sidecar_artifacts(root, task_id=task_id), HTTPStatus.OK
         if path == "/hermes/capability":
             return get_hermes_capability_snapshot(root), HTTPStatus.OK
         if path == "/hermes/bridge-health":

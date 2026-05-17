@@ -34,7 +34,7 @@ Not production-supported yet:
 - Electron desktop installation,
 - production service deployment,
 - exposed network sidecar,
-- production MRAG database,
+- production MRAG database (JSON MVP only; see `docs/design/MRAG_Index_Strategy_Decision_v0.2.0.md`),
 - packaged model download workflow,
 - signed installer and upgrade path.
 
@@ -53,6 +53,14 @@ No runtime feature may write mutable state into the install directory.
 
 The sidecar is intended for localhost use by the desktop shell or local clients.
 
+Inventory (read-only) routes:
+
+- `GET /assets` — installed model assets (runtime models directory).
+- `GET /artifacts` — all exported artifacts.
+- `GET /artifacts/task/{task_id}` — artifacts for a single task id.
+
+`GET /skills` items include a `runtime` object (explicit activation policy, `SKILL.md` source metadata; script execution remains disabled in this phase).
+
 Production hardening requirements before broader deployment:
 
 - stable request ID and trace propagation,
@@ -68,7 +76,15 @@ Cursor is conditionally authorized to push, tag, and prepare release output only
 Required pre-release checks:
 
 ```bash
+./.venv/bin/python scripts/release_gates.py
+```
+
+Equivalent manual steps:
+
+```bash
 ./.venv/bin/python -m pytest tests/contract
+git diff --check
+git diff --cached --check
 ```
 
 Additional release checks:

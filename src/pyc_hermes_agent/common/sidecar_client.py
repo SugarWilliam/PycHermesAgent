@@ -32,10 +32,12 @@ from pyc_hermes_agent.sidecar_api.service import (
     ingest_url_document,
     invoke_chat_completion,
     invoke_formal_analysis,
+    list_asset_inventory,
     list_knowledge_bases,
     list_models,
     list_providers,
     list_rules,
+    list_sidecar_artifacts,
     list_skills,
     run_agent_loop,
     search_knowledge_base,
@@ -227,6 +229,17 @@ class SidecarClient:
         if self._base_url is not None:
             return self._http_get_items("/skills")
         return list_skills(self._root)
+
+    def list_asset_inventory(self) -> dict[str, Any]:
+        if self._base_url is not None:
+            return self._http_get("/assets")
+        return list_asset_inventory(self._root)
+
+    def list_artifacts(self, *, task_id: str | None = None) -> dict[str, Any]:
+        if self._base_url is not None:
+            path = "/artifacts" if task_id is None else f"/artifacts/task/{quote(task_id, safe='')}"
+            return self._http_get(path)
+        return list_sidecar_artifacts(self._root, task_id=task_id)
 
     def invoke_formal_analysis(self, request: MetaAnalysisRequest | Mapping[str, Any]) -> dict[str, Any]:
         serialized_request = _serialize_payload(request)

@@ -21,8 +21,9 @@ The current repository has these validated capabilities:
 - `meta_harness.MetaFramework.execute()` as the formal-analysis entry point with legacy bridge execution and degraded-state reporting.
 - `mrag_core` text knowledge bases with chunking, lexical retrieval, and JSON persistence.
 - Local asset promotion and artifact export foundations.
+- Sidecar inventory routes for installed model assets and exported artifacts (`GET /assets`, `GET /artifacts`).
 
-The current repository is not yet production-ready because it lacks cross-process MRAG ownership guarantees, production storage migration, broad skill runtime binding, hardened release automation, Electron desktop packaging, production observability, and end-to-end install/upgrade verification.
+The current repository is not yet production-ready because it lacks production storage migration at scale, broad semantic retrieval, hardened release automation in CI, Electron desktop packaging, production observability, and end-to-end install/upgrade verification. Cross-process MRAG ownership guardrails, trace-aware sidecar surfaces, explicit skill runtime metadata, MetaHarness benchmark smoke, MRAG ingest/manifest evolution, and local asset/artifact inventory routes are implemented for the engineering-preview line.
 
 ## 3. Product Direction
 
@@ -124,7 +125,7 @@ Required outcomes:
 - HTTP surfaces for file and URL text ingestion.
 - Index manifests with version checks and rebuild/migration behavior.
 - Preserved citations and source URIs.
-- Decision record for JSON vs SQLite/FTS5 vs vector indexing.
+- Decision record for JSON vs SQLite/FTS5 vs vector indexing (`docs/design/MRAG_Index_Strategy_Decision_v0.2.0.md`).
 
 ### Phase 2: Asset, Artifact, and Sidecar Hardening
 

@@ -13,13 +13,13 @@ This document defines how PycHermesAgent must evolve from the current engineerin
 |---------|--------------|-----------------------------|
 | `contracts` | Shared dataclass contracts | Add versioned trace and error context when contracts change |
 | `common` | Runtime paths and sidecar client | Keep path policy aligned with install/local data rules |
-| `sidecar_api` | Python service + HTTP/SSE transport | Harden error, trace, request ID, asset/artifact routes |
+| `sidecar_api` | Python service + HTTP/SSE transport | Harden error, trace, request ID; asset/artifact inventory routes shipped |
 | `llm_gateway` | Provider config and chat runtime | Keep provider-native objects contained; improve provider test matrix |
 | `hermes_engine` | AgentLoop, sessions, memory, tools | Add explicit skill activation and stronger memory/search contracts |
 | `meta_harness` | Formal analysis harness | Add dependency-aware capabilities and benchmark value proof |
 | `mrag_core` | Local retrieval and persistence | Add storage ownership, migration, file/url ingest, richer retrieval |
-| `asset_manager` | Local model asset foundation | Expose through sidecar only after release-safe contract design |
-| `artifact_engine` | Local artifact export foundation | Expose task artifact routes and metadata compatibility |
+| `asset_manager` | Local model asset foundation | Sidecar `GET /assets` inventory (install/promotion helpers) |
+| `artifact_engine` | Local artifact export foundation | Sidecar `GET /artifacts` and task-scoped listing |
 
 ## 3. Sidecar Design
 

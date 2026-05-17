@@ -9,6 +9,8 @@ from collections.abc import Iterator
 from typing import Any, Dict, List
 
 from pyc_hermes_agent import __version__
+from pyc_hermes_agent.asset_manager import AssetManager
+from pyc_hermes_agent.artifact_engine import ArtifactEngine, ArtifactRecord
 from pyc_hermes_agent.common import ensure_runtime_directories, resolve_runtime_paths
 from pyc_hermes_agent.contracts import AgentLoopEvent, AgentLoopRequest, ChatCompletionChunk, ChatCompletionRequest, ChatCompletionResult, ChatMessage, ErrorEnvelope, EventEnvelope, MetaAnalysisRequest, TaskResult, ToolCall, ToolDefinition
 from pyc_hermes_agent.contracts import RetrievalRequest
@@ -28,7 +30,28 @@ from pyc_hermes_agent.sidecar_api.logging import log_event
 
 
 _MRAG_SERVICES: dict[str, MRAGService] = {}
-SIDECAR_API_VERSION = "0.1"
+SIDECAR_API_VERSION = "0.2"
+
+_SKILLS_RUNTIME_POLICY: Dict[str, str] = {
+    "activation_mode": "explicit_only",
+    "script_execution": "disabled",
+    "agent_loop_field": "activated_skills",
+}
+
+
+def _artifact_record_payload(record: ArtifactRecord) -> Dict[str, Any]:
+    return {
+        "artifact_id": record.artifact_id,
+        "task_id": record.task_id,
+        "name": record.name,
+        "media_type": record.media_type,
+        "path": str(record.path),
+        "metadata_path": str(record.metadata_path),
+        "size_bytes": record.size_bytes,
+        "checksum": record.checksum,
+        "created_at_ns": record.created_at_ns,
+        "artifact_format_version": record.artifact_format_version,
+    }
 
 
 def _repo_root() -> Path:
@@ -374,17 +397,47 @@ def list_rules(root: Path | None = None) -> List[Dict[str, Any]]:
 
 def list_skills(root: Path | None = None) -> List[Dict[str, Any]]:
     base = root or _repo_root()
-    return [
-        {
-            "name": skill.name,
-            "description": skill.description,
-            "path": str(skill.path),
-            "license": skill.license,
-            "compatibility": skill.compatibility,
-            "metadata": skill.metadata,
-        }
-        for skill in load_skill_metadata(base)
-    ]
+    items: List[Dict[str, Any]] = []
+    for skill in load_skill_metadata(base):
+        mtime_ns = skill.path.stat().st_mtime_ns
+        items.append(
+            {
+                "name": skill.name,
+                "description": skill.description,
+                "path": str(skill.path),
+                "license": skill.license,
+                "compatibility": skill.compatibility,
+                "metadata": skill.metadata,
+                "runtime": {
+                    "policy": dict(_SKILLS_RUNTIME_POLICY),
+                    "source": {
+                        "kind": "SKILL.md",
+                        "path": str(skill.path),
+                        "mtime_ns": mtime_ns,
+                    },
+                },
+            }
+        )
+    return items
+
+
+def list_asset_inventory(root: Path | None = None) -> Dict[str, Any]:
+    base = root or _repo_root()
+    manager = AssetManager(root=base)
+    return {"items": manager.list_installed_assets()}
+
+
+def list_sidecar_artifacts(root: Path | None = None, *, task_id: str | None = None) -> Dict[str, Any]:
+    base = root or _repo_root()
+    engine = ArtifactEngine(root=base)
+    if task_id is None:
+        records = engine.list_all_artifacts()
+    else:
+        records = engine.list_task_artifacts(task_id)
+    return {
+        "items": [_artifact_record_payload(record) for record in records],
+        "task_id": task_id,
+    }
 
 
 def invoke_formal_analysis(request: MetaAnalysisRequest) -> Dict[str, Any]:

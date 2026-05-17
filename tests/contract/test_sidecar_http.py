@@ -4,8 +4,10 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from pyc_hermes_agent import SidecarClient
+from pyc_hermes_agent.asset_manager import AssetManager, calculate_asset_checksum
+from pyc_hermes_agent.artifact_engine import ArtifactEngine
 from pyc_hermes_agent.common import ensure_runtime_directories, resolve_runtime_paths
-from pyc_hermes_agent.contracts import AgentLoopRequest, MetaAnalysisRequest, RetrievalRequest
+from pyc_hermes_agent.contracts import AgentLoopRequest, MetaAnalysisRequest, ModelAssetManifest, RetrievalRequest
 from pyc_hermes_agent.mrag_core.ownership import MRAG_LOCK_FILE
 from pyc_hermes_agent.sidecar_api import create_http_server
 from pyc_hermes_agent.sidecar_api.service import SIDECAR_API_VERSION
@@ -632,11 +634,55 @@ def test_sidecar_http_server_ingests_file_and_url_documents(tmp_path) -> None:
     }
 
 
+def test_sidecar_http_server_lists_assets_and_artifacts(tmp_path) -> None:
+    from urllib.parse import quote
+
+    payload = b"w"
+    manifest = ModelAssetManifest(
+        asset_id="http/demo",
+        version="1",
+        checksum=calculate_asset_checksum(payload),
+        size_bytes=len(payload),
+    )
+    AssetManager(root=tmp_path).install_bytes(manifest, payload, filename="f.bin")
+    ArtifactEngine(root=tmp_path).export_text("http-task", "out.txt", "payload")
+
+    server, thread = _start_server(root=tmp_path)
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        a_status, a_payload = _get_json(f"{base_url}/assets")
+        art_status, art_payload = _get_json(f"{base_url}/artifacts")
+        scoped_status, scoped = _get_json(f"{base_url}/artifacts/task/{quote('http-task', safe='')}")
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert a_status == 200
+    assert len(a_payload["items"]) == 1
+    assert a_payload["items"][0]["asset_id"] == "http/demo"
+    assert art_status == 200
+    assert len(art_payload["items"]) == 1
+    assert art_payload["items"][0]["task_id"] == "http-task"
+    assert scoped_status == 200
+    assert len(scoped["items"]) == 1
+
+
 def test_sidecar_client_supports_core_http_api_calls(tmp_path) -> None:
     _make_fake_hermes_checkout(tmp_path)
     server, thread = _start_server(root=tmp_path)
     base_url = f"http://127.0.0.1:{server.server_address[1]}"
     client = SidecarClient(base_url=base_url)
+
+    w = b"client-weights"
+    cm = ModelAssetManifest(
+        asset_id="client/http-asset",
+        version="v1",
+        checksum=calculate_asset_checksum(w),
+        size_bytes=len(w),
+    )
+    AssetManager(root=tmp_path).install_bytes(cm, w, filename="c.bin")
+    ArtifactEngine(root=tmp_path).export_text("client-art-task", "blob.txt", "artifact-body")
 
     try:
         config = client.get_config_snapshot()
@@ -665,6 +711,9 @@ def test_sidecar_client_supports_core_http_api_calls(tmp_path) -> None:
             title="Client URL Source",
         )
         result = client.search_knowledge_base(kb["knowledge_base_id"], RetrievalRequest(query="searchable evidence", top_k=5))
+        asset_inv = client.list_asset_inventory()
+        arts = client.list_artifacts()
+        arts_scoped = client.list_artifacts(task_id="client-art-task")
     finally:
         server.shutdown()
         server.server_close()
@@ -679,6 +728,11 @@ def test_sidecar_client_supports_core_http_api_calls(tmp_path) -> None:
         str(tmp_path / "client-source.md"),
         "https://example.invalid/client",
     }
+    assert len(asset_inv["items"]) == 1
+    assert asset_inv["items"][0]["asset_id"] == "client/http-asset"
+    assert len(arts["items"]) == 1
+    assert arts["items"][0]["task_id"] == "client-art-task"
+    assert len(arts_scoped["items"]) == 1
 
 
 def test_sidecar_client_supports_agent_loop_over_http(tmp_path, monkeypatch) -> None:

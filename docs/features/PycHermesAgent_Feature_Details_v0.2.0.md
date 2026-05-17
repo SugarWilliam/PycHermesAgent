@@ -27,14 +27,14 @@
 | Method selection | Partial | heuristic route today | data-shape and precondition routing |
 | LLM runtime | Partial | Copilot/OpenAI-compatible/OpenRouter paths | broader mock matrix and release config docs |
 | Skill discovery | Implemented | metadata parsing tests | explicit activation and audit trail |
-| Skill runtime binding | Planned | none | no implicit execution; context binding first |
+| Skill runtime binding | Partial | `activated_skills` + `GET /skills` `runtime` metadata | permissioned script execution later |
 | MRAG text ingest | Implemented | text service and tests | file/url HTTP surfaces |
 | MRAG persistence | Partial | JSON persistence | lock/ownership and migration/rebuild behavior |
 | MRAG retrieval | Partial | lexical search | citations, indexing strategy, rerank path |
-| Asset manager | Partial | local validation/promotion tests | sidecar route and durability policy |
-| Artifact engine | Partial | export/list tests | sidecar route and desktop integration |
+| Asset manager | Partial | local validation/promotion + `GET /assets` tests | promotion durability + download workflow |
+| Artifact engine | Partial | export/list + `GET /artifacts` tests | export streaming + desktop integration |
 | Electron shell | Planned | no product shell | after sidecar contracts stabilize |
-| Release automation | Planned | governance now defined | gates, tag, release notes, push policy |
+| Release automation | Partial | `scripts/release_gates.py` + governance gates | CI wiring, secret scanning, signed artifacts |
 
 ## 3. Adopted Evaluation Findings
 
