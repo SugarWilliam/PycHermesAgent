@@ -668,6 +668,52 @@ def test_sidecar_http_server_lists_assets_and_artifacts(tmp_path) -> None:
     assert len(scoped["items"]) == 1
 
 
+def test_sidecar_http_merges_request_id_into_service_error_json(tmp_path, monkeypatch) -> None:
+    from pyc_hermes_agent.sidecar_api import http_server as sidecar_http_server
+    from pyc_hermes_agent.sidecar_api import service as sidecar_service
+
+    def _fake_formal(_req):
+        return sidecar_service.make_error_response(
+            "FORMAL_ANALYSIS_FAILED",
+            "internal",
+            "synthetic failure",
+            details={"synthetic": True},
+        )
+
+    monkeypatch.setattr(sidecar_http_server, "invoke_formal_analysis", _fake_formal)
+    server, thread = _start_server(root=tmp_path)
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+    rid = "corr-service-err-1"
+    request = Request(
+        f"{base_url}/formal-analysis",
+        data=json.dumps(
+            {
+                "problem_statement": "demo",
+                "data": {},
+                "params": {},
+            }
+        ).encode("utf-8"),
+        headers={"Content-Type": "application/json", "X-Pyc-Request-Id": rid},
+        method="POST",
+    )
+    try:
+        try:
+            urlopen(request, timeout=5)
+        except HTTPError as exc:
+            assert exc.code == 502
+            body = json.loads(exc.read().decode("utf-8"))
+        else:  # pragma: no cover - defensive
+            raise AssertionError("expected HTTP 502")
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert body["error"]["code"] == "FORMAL_ANALYSIS_FAILED"
+    assert body["error"]["details"]["request_id"] == rid
+    assert body["error"]["details"].get("synthetic") is True
+
+
 def test_sidecar_client_supports_core_http_api_calls(tmp_path) -> None:
     _make_fake_hermes_checkout(tmp_path)
     server, thread = _start_server(root=tmp_path)

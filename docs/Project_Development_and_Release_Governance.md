@@ -147,6 +147,8 @@ Required outcomes:
 - Desktop never writes mutable runtime state into the install directory.
 - Desktop UI tests remain last priority after contract and integration stability.
 
+**Preview (v0.2.x):** a minimal probe-only shell exists under `desktop/` (see `desktop/README.md`). It does not satisfy production packaging, updater, or path-policy gates until Phase 4 completes.
+
 ### Phase 4: Release Hardening
 
 Goal: prepare production-grade release candidates.
@@ -177,6 +179,12 @@ Cursor must stop and ask for human direction instead of pushing, tagging, or rel
 ## 8. Mandatory Verification Matrix
 
 Minimum verification before a normal development commit:
+
+```bash
+./.venv/bin/python scripts/release_gates.py
+```
+
+This runs the contract suite, `git diff --check` (staged and unstaged), and a heuristic scan for common secret patterns in tracked text files. Equivalent manual pytest-only step:
 
 ```bash
 ./.venv/bin/python -m pytest tests/contract

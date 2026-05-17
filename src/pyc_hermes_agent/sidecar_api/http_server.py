@@ -192,6 +192,8 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
             error_code=error.get("code") if isinstance(error, dict) else None,
             error_category=error.get("category") if isinstance(error, dict) else None,
         )
+        if isinstance(payload, dict):
+            self._ensure_error_correlates_request(payload, request_id)
         self._write_json(status, payload)
 
     def _handle_get(self, path: str) -> tuple[dict[str, Any], HTTPStatus]:
@@ -400,6 +402,17 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
             status_label=status_label,
             degraded=bool(health.get("degraded")),
         )
+
+    def _ensure_error_correlates_request(self, payload: dict[str, Any], request_id: str) -> None:
+        """Attach ``request_id`` to error envelopes returned by the service layer or transport."""
+        err = payload.get("error")
+        if not isinstance(err, dict):
+            return
+        details = err.get("details")
+        if not isinstance(details, dict):
+            details = {}
+            err["details"] = details
+        details.setdefault("request_id", request_id)
 
     def _write_json(self, status: HTTPStatus, payload: dict[str, Any]) -> None:
         body = json.dumps(payload).encode("utf-8")

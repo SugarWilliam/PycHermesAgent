@@ -72,6 +72,8 @@ Required fields:
 
 Every new route must specify whether it emits request IDs, trace IDs, or both.
 
+For HTTP JSON errors, the transport sets `X-Pyc-Request-Id` and ensures `error.details.request_id` is present so clients can join logs, headers, and bodies without re-parsing text.
+
 ## 6. Skill Runtime Lifecycle Design
 
 Skill handling must be explicit and auditable.

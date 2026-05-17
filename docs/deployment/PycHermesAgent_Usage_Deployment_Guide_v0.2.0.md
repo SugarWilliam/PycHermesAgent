@@ -87,6 +87,10 @@ git diff --check
 git diff --cached --check
 ```
 
+The `release_gates.py` script additionally performs a heuristic secret-pattern scan on tracked text files; the three commands above do not.
+
+GitHub Actions (`.github/workflows/ci.yml`) runs `pip install -e ".[dev]"` and `scripts/release_gates.py` on Python 3.11 and 3.12 for pushes and pull requests targeting `main`.
+
 Additional release checks:
 
 - classify `git status`,
@@ -128,3 +132,5 @@ Stop and report instead of releasing when:
 ## 8. Desktop Deployment Target
 
 Electron packaging must not begin until sidecar contracts, MRAG ownership, runtime paths, asset/artifact contracts, and release gate automation are stable. Desktop E2E tests remain last in the test priority order.
+
+An **engineering-preview** Electron entry point lives in `desktop/` (health probe only; see `desktop/README.md`). It is not a substitute for install-boundary work on Windows.

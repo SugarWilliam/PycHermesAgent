@@ -22,6 +22,9 @@ analysis = [
   "scipy>=1.13",
   "statsmodels>=0.14",
 ]
+dev = [
+  "pytest>=8.0",
+]
 
 [project.scripts]
 pyc-hermes-sidecar = "pyc_hermes_agent.sidecar_api:main"

@@ -18,7 +18,11 @@ Current repository status:
 4. A minimal local HTTP sidecar transport is implemented.
 5. A minimal OpenAI-compatible synchronous LLM execution path is implemented.
 6. Minimal local model-asset promotion and artifact export helpers are implemented.
-7. Electron desktop and production runtime flows are not yet complete.
+7. CI (GitHub Actions) runs contract tests and `scripts/release_gates.py`; a minimal Electron preview shell lives under `desktop/` (does not bundle Python).
+
+## Continuous integration
+
+Push and pull requests to `main` run **`.github/workflows/ci.yml`** (Python 3.11 and 3.12): `pip install -e ".[dev]"`, `pytest tests/contract`, and `scripts/release_gates.py` (whitespace + heuristic secret scan).
 
 ## Quick Start
 
@@ -28,7 +32,14 @@ Install in editable mode:
 python -m pip install -e .
 ```
 
-Run contract tests:
+For contributors running tests and release gates locally:
+
+```powershell
+python -m pip install -e ".[dev]"
+./.venv/bin/python scripts/release_gates.py
+```
+
+Run contract tests only:
 
 ```powershell
 python -m pytest tests/contract
