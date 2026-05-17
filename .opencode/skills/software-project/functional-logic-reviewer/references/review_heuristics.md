@@ -345,10 +345,10 @@ Imagine a malicious thread scheduler that always preempts at the worst possible 
 1. **Reachability**: Can this code path actually be reached in production?
    - Check if the function is called at all
    - Check if the problematic branch condition can actually be true
-   
+
 2. **Guard Elsewhere**: Is there a check earlier in the call chain that prevents the bad input?
    - Trace callers upward; there may be validation before reaching this point
-   
+
 3. **Intentional Design**: Could this be deliberate?
    - Some "leaks" are intentional (process-lifetime allocations)
    - Some "missing checks" are by design (caller guarantees validity)

@@ -215,7 +215,7 @@ def detect_race_condition(shared_vars, thread_functions):
                 accesses.append((func, 'write'))
             elif var in func.reads:
                 accesses.append((func, 'read'))
-        
+
         # Check if unprotected concurrent access
         has_write = any(a[1] == 'write' for a in accesses)
         if len(accesses) > 1 and has_write:

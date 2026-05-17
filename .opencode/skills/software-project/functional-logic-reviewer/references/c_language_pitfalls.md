@@ -657,7 +657,7 @@ printf("%d", x);  // x == 0
 ```c
 // BAD:
 int flags = 1 << 31;       // UB: Signed overflow
-int x = val << n;          // UB if n >= 32 
+int x = val << n;          // UB if n >= 32
 
 // GOOD:
 uint32_t flags = 1U << 31;        // Unsigned, OK

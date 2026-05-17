@@ -42,7 +42,7 @@ if (file_exists(path)) {        // CHECK
 }
 
 if (queue_count > 0) {          // CHECK
-    // Another thread drains queue here  
+    // Another thread drains queue here
     item = dequeue();            // USE — may return NULL
 }
 ```
