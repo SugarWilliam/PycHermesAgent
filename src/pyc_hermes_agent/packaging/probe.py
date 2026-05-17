@@ -33,13 +33,26 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     root = Path(args.workspace_root).resolve() if args.workspace_root else None
-    raw_paths = resolve_runtime_paths(root)
+    install = os.environ.get("PYC_HERMES_INSTALL_DIR", "").strip()
+    enforced = os.environ.get("PYC_HERMES_ENFORCE_PACKAGING_RULES", "").strip().lower() in {"1", "true", "yes"}
+
+    try:
+        raw_paths = resolve_runtime_paths(root)
+    except RuntimeError as exc:
+        payload: dict[str, object] = {
+            "packaging_rules_enforced": enforced,
+            "workspace_root": str(root) if root else None,
+            "install_dir": install or None,
+            "install_immutability": "failed",
+            "install_immutability_error": str(exc),
+        }
+        print(json.dumps(payload, indent=2))
+        return 1
+
     paths = ensure_runtime_directories(raw_paths) if args.mkdirs else raw_paths
 
-    install = os.environ.get("PYC_HERMES_INSTALL_DIR", "").strip()
-    payload: dict[str, object] = {
-        "packaging_rules_enforced": os.environ.get("PYC_HERMES_ENFORCE_PACKAGING_RULES", "").strip().lower()
-        in {"1", "true", "yes"},
+    payload = {
+        "packaging_rules_enforced": enforced,
         "workspace_root": str(root) if root else None,
         "install_dir": install or None,
         "paths": _paths_dict(paths),

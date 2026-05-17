@@ -89,3 +89,31 @@ def test_packaging_probe_reports_ok_when_install_dir_is_safe(monkeypatch, tmp_pa
     data = json.loads(out)
     assert data["install_immutability"] == "ok"
     assert Path(data["paths"]["mrag_dir"]).is_relative_to(local)
+
+
+def test_packaging_enforced_rejects_appdata_localappdata_nested_under_install(monkeypatch, tmp_path: Path) -> None:
+    """Misconfiguration: roaming/local data must not live under the read-only install tree."""
+    install = tmp_path / "Program Files" / "PycHermesAgent"
+    install.mkdir(parents=True)
+    monkeypatch.setenv("PYC_HERMES_ENFORCE_PACKAGING_RULES", "1")
+    monkeypatch.setenv("PYC_HERMES_INSTALL_DIR", str(install))
+    monkeypatch.setenv("APPDATA", str(install / "Roaming"))
+    monkeypatch.setenv("LOCALAPPDATA", str(install / "Local"))
+
+    with pytest.raises(RuntimeError) as exc:
+        resolve_runtime_paths(install)
+    assert "Packaging violation" in str(exc.value)
+
+
+def test_packaging_probe_exits_nonzero_when_install_immutability_fails(monkeypatch, tmp_path: Path, capsys) -> None:
+    install = tmp_path / "install"
+    install.mkdir(parents=True)
+    monkeypatch.setenv("PYC_HERMES_ENFORCE_PACKAGING_RULES", "1")
+    monkeypatch.setenv("PYC_HERMES_INSTALL_DIR", str(install))
+    monkeypatch.setenv("APPDATA", str(install / "bad-roam"))
+    monkeypatch.setenv("LOCALAPPDATA", str(install / "bad-local"))
+
+    assert packaging_probe_main(["--workspace-root", str(install)]) == 1
+    err = json.loads(capsys.readouterr().out)
+    assert err["install_immutability"] == "failed"
+    assert "Packaging violation" in err["install_immutability_error"]

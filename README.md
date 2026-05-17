@@ -22,7 +22,7 @@ Current repository status:
 
 ## Continuous integration
 
-Push and pull requests to `main` run **`.github/workflows/ci.yml`** (Python 3.11 and 3.12): `pip install -e ".[dev]"`, `pytest tests/contract`, and `scripts/release_gates.py` (whitespace + heuristic secret scan).
+Push and pull requests to `main` run **`.github/workflows/ci.yml`** (Python 3.11 and 3.12): `pip install -e ".[dev]"`, **`pyc-hermes-packaging-probe`** under a simulated Windows-style layout, `scripts/release_gates.py` (contract tests + whitespace + heuristic secret scan).
 
 ## Quick Start
 

@@ -26,5 +26,17 @@ jobs:
           python -m pip install -U pip
           python -m pip install -e ".[dev]"
 
+      - name: Packaging probe smoke (simulated Windows-style dirs on Linux)
+        run: |
+          set -e
+          ROOT="$(mktemp -d)"
+          INSTALL="$ROOT/install"
+          mkdir -p "$INSTALL"
+          export APPDATA="$ROOT/Roaming"
+          export LOCALAPPDATA="$ROOT/Local"
+          export PYC_HERMES_ENFORCE_PACKAGING_RULES=1
+          export PYC_HERMES_INSTALL_DIR="$INSTALL"
+          pyc-hermes-packaging-probe --workspace-root "$INSTALL" --mkdirs
+
       - name: Quality gates (tests + whitespace + secret heuristics)
         run: python scripts/release_gates.py
