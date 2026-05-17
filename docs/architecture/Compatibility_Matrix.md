@@ -1,39 +1,49 @@
 # PycHermesAgent Compatibility Matrix
 
-| Field | Value |
-| --- | --- |
-| Date | 2026-05-14 |
-| Version | v0.2.0 |
-| Author | 彭耀成 |
+**Status:** Required for release and tag decisions
 
-## Version Axes
+## 1. Version Axes
 
-| Axis | Description |
-| --- | --- |
-| `app_version` | Desktop application release |
-| `sidecar_api_version` | Renderer-to-sidecar API contract |
-| `contract_version` | Schema version for runtime envelopes |
-| `model_manifest_version` | Model asset manifest schema |
-| `index_format_version` | Knowledge index format |
-| `artifact_format_version` | Exported artifact format |
+| Axis | Owner | Current Policy | Release Impact |
+|------|-------|----------------|----------------|
+| `app_version` | package/release | Semantic version or preview suffix | tag and release notes |
+| `sidecar_api_version` | `sidecar_api` | Increment on route or payload contract changes | client compatibility |
+| `contract_version` | `contracts` | Increment on dataclass/schema changes | tests and migration notes |
+| `model_manifest_version` | `asset_manager` | Increment on asset manifest changes | model install compatibility |
+| `index_format_version` | `mrag_core` | Increment on index layout changes | migration or rebuild required |
+| `artifact_format_version` | `artifact_engine` | Increment on artifact metadata changes | artifact consumers |
+| `desktop_ipc_version` | desktop shell | Planned | desktop/sidecar compatibility |
 
-## Compatibility Rules
+## 2. Tag Classes
 
-| Rule | Policy |
-| --- | --- |
-| App vs Sidecar API | Major version must remain compatible |
-| Contract payloads | Reject incompatible major versions |
-| Model assets | Must match manifest checksum and supported app range |
-| Indexes | Rebuild on incompatible format changes |
-| Artifacts | Allow independent evolution from core execution |
+| Tag | Meaning | Allowed Automation |
+|-----|---------|--------------------|
+| `vX.Y.Z-preview.N` | Engineering preview checkpoint | Cursor may create after preview gates pass |
+| `vX.Y.Z-rc.N` | Release candidate | Cursor may create after RC gates pass |
+| `vX.Y.Z` | Production release | Cursor may create only after production gates pass |
 
-## `opencode` Scope
+## 3. Compatibility Rules
 
-| Artifact | Support Level |
-| --- | --- |
-| `opencode.json` | Supported |
-| `opencode.jsonc` | Supported |
-| `AGENTS.md` | Supported |
-| `.opencode/skills/*/SKILL.md` | Supported |
-| Full plugin runtime | Not in Phase 0 |
-| Hosted config sync | Not in Phase 0 |
+- Patch versions must not break sidecar API payloads.
+- Minor versions may add fields and routes, but must keep documented defaults.
+- Major versions may remove or break compatibility only with migration notes.
+- MRAG index format changes require migration or explicit rebuild behavior.
+- Asset manifest changes require checksum and promotion compatibility tests.
+- Artifact format changes require consumer-facing release notes.
+
+## 4. Release Matrix Checklist
+
+Before a tag is created, update this table when applicable:
+
+| Change Type | Required Update | Required Test |
+|-------------|-----------------|---------------|
+| Sidecar route/payload | `sidecar_api_version` | sidecar client + HTTP tests |
+| Contract dataclass/schema | `contract_version` | contract tests |
+| MRAG persistence/index | `index_format_version` | restart + migration/rebuild tests |
+| Asset manifest/promotion | `model_manifest_version` | asset manager tests |
+| Artifact metadata | `artifact_format_version` | artifact engine tests |
+| Desktop IPC | `desktop_ipc_version` | desktop integration tests |
+
+## 5. Current Baseline
+
+The current repository line is `v0.2.0` engineering preview. Production `v1.0.0` cannot be tagged until desktop packaging, release gates, storage migration, and installation verification exist.

@@ -1,3 +1,21 @@
+# Checkpoint Absorption Notice
+
+**Status:** Historical checkpoint absorbed into production governance
+**Current authority:** `docs/Project_Development_and_Release_Governance.md` and `docs/architecture/Phase1_Roadmap_v0.2.0.md`
+
+This checkpoint remains useful as a record of the engineering-preview state around 2026-05-18. Its recommended next slice, MRAG single-process ownership or lock guardrails, has been promoted into the active Phase 1A roadmap. Its trace propagation recommendation has been promoted into Phase 1B.
+
+Future agents should treat the original checkpoint below as context, not as the top-level execution plan. Active execution order is now:
+
+1. Phase 1A: MRAG storage ownership.
+2. Phase 1B: trace/request correlation.
+3. Phase 1C: explicit skill runtime lifecycle.
+4. Phase 1D: MetaHarness value proof.
+5. Phase 1E: MRAG retrieval productization.
+
+
+---
+
 # Development Checkpoint 2026-05-18
 
 | Field | Value |

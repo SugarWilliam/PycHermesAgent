@@ -1,27 +1,50 @@
-# Windows Packaging Boundaries
+# Windows Packaging Constraints
 
-| Field | Value |
-| --- | --- |
-| Date | 2026-05-14 |
-| Version | v0.2.0 |
-| Author | 彭耀成 |
+**Status:** Hard constraint
 
-## Directory Rules
+## 1. Directory Policy
 
-- Install directory is read-only.
-- Configuration lives in `%APPDATA%`.
-- Logs, cache, downloads, indexes, and models live in `%LOCALAPPDATA%`.
-- Models must use `model-id/revision-or-sha` directory layout.
-- Downloads must use checksum validation plus a staging-directory rename promotion foundation; this does not yet imply fsync, crash-durability, or locking guarantees.
+The install directory is read-only. Runtime writes must never target the install directory.
 
-## Upgrade Rules
+Required layout:
 
-- App updates and model updates are separate concerns.
-- Sidecar runtime ships with the app.
-- Model assets follow a manifest with checksum and compatibility range.
+| Data Class | Location |
+|------------|----------|
+| user configuration | `%APPDATA%` equivalent |
+| logs | `%LOCALAPPDATA%` equivalent |
+| caches | `%LOCALAPPDATA%` equivalent |
+| MRAG indexes | `%LOCALAPPDATA%` equivalent |
+| downloads | `%LOCALAPPDATA%` equivalent |
+| model assets | `%LOCALAPPDATA%` equivalent |
+| artifacts | `%LOCALAPPDATA%` equivalent |
 
-## Risk Guardrails
+## 2. Model and Asset Promotion
 
-- No mutable runtime state in the install directory.
-- No implicit feature availability based on silent import failures.
-- No mixed responsibility between Electron and the sidecar for model downloads.
+Model downloads and asset installation must use:
+
+- staging directory,
+- checksum validation,
+- manifest validation,
+- atomic promotion where supported,
+- no mutation of install directory.
+
+The current staging rename foundation is not a full fsync, crash-durability, or cross-process locking guarantee. Production claims require additional tests and documented behavior.
+
+## 3. Sidecar and Desktop Boundary
+
+The Electron shell may launch and supervise the sidecar, but sidecar runtime state remains owned by the Python sidecar modules. Desktop code must not bypass sidecar contracts to mutate MRAG indexes, model assets, or artifact records.
+
+## 4. Release Packaging Gate
+
+A Windows release package cannot be tagged production-ready until:
+
+- runtime path tests pass,
+- install-directory immutability is tested,
+- asset promotion tests pass,
+- sidecar health smoke passes after install,
+- upgrade/migration behavior is documented,
+- no local secrets or runtime state are packaged.
+
+## 5. Cursor Automation Boundary
+
+Cursor may automate push, tag, and release preparation only after packaging gates pass for the intended release class. Cursor must stop when signing, installer credentials, store upload credentials, or destructive git operations are required but not explicitly available and verified.

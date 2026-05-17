@@ -1,98 +1,88 @@
-# PycHermesAgent Architecture
+# PycHermesAgent Architecture v0.2.0
 
-| Field | Value |
-| --- | --- |
-| Date | 2026-05-14 |
-| Version | v0.2.0 |
-| Author | 彭耀成 |
-| Status | Active Architecture Baseline |
+**Status:** Production-target architecture baseline
+**Authority:** This document defines module ownership and boundary rules. Development and release governance is defined by `docs/Project_Development_and_Release_Governance.md`.
 
-## Purpose
+## 1. Product Architecture
 
-`PycHermesAgent` is a Windows desktop agent platform built around five clearly separated layers:
+PycHermesAgent is a Windows-first, local-first agent platform baseline. It combines a product-owned orchestration engine, a formal-analysis harness, provider-isolated LLM execution, local retrieval, stable sidecar contracts, and a future Electron shell.
 
-1. `hermes_engine`
-2. `meta_harness`
-3. `llm_gateway`
-4. `mrag_core`
-5. `desktop shell`
-
-The goal is to preserve Hermes learning and memory strengths while adding a stable methodology harness that compensates for weak LLM logic, weak modeling discipline, and weak reasonableness checking.
-
-## Layered Architecture
-
-```text
-Electron Desktop
-├─ Main Process
-├─ Renderer
-└─ Typed IPC
-
-Python Sidecar
-├─ hermes_engine
-├─ meta_harness
-├─ llm_gateway
-├─ mrag_core
-├─ artifact_engine
-└─ asset_manager
-
-Local Storage
-├─ config
-├─ logs
-├─ cache
-├─ indexes
-├─ models
-├─ sessions
-└─ artifacts
+```mermaid
+flowchart TD
+  desktop["Electron Desktop"] --> sidecar["sidecar_api"]
+  sidecar --> hermesEngine["hermes_engine"]
+  sidecar --> metaHarness["meta_harness"]
+  sidecar --> mragCore["mrag_core"]
+  sidecar --> assetManager["asset_manager"]
+  sidecar --> artifactEngine["artifact_engine"]
+  hermesEngine --> llmGateway["llm_gateway"]
+  hermesEngine --> toolRegistry["Tool Registry"]
+  toolRegistry --> metaHarness
+  mragCore --> evidencePackage["Evidence Package"]
 ```
 
-## Hard Boundaries
+The current repository implements the Python sidecar, LLM gateway MVP, Hermes read-only bridge snapshots, a product-owned agent loop, MetaHarness MVP, MRAG text/JSON MVP, and local asset/artifact foundations. The desktop shell and production release runtime are planned, not complete.
 
-- Formal analysis must go through `MetaFramework.execute()`.
-- `meta_harness` must not depend on provider auth, renderer state, or vector-store internals.
-- `hermes_engine` must not implement methodology grading.
-- `llm_gateway` must not leak provider-native objects upward.
-- `mrag_core` must not absorb unrelated runtime caches.
-- The install directory must remain read-only.
+## 2. Module Ownership
 
-## Execution Strategy
+| Module | Owns | Must Not Own |
+|--------|------|--------------|
+| `hermes_engine` | Orchestration, sessions, memory injection, tool loop, retry/recovery, product-owned AgentLoop | Formal method grading, provider auth, vector storage internals |
+| `meta_harness` | Method selection, formal analysis, logic/reasonableness review, CE/SR grades, risks, recommendations, degraded state | General agent runtime, Electron state, provider SDKs, MRAG storage |
+| `llm_gateway` | Provider/model/auth/config compatibility, chat execution, streaming execution, opencode-style config interpretation | Agent orchestration, MetaHarness grading, UI rendering |
+| `mrag_core` | Ingestion, chunking, indexing, retrieval, reranking, evidence packaging, citation fidelity | Logs, model assets, chat memory, artifact export |
+| `sidecar_api` | Stable local product contracts over Python and HTTP/SSE | Business ownership of loop state machines |
+| `asset_manager` | Model/runtime asset validation, staging, promotion, inventory | Chat memory, MRAG indexes, artifacts |
+| `artifact_engine` | Exported task artifacts and metadata | Model assets, MRAG indexes, provider state |
+| `desktop shell` | UI, IPC, settings, lifecycle, release packaging | Provider auth internals, MetaHarness method logic, MRAG indexing internals |
 
-1. Freeze governance and contracts.
-2. Build `meta_harness` as a minimum viable base.
-3. Add `opencode`-style compatibility for LLM configuration and discovery.
-4. Add Hermes integration seams.
-5. Add local-first MRAG.
-6. Build the desktop shell after sidecar contracts are stable.
+## 3. Hard Runtime Boundaries
 
-## Compatibility Strategy
+- Formal analysis must enter through `MetaFramework.execute()`.
+- `meta_harness` must remain a harness, not a monolithic runtime.
+- Provider-native SDK objects and response objects must not escape `llm_gateway`.
+- `mrag_core` must not mix retrieval indexes with logs, chat memory, model assets, or rendered artifacts.
+- Predictive outputs must not be represented as intervention-grade causal claims.
+- CE and SR grading remain separate fields and separate reasoning tracks.
+- Install directories are read-only. Runtime state belongs under platform local/roaming application data.
 
-The project intentionally supports the following `opencode` user-facing artifacts:
+## 4. Current Runtime Shape
 
-- `opencode.json`
-- `opencode.jsonc`
-- `AGENTS.md`
-- `.opencode/skills/*/SKILL.md`
+The implemented runtime is:
 
-The project does not aim to embed the full `opencode` runtime.
-
-## Sidecar Health Contract
-
-- Product consumers must treat top-level `get_health()["status_label"]` as the first readiness signal.
-- Nested `get_health()["hermes"]` fields are diagnostic detail and must not be used to re-derive initial readiness in clients.
-- The minimal Python client entry point is `pyc_hermes_agent.SidecarClient`.
-- If top-level `status_label` is missing, the client collapses to `degraded` when top-level `degraded` is `true`; otherwise it collapses to `unavailable`.
-
-```python
-from pyc_hermes_agent import SidecarClient
-
-status = SidecarClient().get_health_status()
-print(status.status_label)
+```mermaid
+flowchart LR
+  client["SidecarClient or HTTP"] --> service["sidecar_api.service"]
+  service --> agentLoop["hermes_engine.AgentLoop"]
+  agentLoop --> gateway["llm_gateway.execute_chat/stream_chat"]
+  agentLoop --> tools["ToolRegistry"]
+  tools --> formal["MetaFramework.execute"]
+  service --> mrag["MRAGService"]
+  service --> hermesFacade["HermesFacade snapshots"]
 ```
 
-## Related Documents
+This shape is acceptable for engineering preview. It is not yet a production desktop product because storage ownership, runtime skill binding, packaging, migration, observability, and desktop lifecycle remain incomplete.
 
-- `docs/architecture/Hermes_Mixed_Integration_Mapping_v0.2.0.md`
-- `docs/architecture/Execution_Blueprint_v0.2.0.md`
-- `docs/architecture/PycHermesAgent_Solution_Architecture_v0.2.0.md`
-- `docs/design/PycHermesAgent_Detailed_Design_v0.2.0.md`
-- `docs/features/PycHermesAgent_Feature_Details_v0.2.0.md`
-- `docs/deployment/PycHermesAgent_Usage_Deployment_Guide_v0.2.0.md`
+## 5. Production Architecture Direction
+
+Production readiness requires these additions without breaking ownership boundaries:
+
+1. MRAG storage ownership or file locking.
+2. Request and trace propagation across HTTP, service, AgentLoop, LLM, MRAG, and MetaHarness.
+3. Explicit skill runtime lifecycle.
+4. MetaHarness benchmark and dependency capability proof.
+5. Stable asset and artifact sidecar contracts.
+6. Electron lifecycle and packaging.
+7. Release gates and version matrix enforcement.
+
+## 6. Testing Priority
+
+The required test priority remains:
+
+1. Contract tests.
+2. Harness smoke tests.
+3. Compatibility tests.
+4. Integration tests.
+5. Desktop UI tests last.
+
+No production release may invert this priority.

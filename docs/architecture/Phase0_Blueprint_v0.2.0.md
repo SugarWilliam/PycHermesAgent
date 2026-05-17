@@ -1,49 +1,28 @@
-# PycHermesAgent Phase 0 Blueprint
+# PycHermesAgent Phase 0 Blueprint v0.2.0
 
-| Field | Value |
-| --- | --- |
-| Date | 2026-05-14 |
-| Version | v0.2.0 |
-| Author | 彭耀成 |
-| Status | Ready for Implementation |
+**Status:** Historical baseline, absorbed into production governance
 
-## Phase 0 Goals
+Phase 0 established the governance, architecture boundaries, package skeleton, core contracts, compatibility scope, and initial contract tests. It remains important as a historical baseline, but future work is governed by `docs/Project_Development_and_Release_Governance.md` and the active Phase 1 roadmap.
 
-Phase 0 freezes the parts of the system that should not drift during implementation:
+## Phase 0 Deliverables
 
-1. Governance documents
-2. Project rules and skills
-3. Package skeleton
-4. Cross-layer contracts
-5. Packaging and storage boundaries
-6. Compatibility scope
+- `AGENTS.md` project boundaries.
+- `opencode.jsonc` compatibility configuration.
+- Package skeleton under `src/pyc_hermes_agent`.
+- Contract tests under `tests/contract`.
+- Architecture, design, feature, deployment, and constraints documents.
+- Initial OpenCode skill compatibility material.
 
-## Deliverables
+## Continuing Constraints
 
-1. Architecture documents in `docs/architecture/`
-2. Constraint documents in `docs/constraints/`
-3. `AGENTS.md`
-4. `opencode.jsonc`
-5. `.opencode/skills/*/SKILL.md`
-6. `pyproject.toml`
-7. `src/pyc_hermes_agent/` package skeleton
-8. `tests/contract/` skeleton
+The following Phase 0 constraints remain active:
 
-## Success Criteria
+- Formal analysis through `MetaFramework.execute()`.
+- Provider isolation in `llm_gateway`.
+- MRAG storage separation.
+- Install-directory immutability.
+- Contract tests before integration and UI tests.
 
-- The project has a stable ruleset.
-- The project has a stable `opencode` compatibility entry.
-- The project has a stable package structure.
-- The first code iteration no longer depends on ad hoc flat scripts as the product runtime.
+## Superseded Planning Role
 
-## Explicit Non-Goals
-
-- Full Electron desktop implementation
-- Full MRAG pipeline
-- Full Hermes runtime integration
-- Full provider login flows
-- Full migration of all legacy adapters
-
-## Phase 1 Entry Condition
-
-Phase 1 starts only after all governance files, contracts, and skeleton modules are committed to the repository and validated with smoke tests.
+This document no longer defines the active roadmap. Use `Phase1_Roadmap_v0.2.0.md` and `Execution_Blueprint_v0.2.0.md` for current implementation order.

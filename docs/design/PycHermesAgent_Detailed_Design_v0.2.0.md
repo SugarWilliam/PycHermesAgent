@@ -1,387 +1,165 @@
-# PycHermesAgent Detailed Design
+# PycHermesAgent Detailed Design v0.2.0
 
-| Field | Value |
-| --- | --- |
-| Date | 2026-05-15 |
-| Version | v0.2.0 |
-| Author | 彭耀成 |
-| Status | Detailed Design Aligned to Current Implementation |
-
-## Design Goals
-
-1. Preserve the project boundaries defined in `AGENTS.md`.
-2. Give the desktop shell a stable sidecar-facing contract.
-3. Reuse Hermes capabilities without importing the upstream runtime directly into the sidecar process.
-4. Keep methodology logic inside `meta_harness` and provider/model compatibility inside `llm_gateway`.
-5. Keep retrieval and evidence packaging inside `mrag_core`.
+**Status:** Detailed design for production-bound development
+**Governance:** `docs/Project_Development_and_Release_Governance.md`
 
-## Package Topology
+## 1. Design Goals
 
-| Package | Design Role | Current Implementation |
-| --- | --- | --- |
-| `pyc_hermes_agent.sidecar_api` | Stable product-facing Python contract surface | Implemented |
-| `pyc_hermes_agent.common` | Shared client helpers and small product-facing convenience wrappers | Implemented |
-| `pyc_hermes_agent.hermes_engine` | Hermes runtime seam, tool registry, sync loop, and session/history ownership | Implemented as minimal runtime foundation |
-| `pyc_hermes_agent.meta_harness` | Method selection, judgment, quality checks, legacy bridge | Implemented as MVP |
-| `pyc_hermes_agent.llm_gateway` | Config/model/provider/rule/skill compatibility and minimal sync execution | Implemented as minimal runtime boundary |
-| `pyc_hermes_agent.mrag_core` | Knowledge ingestion and retrieval | Implemented as local-first JSON-backed MVP |
-| `pyc_hermes_agent.asset_manager` | Model and runtime assets | Partial: local manifest validation, checksum verification, and staging-directory rename promotion foundation; no fsync, durability, or locking guarantee yet |
-| `pyc_hermes_agent.artifact_engine` | Exported artifacts | Partial: local artifact export and task-artifact metadata foundation |
+This document defines how PycHermesAgent must evolve from the current engineering preview into a production-grade local-first agent platform. It is implementation-oriented and must be updated whenever contracts, storage layouts, runtime flows, or release gates change.
 
-## Public Runtime Contracts
+## 2. Package Topology
 
-Primary dataclass contracts live in `src/pyc_hermes_agent/contracts/schemas.py`.
+| Package | Current Role | Next Production Design Step |
+|---------|--------------|-----------------------------|
+| `contracts` | Shared dataclass contracts | Add versioned trace and error context when contracts change |
+| `common` | Runtime paths and sidecar client | Keep path policy aligned with install/local data rules |
+| `sidecar_api` | Python service + HTTP/SSE transport | Harden error, trace, request ID, asset/artifact routes |
+| `llm_gateway` | Provider config and chat runtime | Keep provider-native objects contained; improve provider test matrix |
+| `hermes_engine` | AgentLoop, sessions, memory, tools | Add explicit skill activation and stronger memory/search contracts |
+| `meta_harness` | Formal analysis harness | Add dependency-aware capabilities and benchmark value proof |
+| `mrag_core` | Local retrieval and persistence | Add storage ownership, migration, file/url ingest, richer retrieval |
+| `asset_manager` | Local model asset foundation | Expose through sidecar only after release-safe contract design |
+| `artifact_engine` | Local artifact export foundation | Expose task artifact routes and metadata compatibility |
 
-Important contract families:
+## 3. Sidecar Design
 
-1. Task contracts: `TaskRequest`, `TaskResult`
-2. Chat and agent runtime contracts: `ChatMessage`, `ChatCompletionRequest`, `ChatCompletionResult`, `ToolDefinition`, `ToolCall`, `ToolCallResult`, `AgentLoopRequest`, `AgentLoopResult`, `AgentPlan`, `PlanStep`
-3. Formal analysis contracts: `MetaAnalysisRequest`, `MetaAnalysisResult`
-4. Event and error envelopes: `EventEnvelope`, `ErrorEnvelope`
-5. Hermes discovery and bridge contracts: `HermesRuntimeSnapshot`, `HermesIntegrationSnapshot`, `Hermes*Snapshot`
-6. Retrieval contracts: `RetrievalRequest`, `RetrievalResult`, `Citation`, `RetrievalHit`
+The sidecar is the stable local product surface. It may expose orchestration but must not own business state machines that belong to `hermes_engine`, `meta_harness`, or `mrag_core`.
 
-Design rule:
+Required HTTP/SSE properties:
 
-- Contracts are the stable boundary.
-- Internal implementations may evolve, but these envelopes should remain versioned and predictable.
+- JSON errors use a standard envelope.
+- Streaming events include terminal state.
+- Request IDs are generated or propagated.
+- Agent loop trace IDs remain separate from request IDs.
+- Health status distinguishes ready, degraded, unavailable, and ready-with-warnings.
 
-## Sidecar API Design
+Future routes should be added only with contract tests and client coverage.
 
-The sidecar API is currently implemented in two layers:
+## 4. MRAG Storage Ownership Design
 
-1. An importable Python function surface
-2. A minimal local HTTP transport
+The current JSON persistence is acceptable only with an explicit ownership guardrail.
 
-Implemented function entry points in `src/pyc_hermes_agent/sidecar_api/service.py` include:
+Design requirements:
 
-1. Health and configuration: `get_health`, `get_config_snapshot`
-2. Hermes snapshots: `get_hermes_capability_snapshot`, `get_hermes_sessions_snapshot`, `get_hermes_memory_snapshot`, `get_hermes_skills_snapshot`, `get_hermes_tools_snapshot`, `get_hermes_bridge_health`
-3. LLM compatibility discovery: `list_providers`, `list_models`, `list_rules`, `list_skills`
-4. Formal analysis: `invoke_formal_analysis`
-5. Agent runtime: `run_agent_loop`
-6. MRAG: `list_knowledge_bases`, `create_knowledge_base`, `ingest_text_document`, `search_knowledge_base`
+- A storage root must have a single active owner or lock.
+- Same-process reuse is allowed.
+- Second-process writes must fail with a structured sidecar error.
+- Lock files must be in the runtime data directory, not the install directory.
+- Lock behavior must be tested with restart and cleanup paths.
+- Index manifests must include version fields.
 
-Implemented HTTP transport entry points in `src/pyc_hermes_agent/sidecar_api/http_server.py` include:
+Production migration path:
 
-1. `GET /health`
-2. `GET /config`
-3. `GET /providers`
-4. `GET /models`
-5. `GET /rules`
-6. `GET /skills`
-7. `GET /hermes/capability`
-8. `GET /hermes/bridge-health`
-9. `GET /hermes/sessions`
-10. `GET /hermes/memory`
-11. `GET /hermes/skills`
-12. `GET /hermes/tools`
-13. `GET /knowledge-bases`
-14. `POST /formal-analysis`
-15. `POST /agent/run`
-16. `POST /knowledge-bases`
-17. `POST /knowledge-bases/{id}/documents/text`
-18. `POST /knowledge-bases/{id}/search`
+1. Locked JSON MVP.
+2. Index format check and rebuild behavior.
+3. SQLite/FTS5 or vector index decision record.
+4. Optional embeddings/reranking after storage migration rules exist.
 
-Current design tradeoff:
+## 5. Trace and Error Design
 
-- The interface is easy to test and now supports a minimal local process boundary over HTTP.
-- It is still not a production-complete sidecar process contract.
+Trace data exists for operator diagnosis, not for model prompting.
 
-Current implementation additions:
+Required fields:
 
-1. The HTTP transport now emits minimal structured log events for request start and finish.
-2. Transport error payloads now carry an explicit top-level `status` field when the request fails.
+| Field | Meaning |
+|-------|---------|
+| `request_id` | External sidecar request correlation |
+| `trace_id` | Agent loop execution trace |
+| `sequence` | Ordered streaming event sequence |
+| `task_id` | Task or operation identity when available |
+| `error.code` | Stable machine-readable error |
+| `error.category` | Transport, validation, provider, storage, runtime, or degraded |
 
-## Sidecar Client Design
+Every new route must specify whether it emits request IDs, trace IDs, or both.
 
-`src/pyc_hermes_agent/common/sidecar_client.py` provides the minimum product client wrapper.
+## 6. Skill Runtime Lifecycle Design
 
-Design rules:
+Skill handling must be explicit and auditable.
 
-1. `SidecarClient.get_health()` returns the raw health payload.
-2. `SidecarClient.get_health_status()` returns a small normalized object for product consumption.
-3. Top-level `status_label` is authoritative.
-4. Nested `hermes` readiness detail must not be used to reconstruct first-read health.
-5. Missing top-level `status_label` collapses to `degraded` only when top-level `degraded` is true; otherwise it collapses to `unavailable`.
-6. `SidecarClient` can read health from the local HTTP transport via `base_url`.
-7. `SidecarClient.run_agent_loop()` mirrors the sidecar route without moving loop ownership out of `hermes_engine`.
+```mermaid
+flowchart LR
+  discover["Discover"] --> parse["Parse Metadata"]
+  parse --> activate["Explicit Activate"]
+  activate --> bind["Bind Context"]
+  bind --> audit["Audit Metadata"]
+  audit --> executeLater["Permissioned Script Execution Later"]
+```
 
-## Hermes Bridge Design
+Phase 1 supports discovery, parsing, explicit activation, and context binding. Script execution is not permitted until a permission model, sandbox policy, and audit trail exist.
 
-`src/pyc_hermes_agent/hermes_engine/runtime.py` implements a read-only seam around the vendored `upstream/hermes-agent/` checkout.
+Skill context binding rules:
 
-The design intentionally favors `subprocess-readonly` probing over direct runtime embedding.
+- Never inject all discovered skills by default.
+- Bind only explicitly requested skills.
+- Preserve source path and metadata in trace/audit payloads.
+- Do not let skill content override `AGENTS.md` or governance constraints.
 
-Bridged surfaces currently include:
+## 7. MetaHarness Value Proof Design
 
-1. Sessions
-2. Skills
-3. Tools
-4. Memory
+MetaHarness must demonstrate reliability value. All formal analysis remains routed through `MetaFramework.execute()`; benchmark and dependency improvements must strengthen that entry point rather than create a parallel API.
 
-Design intent:
+Required implementation direction:
 
-1. Allow real upstream surface inspection
-2. Avoid merging upstream runtime ownership into the sidecar process
-3. Keep bridge health and warnings visible through explicit contracts
+- `CapabilityRegistry.is_dependency_available()` must reflect real capability status.
+- `LegacyMetaBridge` must expose capability status without requiring execution side effects.
+- `MethodSelector` must consider task type, data shape, and method preconditions.
+- `MethodJudge` and `QualityChecker` must identify method-specific risks.
+- Benchmark tests must compare baseline behavior to MetaHarness-guided behavior.
 
-Current limitation:
+Benchmark dimensions:
 
-- The bridge is good for discovery and readiness reporting, but it is not yet a full conversation runtime adapter.
+| Dimension | Example Metric |
+|-----------|----------------|
+| Causal boundary | Overclaim reduction |
+| Method choice | Correct method selection rate |
+| Risk review | Missed high-risk issue rate |
+| Evidence grade | Correct CE/SR separation |
+| Degraded state | Correct unavailable/degraded labeling |
 
-## Agent Runtime Position
+## 8. LLM Gateway Design
 
-Current repository status:
+`llm_gateway` is the only provider runtime boundary.
 
-1. The project is an Agent infrastructure and sidecar skeleton.
-2. It now includes a minimal synchronous multi-turn Agent runtime.
-3. It is not yet a full production-grade Agent runtime.
+Rules:
 
-Accepted architecture rule:
+- Model IDs use `provider/model` format.
+- Provider-specific headers, tokens, refresh behavior, and native responses remain inside `llm_gateway`.
+- Errors crossing the boundary must be normalized.
+- Streaming parsers must have mock-provider tests.
+- Free-first model presentation remains the default.
 
-1. Agent orchestration belongs in `hermes_engine`.
-2. `sidecar_api` should expose orchestration, not own it.
-3. `meta_harness` should remain an explicit callable capability inside the agent ecosystem rather than becoming the orchestration owner.
+## 9. Asset and Artifact Design
 
-Current remaining Agent runtime gaps:
+Asset and artifact services are separate domains.
 
-1. Richer planning and decomposition beyond heuristic prompt-time plan injection
-2. Richer full-loop streaming beyond assistant text delta passthrough
+- `asset_manager` owns model/runtime asset manifests, checksums, staging, promotion, and inventory.
+- `artifact_engine` owns task outputs, metadata, checksums, and export records.
+- Neither service may store MRAG indexes or chat memory.
+- Sidecar routes for these services must be versioned and covered by contract tests before desktop integration.
 
-Current implementation update:
+## 10. Desktop Design Preconditions
 
-1. A minimal synchronous `AgentLoop` now exists in `src/pyc_hermes_agent/hermes_engine/agent_loop.py`.
-2. The current loop is engine-owned and executes a bounded `[LLM -> tool -> re-call]` cycle.
-3. Tool definitions and returned tool calls now move through the `llm_gateway` sync execution path.
-4. `meta_harness` is now wired into the loop as builtin `formal_analysis` callable capability rather than as orchestration owner.
-5. `sidecar_api` and the local HTTP transport now expose the loop but do not own its state machine.
-6. `AgentSessionStore` now persists session-backed history under runtime local data.
-7. Prompt assembly now injects bounded session memory as fenced system context before the recent live window.
-8. Minimal planning and decomposition now exist through heuristic `AgentPlan` generation and execution-plan system-message injection, and callers can disable it per request with `planning_enabled=False`.
-9. Minimal reflection and retry budgeting now exist for two bounded recovery cases: empty assistant replies and tool turns where every dispatched tool result is an error.
-10. Recovery guidance is injected as transient system context, bounded by `retry_budget`, reported through `retry_count`, and kept inside `hermes_engine` rather than a separate recovery service.
-11. `AgentLoop.stream()` now exposes a minimal event stream for loop start, plan emission, token-level assistant text deltas, assistant completion, tool results, retries, done, and error, while `run()` remains a thin wrapper over the same underlying state machine.
+Electron desktop work may begin after:
 
-## MetaHarness Design
+- sidecar health/error/trace semantics are stable,
+- MRAG storage ownership is protected,
+- runtime paths and packaging constraints are enforced,
+- release gates can distinguish preview vs production,
+- asset/artifact APIs are stable enough for UI consumption.
 
-`MetaFramework.execute()` in `src/pyc_hermes_agent/meta_harness/kernel/framework.py` is the only formal-analysis entry point.
+## 11. Verification Requirements
 
-Positioning rule:
+Minimum command:
 
-1. `meta_harness` is currently a configurable method-routing and review harness.
-2. It is not currently a general symbolic inference engine.
-3. It does not guarantee deterministic logical compensation for weak LLM reasoning.
+```bash
+./.venv/bin/python -m pytest tests/contract
+```
 
-Execution model:
+Scope-specific requirements:
 
-1. `MethodSelector` chooses a method using keyword and data-shape heuristics.
-2. `LegacyMetaBridge` executes the selected method against legacy adapters when data is supplied.
-3. `MethodJudge` produces logic and reasonableness review outputs.
-4. `QualityChecker` annotates risks, recommendations, and degraded-state validation.
-
-Current design characteristics:
-
-1. Good enough for contract freezing and smoke testing
-2. Not good enough for strong method assurance
-3. Dependency availability remains under-modeled because `CapabilityRegistry.is_dependency_available()` currently returns `True` for known capabilities
-
-Boundary rule:
-
-1. `meta_harness` does not directly call LLM providers today.
-2. If future method routing or review becomes model-assisted, it must go through `llm_gateway` execution interfaces rather than bypassing provider boundaries.
-3. If integrated into an Agent loop, `meta_harness` should be invoked as an explicit runtime capability or tool, not as the owner of orchestration state.
-
-## LLM Gateway Design
-
-`llm_gateway` is currently a compatibility and discovery layer.
-
-Boundary rule:
-
-1. `llm_gateway` remains the only layer that may own provider/model execution semantics.
-2. Other layers may depend on `llm_gateway` abstractions, but must not embed provider-specific execution logic.
-
-What it resolves today:
-
-1. `opencode.json` and `opencode.jsonc`
-2. Provider and model catalogs
-3. Free-first sorting
-4. Rule discovery from `AGENTS.md`
-5. Skill discovery from `.opencode/skills/*/SKILL.md`
-
-What it does not yet own:
-
-1. Broad provider coverage beyond the minimal OpenAI-compatible and direct GitHub Copilot sync paths
-2. Rich authentication flows
-3. Broad provider streaming execution beyond the minimal OpenAI-compatible and GitHub Copilot SSE path
-4. Production-grade retries and rate limiting
-5. Runtime model fallback
-
-Current implementation additions:
-
-1. `src/pyc_hermes_agent/llm_gateway/runtime.py` provides minimal synchronous execution paths for OpenAI-compatible providers and direct GitHub Copilot plus minimal SSE streaming paths for the same surface.
-2. The initial runtime path supports `model`, `messages`, timeout, retry count, configured base URL, API key/header injection, Copilot token resolution, Copilot request headers, one-shot credential refresh on `401`, and SSE chunk parsing.
-3. The runtime remains intentionally narrow and does not yet change the architectural rule that `llm_gateway` is the sole LLM execution boundary.
-4. Runtime execution is explicitly gated to a small provider allowlist rather than implicitly enabling all discovered providers.
-
-Accepted next-step rule for Agent runtime:
-
-1. The first Agent-loop implementation should extend the current synchronous LLM path with tool definitions and parsed tool calls.
-2. Richer full-loop streaming beyond assistant text delta passthrough should remain deferred until the synchronous loop and minimal event stream are stable.
-3. Tool execution contracts should converge on an OpenAI-compatible function-calling shape where practical.
-
-Current implementation update:
-
-1. `execute_chat()` now accepts tool definitions and parses returned `tool_calls`.
-2. `stream_chat()` now parses minimal OpenAI-compatible SSE delta events and emits incremental chunks plus a final done event.
-3. `sidecar_api.stream_chat_completion()` and `POST /llm/chat/stream` now expose the streaming path without moving provider semantics out of `llm_gateway`.
-4. `hermes_engine` still owns tool dispatch and loop control.
-
-## Agent Loop Streaming Design
-
-The current agent-loop streaming path is hybrid: assistant text and streamed tool-call formation are emitted incrementally, while tool results, retries, and lifecycle updates remain event-oriented.
-
-Current implementation characteristics:
-
-1. `AgentLoop.stream()` emits loop lifecycle events from the same state machine used by `AgentLoop.run()`.
-2. Event types currently include start, plan, assistant delta/completed, assistant tool-call delta, tool result, retry, done, and error.
-3. The HTTP transport exposes this path as `POST /agent/run/stream` using SSE.
-4. Assistant text deltas and streamed tool-call formation now pass through the loop when a streaming LLM executor is available, while tool results, retries, and final result updates remain event-oriented.
-5. Each event now carries stable metadata: `event_id` for identity, `trace_id` for stream correlation, `sequence` for ordering, and `is_terminal` for completion semantics.
-
-## MRAG Design
-
-`mrag_core` currently uses an `MRAGService` with optional local JSON persistence.
-
-Flow:
-
-1. Create a knowledge base.
-2. Parse text, file, or URL text into a `KnowledgeDocument`.
-3. Chunk by character windows.
-4. Store documents and chunks in memory.
-5. Persist manifests, source documents, and chunk indexes when a storage root is configured.
-6. Retrieve using lexical token overlap.
-7. Return hits and citations.
-
-Current limitation:
-
-- This is still an MVP evidence path, not a production retrieval subsystem.
-- Persistence is JSON-backed and local-first, but there is no production database, migration layer, vector index, or concurrency model.
-
-Current on-disk layout when persistence is enabled:
-
-1. `mrag_core/knowledge_bases/<knowledge_base_id>/manifest.json`
-2. `mrag_core/sources/<knowledge_base_id>/<document_id>.json`
-3. `mrag_core/indexes/<knowledge_base_id>/chunks.json`
-
-Artifact outputs remain outside the MRAG root and should continue to live under the runtime `artifacts` directory.
-
-## Storage and Packaging Design
-
-Target storage rules come from:
-
-1. `docs/constraints/windows-packaging.md`
-2. `docs/constraints/mrag-evidence-boundaries.md`
-
-Target rules:
-
-1. Install directory is read-only.
-2. `%APPDATA%` stores configuration.
-3. `%LOCALAPPDATA%` stores mutable runtime assets.
-4. MRAG indexes, sources, and artifacts remain physically separate.
-5. Model downloads require checksum validation and staging-directory rename promotion foundation; current code does not provide fsync, crash-durability, or cross-process locking guarantees.
-
-Current implementation additions:
-
-1. `src/pyc_hermes_agent/common/runtime_paths.py` resolves sandboxed or OS-backed runtime directories.
-2. `MRAGService` now persists knowledge-base manifests, source documents, and chunk indexes under the local MRAG runtime root.
-
-Current implementation gap:
-
-- These rules are documented but not yet implemented end to end in code.
-
-## Concurrency Model
-
-The current sidecar concurrency model is intentionally minimal.
-
-1. The local HTTP transport uses `ThreadingHTTPServer`.
-2. The current persistence design assumes single-process ownership of the runtime storage root.
-3. There is no cross-process locking, work queue, or migration coordinator yet.
-4. JSON-backed MRAG persistence should therefore be treated as engineering-preview storage rather than a concurrent production store.
-
-## Error and Degraded-State Design
-
-The current implementation uses explicit degraded-state reporting in multiple places:
-
-1. Sidecar health reports `degraded` and `status_label`.
-2. Formal analysis results report `degraded` and structured risks.
-3. Hermes bridge health reports blocked and bridged surfaces.
-
-Current limitation:
-
-- Degraded-state semantics are present, but not yet standardized across a transport boundary, desktop shell, persistent logs, or operator alerts.
-
-Accepted next design step:
-
-1. Keep top-level `status_label` as the canonical readiness signal.
-2. Standardize that signal in transport responses, structured logs, and future desktop lifecycle events.
-
-## Skill Lifecycle Design
-
-Current skill support is discovery-oriented rather than execution-oriented.
-
-Current implemented lifecycle:
-
-1. Discover `.opencode/skills/*/SKILL.md`
-2. Parse frontmatter metadata
-3. Expose skill metadata through `llm_gateway` and `sidecar_api`
-
-Accepted target lifecycle:
-
-1. Discover
-2. Parse
-3. Normalize
-4. Persist or cache metadata if needed
-5. Bind at runtime through explicit consumer flows
-
-Current limitation:
-
-- Skills are currently metadata resources, not deeply integrated runtime behaviors inside `meta_harness` or `llm_gateway` execution flows.
-
-## Test Design
-
-Current automated verification lives in `tests/contract/` and focuses on:
-
-1. Contract stability
-2. Hermes seam behavior with fake upstream fixtures
-3. MetaHarness smoke behavior
-4. LLM compatibility resolution
-5. MRAG text retrieval behavior
-6. Sidecar health and client semantics
-
-Current test gap:
-
-1. No end-to-end desktop tests
-2. Only minimal sidecar transport tests
-3. Only minimal persistent-storage tests
-4. No packaging installer tests
-5. No performance or soak tests
-
-## Production Gaps
-
-The most important design gaps before production are:
-
-1. A production-grade sidecar transport and lifecycle model
-2. Real LLM provider execution paths
-3. Persistent MRAG storage and index management
-4. Implemented asset and artifact subsystems
-5. End-to-end integration and release validation
-
-## Related Documents
-
-- `docs/architecture/Hermes_Mixed_Integration_Mapping_v0.2.0.md`
-- `docs/architecture/Execution_Blueprint_v0.2.0.md`
-- `docs/architecture/PycHermesAgent_Solution_Architecture_v0.2.0.md`
-- `docs/architecture/Phase1_Roadmap_v0.2.0.md`
-- `docs/features/PycHermesAgent_Feature_Details_v0.2.0.md`
-- `docs/deployment/PycHermesAgent_Usage_Deployment_Guide_v0.2.0.md`
+- MRAG: lock, restart, index version, retrieval tests.
+- LLM: mock provider, auth failure, SSE parsing tests.
+- AgentLoop: tool call, retry, session persistence, stream tests.
+- MetaHarness: routing, degraded, benchmark smoke tests.
+- Packaging: runtime path and asset promotion tests.
+- Release: status classification, secret scan, release note checks.

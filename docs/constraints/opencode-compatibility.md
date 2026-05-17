@@ -1,25 +1,44 @@
-# opencode Compatibility Boundaries
+# OpenCode Compatibility Constraints
 
-| Field | Value |
-| --- | --- |
-| Date | 2026-05-14 |
-| Version | v0.2.0 |
-| Author | 彭耀成 |
+**Status:** Hard constraint
 
-## Supported Compatibility Targets
+## 1. Compatibility Scope
 
-- `opencode.json`
-- `opencode.jsonc`
-- `AGENTS.md`
-- `.opencode/skills/*/SKILL.md`
+PycHermesAgent supports compatibility with:
 
-## Design Intent
+- `opencode.json` and `opencode.jsonc`,
+- `AGENTS.md`,
+- `.opencode/skills/*/SKILL.md`,
+- provider/model style identifiers.
 
-Compatibility exists to reduce user learning cost. It is not a requirement to embed or duplicate the full `opencode` runtime.
+The project must not clone the complete OpenCode runtime.
 
-## Implementation Rules
+## 2. LLM Boundary
 
-- Preserve `provider/model` identifiers.
-- Preserve free-first model presentation.
-- Preserve project rule and skill discovery semantics where practical.
-- Keep compatibility logic inside `llm_gateway`.
+OpenCode-style provider and model compatibility belongs in `llm_gateway`. Provider-specific details must not leak into `hermes_engine`, `meta_harness`, `mrag_core`, or the desktop shell.
+
+## 3. Skill Lifecycle
+
+Skill compatibility evolves through explicit phases:
+
+1. discover,
+2. parse metadata,
+3. explicit activation,
+4. controlled context binding,
+5. audited runtime behavior,
+6. permission-gated script execution later.
+
+Implicit execution of discovered skills is forbidden. Script execution requires a future permission model and audit trail.
+
+## 4. Free-First Presentation
+
+Default model presentation must remain free-first unless a user explicitly configures otherwise.
+
+## 5. Release Gate
+
+Any change to OpenCode compatibility requires:
+
+- compatibility tests,
+- sidecar list/config tests when exposed,
+- documentation update,
+- no provider-native object leakage.
