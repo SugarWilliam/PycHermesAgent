@@ -1,7 +1,10 @@
 import json
 
+import pytest
+
 from pyc_hermes_agent.contracts import RetrievalRequest
-from pyc_hermes_agent.mrag_core import MRAGService
+from pyc_hermes_agent.mrag_core import MRAGService, MRAGStorageLockedError
+from pyc_hermes_agent.mrag_core.ownership import MRAG_LOCK_FILE
 from pyc_hermes_agent.mrag_core.persistence import MRAG_INDEX_FORMAT_VERSION, MRAG_MANIFEST_VERSION
 
 
@@ -103,3 +106,42 @@ def test_mrag_loads_legacy_chunk_index_list_shape(tmp_path) -> None:
     assert persisted is not None
     assert persisted.chunks
     assert result.hits
+
+
+def test_mrag_rejects_storage_root_locked_by_unknown_owner(tmp_path) -> None:
+    storage_root = tmp_path / "mrag-store"
+    storage_root.mkdir()
+    (storage_root / MRAG_LOCK_FILE).write_text(
+        json.dumps({"owner_id": "external-owner", "pid": 999999}, ensure_ascii=True),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(MRAGStorageLockedError) as exc_info:
+        MRAGService(storage_root=storage_root)
+
+    assert str(storage_root) in str(exc_info.value)
+    assert exc_info.value.lock_path == storage_root / MRAG_LOCK_FILE
+
+
+def test_mrag_allows_same_process_to_share_storage_owner(tmp_path) -> None:
+    storage_root = tmp_path / "mrag-store"
+    first_service = MRAGService(storage_root=storage_root)
+    kb = first_service.create_knowledge_base("shared")
+
+    second_service = MRAGService(storage_root=storage_root)
+    persisted = second_service.get_knowledge_base(kb.knowledge_base_id)
+
+    assert persisted is not None
+    assert persisted.name == "shared"
+
+
+def test_mrag_close_releases_storage_owner(tmp_path) -> None:
+    storage_root = tmp_path / "mrag-store"
+    service = MRAGService(storage_root=storage_root)
+    assert (storage_root / MRAG_LOCK_FILE).exists()
+
+    service.close()
+
+    assert not (storage_root / MRAG_LOCK_FILE).exists()
+    replacement = MRAGService(storage_root=storage_root)
+    replacement.create_knowledge_base("replacement")

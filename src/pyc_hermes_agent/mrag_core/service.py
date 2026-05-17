@@ -9,6 +9,7 @@ from uuid import uuid4
 from pyc_hermes_agent.contracts import KnowledgeDocument, RetrievalRequest, RetrievalResult
 from pyc_hermes_agent.mrag_core.chunk import chunk_document
 from pyc_hermes_agent.mrag_core.document import KnowledgeBase
+from pyc_hermes_agent.mrag_core.ownership import MRAGStorageOwner, acquire_mrag_storage_owner
 from pyc_hermes_agent.mrag_core.parse import parse_file_document, parse_text_document, parse_url_document
 from pyc_hermes_agent.mrag_core.persistence import load_knowledge_bases, persist_knowledge_base
 from pyc_hermes_agent.mrag_core.retrieve import retrieve
@@ -17,6 +18,9 @@ from pyc_hermes_agent.mrag_core.retrieve import retrieve
 class MRAGService:
     def __init__(self, *, storage_root: Path | None = None) -> None:
         self._storage_root = storage_root.resolve() if storage_root is not None else None
+        self._storage_owner: MRAGStorageOwner | None = (
+            acquire_mrag_storage_owner(self._storage_root) if self._storage_root is not None else None
+        )
         self._knowledge_bases: Dict[str, KnowledgeBase] = (
             load_knowledge_bases(self._storage_root) if self._storage_root is not None else {}
         )
@@ -78,3 +82,15 @@ class MRAGService:
         if self._storage_root is None:
             return
         persist_knowledge_base(self._storage_root, knowledge_base)
+
+    def close(self) -> None:
+        if self._storage_owner is None:
+            return
+        self._storage_owner.close()
+        self._storage_owner = None
+
+    def __enter__(self) -> "MRAGService":
+        return self
+
+    def __exit__(self, exc_type, exc, traceback) -> None:
+        self.close()

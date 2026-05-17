@@ -15,6 +15,7 @@ from urllib.parse import unquote, urlparse
 from uuid import uuid4
 
 from pyc_hermes_agent.contracts import AgentLoopRequest, ChatCompletionRequest, MetaAnalysisRequest, RetrievalRequest
+from pyc_hermes_agent.mrag_core import MRAGStorageLockedError
 from pyc_hermes_agent.sidecar_api.logging import log_event
 from pyc_hermes_agent.sidecar_api.service import (
     SIDECAR_API_VERSION,
@@ -130,6 +131,21 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
                 },
             )
             status = HTTPStatus.BAD_REQUEST
+        except MRAGStorageLockedError as exc:
+            payload = self._error_payload(
+                "MRAG_STORAGE_LOCKED",
+                "storage",
+                str(exc),
+                retryable=True,
+                details={
+                    "method": method,
+                    "path": path,
+                    "http_status": int(HTTPStatus.LOCKED),
+                    "request_id": request_id,
+                    "lock_path": str(exc.lock_path),
+                },
+            )
+            status = HTTPStatus.LOCKED
         except Exception as exc:  # pragma: no cover - defensive boundary
             payload = self._error_payload(
                 "INTERNAL_ERROR",

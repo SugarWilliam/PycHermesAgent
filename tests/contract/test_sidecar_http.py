@@ -4,7 +4,9 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from pyc_hermes_agent import SidecarClient
+from pyc_hermes_agent.common import ensure_runtime_directories, resolve_runtime_paths
 from pyc_hermes_agent.contracts import AgentLoopRequest, MetaAnalysisRequest, RetrievalRequest
+from pyc_hermes_agent.mrag_core.ownership import MRAG_LOCK_FILE
 from pyc_hermes_agent.sidecar_api import create_http_server
 from pyc_hermes_agent.sidecar_api.service import SIDECAR_API_VERSION
 
@@ -186,6 +188,35 @@ def test_sidecar_http_server_returns_standard_error_response_for_unknown_route(t
     assert payload["error"]["details"]["path"] == "/unknown-route"
     assert payload["error"]["details"]["method"] == "POST"
     assert payload["error"]["details"]["http_status"] == 404
+    assert payload["error"]["details"]["request_id"] == headers["X-Pyc-Request-Id"]
+
+
+def test_sidecar_http_server_returns_storage_error_when_mrag_locked(tmp_path) -> None:
+    mrag_root = ensure_runtime_directories(resolve_runtime_paths(tmp_path)).mrag_dir
+    (mrag_root / MRAG_LOCK_FILE).write_text(
+        json.dumps({"owner_id": "external-owner", "pid": 999999}, ensure_ascii=True),
+        encoding="utf-8",
+    )
+    server, thread = _start_server(root=tmp_path)
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+
+    try:
+        status_code, payload, headers = _post_json_error_with_headers(
+            f"{base_url}/knowledge-bases",
+            {"name": "locked"},
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert status_code == 423
+    assert payload["status"] == "error"
+    assert payload["error"]["code"] == "MRAG_STORAGE_LOCKED"
+    assert payload["error"]["category"] == "storage"
+    assert payload["error"]["retryable"] is True
+    assert payload["error"]["details"]["path"] == "/knowledge-bases"
+    assert payload["error"]["details"]["http_status"] == 423
     assert payload["error"]["details"]["request_id"] == headers["X-Pyc-Request-Id"]
 
 
