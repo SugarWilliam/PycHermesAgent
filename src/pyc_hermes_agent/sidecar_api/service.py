@@ -428,6 +428,14 @@ def invoke_formal_analysis(request: MetaAnalysisRequest) -> Dict[str, Any]:
         return response
 
 
+def get_meta_harness_dependency_snapshot() -> Dict[str, Any]:
+    return MetaFramework().dependency_snapshot()
+
+
+def get_meta_harness_benchmark_smoke() -> Dict[str, Any]:
+    return MetaFramework().run_benchmark_smoke()
+
+
 def invoke_chat_completion(request: ChatCompletionRequest, root: Path | None = None) -> Dict[str, Any]:
     base = root or _repo_root()
     try:

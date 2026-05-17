@@ -28,6 +28,8 @@ from pyc_hermes_agent.sidecar_api.service import (
     get_hermes_sessions_snapshot,
     get_hermes_skills_snapshot,
     get_hermes_tools_snapshot,
+    get_meta_harness_benchmark_smoke,
+    get_meta_harness_dependency_snapshot,
     ingest_text_document,
     invoke_chat_completion,
     invoke_formal_analysis,
@@ -211,6 +213,8 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
                     "/llm/chat",
                     "/llm/chat/stream",
                     "/formal-analysis",
+                    "/meta-harness/dependencies",
+                    "/meta-harness/benchmark-smoke",
                     "/knowledge-bases",
                     "/knowledge-bases/{id}/documents/text",
                     "/knowledge-bases/{id}/search",
@@ -242,6 +246,8 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
             return get_hermes_skills_snapshot(root), HTTPStatus.OK
         if path == "/hermes/tools":
             return get_hermes_tools_snapshot(root), HTTPStatus.OK
+        if path == "/meta-harness/dependencies":
+            return get_meta_harness_dependency_snapshot(), HTTPStatus.OK
         if path == "/knowledge-bases":
             return {"items": list_knowledge_bases(root)}, HTTPStatus.OK
         raise KeyError(f"Unknown route: {path}")
@@ -251,6 +257,8 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
             response = invoke_formal_analysis(MetaAnalysisRequest(**payload))
             status = HTTPStatus.OK if "error" not in response else HTTPStatus.BAD_GATEWAY
             return response, status
+        if path == "/meta-harness/benchmark-smoke":
+            return get_meta_harness_benchmark_smoke(), HTTPStatus.OK
         if path == "/agent/run":
             response = run_agent_loop(AgentLoopRequest(**payload), root=self._server_root())
             status = HTTPStatus.OK if "error" not in response else HTTPStatus.BAD_GATEWAY

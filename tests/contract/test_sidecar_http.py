@@ -266,6 +266,38 @@ def test_sidecar_http_server_runs_formal_analysis(tmp_path) -> None:
     assert payload["analysis"]["selected_method"] == "A-22"
 
 
+def test_sidecar_http_server_serves_meta_harness_dependency_snapshot(tmp_path) -> None:
+    server, thread = _start_server(root=tmp_path)
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+
+    try:
+        status_code, payload = _get_json(f"{base_url}/meta-harness/dependencies")
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert status_code == 200
+    assert payload["entrypoint"] == "MetaFramework.execute"
+    assert payload["capability_count"] >= 1
+
+
+def test_sidecar_http_server_runs_meta_harness_benchmark_smoke(tmp_path) -> None:
+    server, thread = _start_server(root=tmp_path)
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+
+    try:
+        status_code, payload = _post_json(f"{base_url}/meta-harness/benchmark-smoke", {})
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert status_code == 200
+    assert payload["entrypoint"] == "MetaFramework.execute"
+    assert payload["passed"] is True
+
+
 def test_sidecar_http_server_returns_error_status_for_failed_formal_analysis(tmp_path, monkeypatch) -> None:
     from pyc_hermes_agent.sidecar_api import service as sidecar_service
 

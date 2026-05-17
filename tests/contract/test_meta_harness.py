@@ -32,3 +32,29 @@ def test_meta_framework_selects_network_method_from_data_shape() -> None:
         )
     )
     assert result.selected_method == "A-22"
+
+
+def test_meta_framework_reports_dependency_availability_snapshot() -> None:
+    framework = MetaFramework()
+
+    snapshot = framework.dependency_snapshot()
+
+    assert snapshot["entrypoint"] == "MetaFramework.execute"
+    assert snapshot["capability_count"] >= 1
+    assert any(capability["id"] == "A-22" for capability in snapshot["capabilities"])
+    network = next(capability for capability in snapshot["capabilities"] if capability["id"] == "A-22")
+    assert network["dependencies"][0]["name"] == "network_science_adapters"
+    assert "available" in network["dependencies"][0]
+
+
+def test_meta_framework_runs_benchmark_smoke_through_execute() -> None:
+    framework = MetaFramework()
+
+    smoke = framework.run_benchmark_smoke()
+
+    assert smoke["entrypoint"] == "MetaFramework.execute"
+    assert smoke["case_count"] >= 2
+    assert smoke["passed"] is True
+    assert smoke["failed_count"] == 0
+    assert any(case["selected_method"] == "A-22" for case in smoke["cases"])
+    assert all(case["duration_ms"] >= 0 for case in smoke["cases"])

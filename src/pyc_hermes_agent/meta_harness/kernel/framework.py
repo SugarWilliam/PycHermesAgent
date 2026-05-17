@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+from time import perf_counter
 from typing import Optional
 
 from pyc_hermes_agent.contracts import MetaAnalysisRequest, MetaAnalysisResult
@@ -46,6 +47,81 @@ class MetaFramework:
 
     def execute_dict(self, request: MetaAnalysisRequest) -> dict:
         return asdict(self.execute(request))
+
+    def dependency_snapshot(self) -> dict:
+        capabilities = []
+        for capability in sorted(self.registry.all(), key=lambda item: item.id):
+            dependencies = []
+            for dependency in capability.dependencies:
+                status = self.bridge.status(dependency)
+                dependencies.append(
+                    {
+                        "name": dependency,
+                        "available": status.available,
+                        "path": str(status.path) if status.path is not None else "",
+                        "error": status.error or "",
+                    }
+                )
+            capabilities.append(
+                {
+                    "id": capability.id,
+                    "kind": capability.kind,
+                    "max_evidence_grade": capability.max_evidence_grade,
+                    "dependencies": dependencies,
+                    "available": all(dependency["available"] for dependency in dependencies),
+                }
+            )
+        return {
+            "entrypoint": "MetaFramework.execute",
+            "capability_count": len(capabilities),
+            "capabilities": capabilities,
+        }
+
+    def run_benchmark_smoke(self) -> dict:
+        cases = [
+            MetaAnalysisRequest(
+                problem_statement="network pagerank smoke benchmark",
+                data={"adjacency": [[0.0, 1.0], [1.0, 0.0]]},
+                params={"analysis": "pagerank"},
+            ),
+            MetaAnalysisRequest(problem_statement="因果分析：X 对 Y 的影响"),
+            MetaAnalysisRequest(problem_statement="please do something vague"),
+        ]
+        results = []
+        failed_count = 0
+        for index, request in enumerate(cases, start=1):
+            started = perf_counter()
+            try:
+                result = self.execute(request)
+                results.append(
+                    {
+                        "case_id": f"smoke-{index}",
+                        "selected_method": result.selected_method,
+                        "degraded": result.degraded,
+                        "evidence_grade": result.evidence_grade,
+                        "duration_ms": round((perf_counter() - started) * 1000, 3),
+                        "error": "",
+                    }
+                )
+            except Exception as exc:  # pragma: no cover - defensive smoke wrapper
+                failed_count += 1
+                results.append(
+                    {
+                        "case_id": f"smoke-{index}",
+                        "selected_method": "",
+                        "degraded": True,
+                        "evidence_grade": "",
+                        "duration_ms": round((perf_counter() - started) * 1000, 3),
+                        "error": str(exc),
+                    }
+                )
+        return {
+            "entrypoint": "MetaFramework.execute",
+            "case_count": len(results),
+            "failed_count": failed_count,
+            "passed": failed_count == 0,
+            "cases": results,
+        }
 
     def _execute_selected_method(self, request: MetaAnalysisRequest, selected: Optional[object]) -> dict:
         if selected is None:

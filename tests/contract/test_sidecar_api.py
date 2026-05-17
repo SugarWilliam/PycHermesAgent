@@ -12,6 +12,8 @@ from pyc_hermes_agent.sidecar_api import (
     get_hermes_sessions_snapshot,
     get_hermes_skills_snapshot,
     get_hermes_tools_snapshot,
+    get_meta_harness_benchmark_smoke,
+    get_meta_harness_dependency_snapshot,
     ingest_text_document,
     invoke_formal_analysis,
     list_knowledge_bases,
@@ -259,6 +261,22 @@ def test_sidecar_config_snapshot() -> None:
     snapshot = get_config_snapshot(root)
     assert snapshot["default_model"]
     assert snapshot["free_first"] is True
+
+
+def test_sidecar_exposes_meta_harness_dependency_snapshot() -> None:
+    snapshot = get_meta_harness_dependency_snapshot()
+
+    assert snapshot["entrypoint"] == "MetaFramework.execute"
+    assert snapshot["capability_count"] >= 1
+    assert any(capability["id"] == "A-22" for capability in snapshot["capabilities"])
+
+
+def test_sidecar_exposes_meta_harness_benchmark_smoke() -> None:
+    smoke = get_meta_harness_benchmark_smoke()
+
+    assert smoke["entrypoint"] == "MetaFramework.execute"
+    assert smoke["passed"] is True
+    assert smoke["failed_count"] == 0
 
 
 def test_sidecar_hermes_capability_snapshot(tmp_path: Path) -> None:
