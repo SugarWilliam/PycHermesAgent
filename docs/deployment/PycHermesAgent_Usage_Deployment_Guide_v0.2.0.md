@@ -49,6 +49,12 @@ The product must respect platform storage boundaries:
 
 No runtime feature may write mutable state into the install directory.
 
+### 3a. Read-only install preview (Windows / contract tests)
+
+For a read-only program directory, set `PYC_HERMES_ENFORCE_PACKAGING_RULES=1` so writable paths use `%APPDATA%` / `%LOCALAPPDATA%` (Windows) or **both** `APPDATA` and `LOCALAPPDATA` env vars (used in POSIX CI to simulate the layout). Optional `PYC_HERMES_INSTALL_DIR` must point at the read-only root; `pyc-hermes-packaging-probe` validates that no writable directory lies under it.
+
+Launcher and probe: `packaging/windows/README.md`, `docs/constraints/windows-packaging.md` §6.
+
 ## 4. Sidecar Operation
 
 The sidecar is intended for localhost use by the desktop shell or local clients.

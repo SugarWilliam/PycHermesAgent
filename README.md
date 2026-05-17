@@ -45,10 +45,18 @@ Run contract tests only:
 python -m pytest tests/contract
 ```
 
-Run the local sidecar HTTP server:
+Run the local sidecar HTTP server (editable install / dev; writable sandbox under `--root`):
 
 ```powershell
 pyc-hermes-sidecar --host 127.0.0.1 --port 8765
+```
+
+Windows **read-only install preview** (writable data in `%LOCALAPPDATA%` / `%APPDATA%`, not under the repo): see `packaging/windows/README.md` and use `Run-SidecarPreview.ps1`.
+
+Inspect resolved directories (JSON):
+
+```powershell
+pyc-hermes-packaging-probe --mkdirs
 ```
 
 Read health from Python:

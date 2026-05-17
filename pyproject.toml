@@ -28,6 +28,7 @@ dev = [
 
 [project.scripts]
 pyc-hermes-sidecar = "pyc_hermes_agent.sidecar_api:main"
+pyc-hermes-packaging-probe = "pyc_hermes_agent.packaging.probe:cli_main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

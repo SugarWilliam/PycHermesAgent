@@ -48,3 +48,12 @@ A Windows release package cannot be tagged production-ready until:
 ## 5. Cursor Automation Boundary
 
 Cursor may automate push, tag, and release preparation only after packaging gates pass for the intended release class. Cursor must stop when signing, installer credentials, store upload credentials, or destructive git operations are required but not explicitly available and verified.
+
+## 6. Executable prototype (preview)
+
+The repository ships a **non-production** Windows launcher and path probe:
+
+- `packaging/windows/Run-SidecarPreview.ps1` sets `PYC_HERMES_ENFORCE_PACKAGING_RULES` and starts the sidecar with a read-only `--root`.
+- Console entry point `pyc-hermes-packaging-probe` prints resolved runtime paths and validates `PYC_HERMES_INSTALL_DIR` when enforcement is enabled.
+
+These prototypes do **not** satisfy the production packaging gate in §4; they exist to make constraints testable and operable during development.

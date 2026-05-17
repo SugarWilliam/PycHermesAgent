@@ -20,17 +20,49 @@ class RuntimePaths:
     mrag_dir: Path
 
 
+def _packaging_rules_enforced() -> bool:
+    return os.environ.get("PYC_HERMES_ENFORCE_PACKAGING_RULES", "").strip().lower() in {"1", "true", "yes"}
+
+
+def _maybe_validate_against_install_dir(paths: RuntimePaths) -> None:
+    raw = os.environ.get("PYC_HERMES_INSTALL_DIR", "").strip()
+    if not raw or not _packaging_rules_enforced():
+        return
+    from pyc_hermes_agent.packaging.policy import validate_runtime_paths_outside_install
+
+    validate_runtime_paths_outside_install(paths, Path(raw))
+
+
 def resolve_runtime_paths(root: Path | None = None, *, app_name: str = "PycHermesAgent") -> RuntimePaths:
-    if root is not None:
+    """Resolve writable runtime directories.
+
+    * When *root* is set and packaging rules are **not** enforced (default dev/test),
+      all writable paths stay under ``root/.pyc_hermes_agent_runtime/...`` (sandbox).
+    * When ``PYC_HERMES_ENFORCE_PACKAGING_RULES`` is truthy, *root* is ignored for
+      writable layout: paths follow Windows ``%APPDATA%`` / ``%LOCALAPPDATA%`` or
+      POSIX XDG config/data dirs — required for read-only install directories.
+    * When *root* is None and packaging is not enforced, POSIX hosts use XDG; Windows
+      uses normal user profile locations.
+    """
+    use_workspace_sandbox = root is not None and not _packaging_rules_enforced()
+    if use_workspace_sandbox:
         sandbox_root = Path(root).resolve() / ".pyc_hermes_agent_runtime"
         config_dir = sandbox_root / "APPDATA" / app_name
         local_data_dir = sandbox_root / "LOCALAPPDATA" / app_name
-    else:
+    elif os.name == "nt":
         home = Path.home()
         config_dir = Path(os.environ.get("APPDATA", home / "AppData" / "Roaming")) / app_name
         local_data_dir = Path(os.environ.get("LOCALAPPDATA", home / "AppData" / "Local")) / app_name
+    elif "APPDATA" in os.environ and "LOCALAPPDATA" in os.environ:
+        # Allow CI / POSIX hosts to simulate Windows layout (packaging contract tests).
+        config_dir = Path(os.environ["APPDATA"]) / app_name
+        local_data_dir = Path(os.environ["LOCALAPPDATA"]) / app_name
+    else:
+        home = Path.home()
+        config_dir = Path(os.environ.get("XDG_CONFIG_HOME", home / ".config")) / app_name
+        local_data_dir = Path(os.environ.get("XDG_DATA_HOME", home / ".local" / "share")) / app_name
 
-    return RuntimePaths(
+    paths = RuntimePaths(
         config_dir=config_dir,
         local_data_dir=local_data_dir,
         logs_dir=local_data_dir / "logs",
@@ -41,6 +73,8 @@ def resolve_runtime_paths(root: Path | None = None, *, app_name: str = "PycHerme
         artifacts_dir=local_data_dir / "artifacts",
         mrag_dir=local_data_dir / "mrag_core",
     )
+    _maybe_validate_against_install_dir(paths)
+    return paths
 
 
 def ensure_runtime_directories(paths: RuntimePaths) -> RuntimePaths:
