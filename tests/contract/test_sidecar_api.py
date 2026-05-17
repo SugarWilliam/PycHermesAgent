@@ -228,6 +228,16 @@ def test_sidecar_health_reports_unavailable_when_checkout_missing(tmp_path: Path
     assert health["hermes"]["status_label"] == "unavailable"
 
 
+def test_sidecar_health_refreshes_when_upstream_state_changes(tmp_path: Path) -> None:
+    first = get_health(tmp_path)
+    _make_fake_hermes_checkout(tmp_path)
+    second = get_health(tmp_path)
+
+    assert first["status_label"] == "unavailable"
+    assert second["status_label"] == "ready-with-warnings"
+    assert second["hermes"]["bridge_ready"] is True
+
+
 def test_sidecar_lists_providers_and_models() -> None:
     root = Path(__file__).resolve().parents[2]
     providers = list_providers(root)
@@ -339,6 +349,31 @@ def test_sidecar_formal_analysis_invocation() -> None:
     assert "events" in response
     assert "result" in response
     assert response["analysis"]["selected_method"] == "A-22"
+
+
+def test_sidecar_formal_analysis_returns_standard_error_response_on_failure(monkeypatch) -> None:
+    from pyc_hermes_agent.sidecar_api import service as sidecar_service
+
+    class _FailingFramework:
+        def execute(self, request):
+            raise RuntimeError("analysis exploded")
+
+    monkeypatch.setattr(sidecar_service, "MetaFramework", lambda: _FailingFramework())
+
+    response = invoke_formal_analysis(
+        MetaAnalysisRequest(
+            problem_statement="network pagerank analysis",
+            data={"adjacency": [[0.0, 1.0], [1.0, 0.0]]},
+            params={"analysis": "pagerank"},
+        )
+    )
+
+    assert response["status"] == "error"
+    assert response["error"]["code"] == "FORMAL_ANALYSIS_FAILED"
+    assert response["error"]["category"] == "internal"
+    assert response["error"]["retryable"] is False
+    assert response["error"]["degraded"] is False
+    assert response["events"][-1]["type"] == "task.failed"
 
 
 def test_sidecar_agent_loop_runs_formal_analysis_tool() -> None:

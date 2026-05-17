@@ -1,10 +1,12 @@
 import json
 import threading
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from pyc_hermes_agent import SidecarClient
 from pyc_hermes_agent.contracts import AgentLoopRequest, MetaAnalysisRequest, RetrievalRequest
 from pyc_hermes_agent.sidecar_api import create_http_server
+from pyc_hermes_agent.sidecar_api.service import SIDECAR_API_VERSION
 
 from .test_sidecar_api import _make_fake_hermes_checkout
 
@@ -32,6 +34,36 @@ def _post_json(url: str, payload: dict) -> tuple[int, dict]:
         return response.status, json.loads(response.read().decode("utf-8"))
 
 
+def _get_json_with_headers(url: str) -> tuple[int, dict, dict[str, str]]:
+    with urlopen(url, timeout=5) as response:
+        return response.status, json.loads(response.read().decode("utf-8")), dict(response.headers.items())
+
+
+def _post_json_with_headers(url: str, payload: dict) -> tuple[int, dict, dict[str, str]]:
+    request = Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urlopen(request, timeout=5) as response:
+        return response.status, json.loads(response.read().decode("utf-8")), dict(response.headers.items())
+
+
+def _post_json_error_with_headers(url: str, payload: dict) -> tuple[int, dict, dict[str, str]]:
+    request = Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=5) as response:
+            return response.status, json.loads(response.read().decode("utf-8")), dict(response.headers.items())
+    except HTTPError as exc:
+        return exc.code, json.loads(exc.read().decode("utf-8")), dict(exc.headers.items())
+
+
 def _post_sse(url: str, payload: dict) -> tuple[int, list[dict]]:
     request = Request(
         url,
@@ -48,6 +80,24 @@ def _post_sse(url: str, payload: dict) -> tuple[int, list[dict]]:
             if line.startswith("data:"):
                 chunks.append(line[5:].lstrip())
         return response.status, [json.loads(chunk) for chunk in chunks]
+
+
+def _post_sse_with_headers(url: str, payload: dict) -> tuple[int, list[dict], dict[str, str]]:
+    request = Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json", "Accept": "text/event-stream"},
+        method="POST",
+    )
+    with urlopen(request, timeout=5) as response:
+        chunks: list[str] = []
+        for raw_line in response:
+            line = raw_line.decode("utf-8").rstrip("\r\n")
+            if not line:
+                continue
+            if line.startswith("data:"):
+                chunks.append(line[5:].lstrip())
+        return response.status, [json.loads(chunk) for chunk in chunks], dict(response.headers.items())
 
 
 def test_sidecar_http_server_serves_health_and_http_client(tmp_path) -> None:
@@ -67,6 +117,76 @@ def test_sidecar_http_server_serves_health_and_http_client(tmp_path) -> None:
     assert payload["status_label"] == "ready-with-warnings"
     assert client_status.status_label == "ready-with-warnings"
     assert client_status.degraded is False
+
+
+def test_sidecar_http_server_sets_api_version_header_on_json_success(tmp_path) -> None:
+    _make_fake_hermes_checkout(tmp_path)
+    server, thread = _start_server(root=tmp_path)
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+
+    try:
+        status_code, payload, headers = _get_json_with_headers(f"{base_url}/health")
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert status_code == 200
+    assert payload["sidecar_api_version"] == SIDECAR_API_VERSION
+    assert headers["X-Pyc-Sidecar-Api-Version"] == SIDECAR_API_VERSION
+    assert headers["X-Pyc-Request-Id"]
+
+
+def test_sidecar_http_server_sets_api_version_header_on_json_error(tmp_path) -> None:
+    server, thread = _start_server(root=tmp_path)
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+
+    try:
+        status_code, payload, headers = _post_json_error_with_headers(
+            f"{base_url}/knowledge-bases",
+            {"name": ""},
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert status_code == 400
+    assert payload["status"] == "error"
+    assert payload["error"]["code"] == "INVALID_REQUEST"
+    assert payload["error"]["category"] == "request"
+    assert payload["error"]["retryable"] is False
+    assert payload["error"]["degraded"] is False
+    assert payload["error"]["details"]["path"] == "/knowledge-bases"
+    assert payload["error"]["details"]["method"] == "POST"
+    assert payload["error"]["details"]["http_status"] == 400
+    assert payload["error"]["details"]["request_id"] == headers["X-Pyc-Request-Id"]
+    assert headers["X-Pyc-Sidecar-Api-Version"] == SIDECAR_API_VERSION
+    assert headers["X-Pyc-Request-Id"]
+
+
+def test_sidecar_http_server_returns_standard_error_response_for_unknown_route(tmp_path) -> None:
+    server, thread = _start_server(root=tmp_path)
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+
+    try:
+        status_code, payload, headers = _post_json_error_with_headers(
+            f"{base_url}/unknown-route",
+            {},
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert status_code == 404
+    assert payload["status"] == "error"
+    assert payload["error"]["code"] == "NOT_FOUND"
+    assert payload["error"]["category"] == "transport"
+    assert payload["error"]["details"]["path"] == "/unknown-route"
+    assert payload["error"]["details"]["method"] == "POST"
+    assert payload["error"]["details"]["http_status"] == 404
+    assert payload["error"]["details"]["request_id"] == headers["X-Pyc-Request-Id"]
 
 
 def test_sidecar_http_server_runs_formal_analysis(tmp_path) -> None:
@@ -89,6 +209,147 @@ def test_sidecar_http_server_runs_formal_analysis(tmp_path) -> None:
 
     assert status_code == 200
     assert payload["analysis"]["selected_method"] == "A-22"
+
+
+def test_sidecar_http_server_returns_error_status_for_failed_formal_analysis(tmp_path, monkeypatch) -> None:
+    from pyc_hermes_agent.sidecar_api import service as sidecar_service
+
+    class _FailingFramework:
+        def execute(self, request):
+            raise RuntimeError("analysis exploded")
+
+    monkeypatch.setattr(sidecar_service, "MetaFramework", lambda: _FailingFramework())
+    server, thread = _start_server(root=tmp_path)
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+
+    try:
+        status_code, payload, headers = _post_json_error_with_headers(
+            f"{base_url}/formal-analysis",
+            {
+                "problem_statement": "network pagerank analysis",
+                "data": {"adjacency": [[0.0, 1.0], [1.0, 0.0]]},
+                "params": {"analysis": "pagerank"},
+            },
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert status_code == 502
+    assert payload["status"] == "error"
+    assert payload["error"]["code"] == "FORMAL_ANALYSIS_FAILED"
+    assert payload["error"]["category"] == "internal"
+    assert payload["events"][-1]["type"] == "task.failed"
+    assert headers["X-Pyc-Sidecar-Api-Version"] == SIDECAR_API_VERSION
+    assert headers["X-Pyc-Request-Id"]
+
+
+def test_sidecar_http_server_logs_health_status_transition_once_per_change(tmp_path, monkeypatch) -> None:
+    from pyc_hermes_agent.sidecar_api import http_server as sidecar_http_server
+
+    log_calls: list[tuple[str, dict]] = []
+
+    monkeypatch.setattr(sidecar_http_server, "log_event", lambda event, **fields: log_calls.append((event, fields)))
+    server, thread = _start_server(root=tmp_path)
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+
+    try:
+        _get_json(f"{base_url}/health")
+        _get_json(f"{base_url}/health")
+        _make_fake_hermes_checkout(tmp_path)
+        _get_json(f"{base_url}/health")
+        _get_json(f"{base_url}/health")
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    transitions = [fields for event, fields in log_calls if event == "sidecar.health.transition"]
+
+    assert len(transitions) == 2
+    assert transitions[0]["previous_status_label"] is None
+    assert transitions[0]["status_label"] == "unavailable"
+    assert transitions[0]["degraded"] is True
+    assert transitions[0]["request_id"]
+    assert transitions[1]["previous_status_label"] == "unavailable"
+    assert transitions[1]["status_label"] == "ready-with-warnings"
+    assert transitions[1]["degraded"] is False
+    assert transitions[1]["request_id"]
+
+
+def test_sidecar_http_server_correlates_request_logs_and_response_header(tmp_path, monkeypatch) -> None:
+    from pyc_hermes_agent.sidecar_api import http_server as sidecar_http_server
+
+    log_calls: list[tuple[str, dict]] = []
+
+    monkeypatch.setattr(sidecar_http_server, "log_event", lambda event, **fields: log_calls.append((event, fields)))
+    _make_fake_hermes_checkout(tmp_path)
+    server, thread = _start_server(root=tmp_path)
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+
+    try:
+        status_code, _payload, headers = _get_json_with_headers(f"{base_url}/health")
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    started = next(fields for event, fields in log_calls if event == "http.request.started")
+    finished = next(fields for event, fields in log_calls if event == "http.request.finished")
+    request_id = headers["X-Pyc-Request-Id"]
+
+    assert status_code == 200
+    assert request_id
+    assert started["request_id"] == request_id
+    assert finished["request_id"] == request_id
+    assert started["path"] == "/health"
+    assert finished["path"] == "/health"
+    assert finished["status"] == 200
+
+
+def test_sidecar_http_server_sets_request_id_header_on_sse(tmp_path, monkeypatch) -> None:
+    from pyc_hermes_agent.sidecar_api import service as sidecar_service
+
+    class _FakeAgentLoop:
+        def __init__(self, *, root=None):
+            self.root = root
+
+        def stream(self, request, *, max_iterations=8, session_id=None, planning_enabled=True, retry_budget=1):
+            from pyc_hermes_agent.contracts import AgentLoopEvent
+
+            yield AgentLoopEvent(
+                event_id="event-1",
+                trace_id="trace-1",
+                sequence=1,
+                event="done",
+                is_terminal=True,
+                session_id=session_id or "session-1",
+                model=request.model,
+                content="Hello",
+            )
+
+    monkeypatch.setattr(sidecar_service, "AgentLoop", _FakeAgentLoop)
+    server, thread = _start_server(root=tmp_path)
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+
+    try:
+        status_code, events, headers = _post_sse_with_headers(
+            f"{base_url}/agent/run/stream",
+            {
+                "session_id": "session-1",
+                "model": "openai-compatible/demo-model",
+                "messages": [{"role": "user", "content": "Hello"}],
+            },
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert status_code == 200
+    assert headers["X-Pyc-Request-Id"]
+    assert events[-1]["event"] == "done"
 
 
 def test_sidecar_http_server_runs_agent_loop(tmp_path, monkeypatch) -> None:
@@ -362,6 +623,51 @@ def test_sidecar_http_server_streams_agent_loop_events(tmp_path, monkeypatch) ->
     assert events[1]["tool_calls"][0]["name"] == "echo_text"
     assert events[-1]["is_terminal"] is True
     assert events[-1]["payload"]["result"]["content"] == "Hello"
+
+
+def test_sidecar_http_server_sets_api_version_header_on_sse(tmp_path, monkeypatch) -> None:
+    from pyc_hermes_agent.sidecar_api import service as sidecar_service
+
+    class _FakeAgentLoop:
+        def __init__(self, *, root=None):
+            self.root = root
+
+        def stream(self, request, *, max_iterations=8, session_id=None, planning_enabled=True, retry_budget=1):
+            from pyc_hermes_agent.contracts import AgentLoopEvent
+
+            yield AgentLoopEvent(
+                event_id="event-1",
+                trace_id="trace-1",
+                sequence=1,
+                event="done",
+                is_terminal=True,
+                session_id=session_id or "session-1",
+                model=request.model,
+                content="Hello",
+            )
+
+    monkeypatch.setattr(sidecar_service, "AgentLoop", _FakeAgentLoop)
+    server, thread = _start_server(root=tmp_path)
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+
+    try:
+        status_code, events, headers = _post_sse_with_headers(
+            f"{base_url}/agent/run/stream",
+            {
+                "session_id": "session-1",
+                "model": "openai-compatible/demo-model",
+                "messages": [{"role": "user", "content": "Hello"}],
+            },
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert status_code == 200
+    assert headers["X-Pyc-Sidecar-Api-Version"] == SIDECAR_API_VERSION
+    assert headers["X-Pyc-Request-Id"]
+    assert events[-1]["event"] == "done"
 
 
 def test_sidecar_http_server_streams_terminal_error_event_on_agent_loop_failure(tmp_path, monkeypatch) -> None:

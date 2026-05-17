@@ -5,9 +5,14 @@ from __future__ import annotations
 import json
 from dataclasses import asdict
 from pathlib import Path
+from typing import Any
 
 from pyc_hermes_agent.contracts import DocumentChunk, KnowledgeDocument
 from pyc_hermes_agent.mrag_core.document import KnowledgeBase
+
+
+MRAG_MANIFEST_VERSION = 1
+MRAG_INDEX_FORMAT_VERSION = 1
 
 
 def load_knowledge_bases(storage_root: Path) -> dict[str, KnowledgeBase]:
@@ -21,6 +26,8 @@ def load_knowledge_bases(storage_root: Path) -> dict[str, KnowledgeBase]:
     knowledge_bases: dict[str, KnowledgeBase] = {}
     for manifest_path in sorted(manifests_root.glob("*/manifest.json")):
         manifest = _read_json(manifest_path)
+        if not isinstance(manifest, dict):
+            continue
         knowledge_base_id = str(manifest.get("knowledge_base_id", ""))
         if not knowledge_base_id:
             continue
@@ -33,7 +40,7 @@ def load_knowledge_bases(storage_root: Path) -> dict[str, KnowledgeBase]:
         chunks_path = indexes_root / knowledge_base_id / "chunks.json"
         chunks = []
         if chunks_path.exists():
-            chunks = [DocumentChunk(**chunk) for chunk in _read_json(chunks_path)]
+            chunks = [DocumentChunk(**chunk) for chunk in _read_chunk_payload(_read_json(chunks_path))]
 
         knowledge_bases[knowledge_base_id] = KnowledgeBase(
             knowledge_base_id=knowledge_base_id,
@@ -57,6 +64,7 @@ def persist_knowledge_base(storage_root: Path, knowledge_base: KnowledgeBase) ->
     _write_json_atomic(
         manifest_dir / "manifest.json",
         {
+            "manifest_version": MRAG_MANIFEST_VERSION,
             "knowledge_base_id": knowledge_base.knowledge_base_id,
             "name": knowledge_base.name,
         },
@@ -72,11 +80,27 @@ def persist_knowledge_base(storage_root: Path, knowledge_base: KnowledgeBase) ->
         if existing_path not in current_document_paths:
             existing_path.unlink()
 
-    _write_json_atomic(indexes_dir / "chunks.json", [asdict(chunk) for chunk in knowledge_base.chunks])
+    _write_json_atomic(
+        indexes_dir / "chunks.json",
+        {
+            "index_format_version": MRAG_INDEX_FORMAT_VERSION,
+            "chunks": [asdict(chunk) for chunk in knowledge_base.chunks],
+        },
+    )
 
 
 def _read_json(path: Path):
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _read_chunk_payload(payload: Any) -> list[dict[str, Any]]:
+    if isinstance(payload, list):
+        return [chunk for chunk in payload if isinstance(chunk, dict)]
+    if isinstance(payload, dict):
+        chunks = payload.get("chunks", [])
+        if isinstance(chunks, list):
+            return [chunk for chunk in chunks if isinstance(chunk, dict)]
+    return []
 
 
 def _write_json_atomic(path: Path, payload) -> None:
@@ -86,4 +110,9 @@ def _write_json_atomic(path: Path, payload) -> None:
     temp_path.replace(path)
 
 
-__all__ = ["load_knowledge_bases", "persist_knowledge_base"]
+__all__ = [
+    "MRAG_INDEX_FORMAT_VERSION",
+    "MRAG_MANIFEST_VERSION",
+    "load_knowledge_bases",
+    "persist_knowledge_base",
+]

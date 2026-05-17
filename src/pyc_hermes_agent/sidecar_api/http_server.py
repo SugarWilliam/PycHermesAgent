@@ -9,12 +9,15 @@ from dataclasses import asdict, is_dataclass
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from threading import Lock
 from typing import Any, Sequence, cast
 from urllib.parse import unquote, urlparse
+from uuid import uuid4
 
 from pyc_hermes_agent.contracts import AgentLoopRequest, ChatCompletionRequest, MetaAnalysisRequest, RetrievalRequest
 from pyc_hermes_agent.sidecar_api.logging import log_event
 from pyc_hermes_agent.sidecar_api.service import (
+    SIDECAR_API_VERSION,
     create_knowledge_base,
     get_config_snapshot,
     get_health,
@@ -32,6 +35,7 @@ from pyc_hermes_agent.sidecar_api.service import (
     list_providers,
     list_rules,
     list_skills,
+    make_error_response,
     run_agent_loop,
     search_knowledge_base,
     stream_agent_loop,
@@ -50,10 +54,22 @@ class SidecarHTTPServer(ThreadingHTTPServer):
     def __init__(self, server_address: tuple[str, int], *, root: Path | None = None) -> None:
         super().__init__(server_address, SidecarRequestHandler)
         self.root = root
+        self._health_state_lock = Lock()
+        self._last_health_status_label: str | None = None
+
+    def remember_health_status(self, status_label: str) -> str | None:
+        with self._health_state_lock:
+            previous_status_label = self._last_health_status_label
+            self._last_health_status_label = status_label
+        return previous_status_label
 
 
 class SidecarRequestHandler(BaseHTTPRequestHandler):
-    server_version = "PycHermesAgentSidecar/0.1"
+    server_version = f"PycHermesAgentSidecar/{SIDECAR_API_VERSION}"
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        self._request_id = str(uuid4())
+        super().__init__(*args, **kwargs)
 
     def do_GET(self) -> None:  # noqa: N802
         self._dispatch("GET")
@@ -66,7 +82,8 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
 
     def _dispatch(self, method: str) -> None:
         path = self._normalized_path()
-        log_event("http.request.started", method=method, path=path)
+        request_id = self._request_id
+        log_event("http.request.started", request_id=request_id, method=method, path=path)
         try:
             if method == "GET":
                 payload, status = self._handle_get(path)
@@ -75,22 +92,79 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
             else:
                 raise ValueError(f"Unsupported method: {method}")
         except json.JSONDecodeError as exc:
-            payload = self._error_payload("INVALID_JSON", str(exc))
+            payload = self._error_payload(
+                "INVALID_JSON",
+                "request",
+                str(exc),
+                details={
+                    "method": method,
+                    "path": path,
+                    "http_status": int(HTTPStatus.BAD_REQUEST),
+                    "request_id": request_id,
+                },
+            )
             status = HTTPStatus.BAD_REQUEST
         except KeyError as exc:
-            payload = self._error_payload("NOT_FOUND", str(exc))
+            payload = self._error_payload(
+                "NOT_FOUND",
+                "transport",
+                str(exc),
+                details={
+                    "method": method,
+                    "path": path,
+                    "http_status": int(HTTPStatus.NOT_FOUND),
+                    "request_id": request_id,
+                },
+            )
             status = HTTPStatus.NOT_FOUND
         except ValueError as exc:
-            payload = self._error_payload("INVALID_REQUEST", str(exc))
+            payload = self._error_payload(
+                "INVALID_REQUEST",
+                "request",
+                str(exc),
+                details={
+                    "method": method,
+                    "path": path,
+                    "http_status": int(HTTPStatus.BAD_REQUEST),
+                    "request_id": request_id,
+                },
+            )
             status = HTTPStatus.BAD_REQUEST
         except Exception as exc:  # pragma: no cover - defensive boundary
-            payload = self._error_payload("INTERNAL_ERROR", str(exc))
+            payload = self._error_payload(
+                "INTERNAL_ERROR",
+                "internal",
+                str(exc),
+                details={
+                    "method": method,
+                    "path": path,
+                    "http_status": int(HTTPStatus.INTERNAL_SERVER_ERROR),
+                    "request_id": request_id,
+                },
+            )
             status = HTTPStatus.INTERNAL_SERVER_ERROR
 
         if payload is None:
-            log_event("http.request.finished", method=method, path=path, status=int(status), has_error=False)
+            log_event(
+                "http.request.finished",
+                request_id=request_id,
+                method=method,
+                path=path,
+                status=int(status),
+                has_error=False,
+            )
             return
-        log_event("http.request.finished", method=method, path=path, status=int(status), has_error="error" in payload)
+        error = payload.get("error") if isinstance(payload, dict) else None
+        log_event(
+            "http.request.finished",
+            request_id=request_id,
+            method=method,
+            path=path,
+            status=int(status),
+            has_error="error" in payload,
+            error_code=error.get("code") if isinstance(error, dict) else None,
+            error_category=error.get("category") if isinstance(error, dict) else None,
+        )
         self._write_json(status, payload)
 
     def _handle_get(self, path: str) -> tuple[dict[str, Any], HTTPStatus]:
@@ -126,7 +200,9 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
                 ],
             }, HTTPStatus.OK
         if path == "/health":
-            return get_health(root), HTTPStatus.OK
+            health = get_health(root)
+            self._log_health_transition(health)
+            return health, HTTPStatus.OK
         if path == "/config":
             return get_config_snapshot(root), HTTPStatus.OK
         if path == "/providers":
@@ -155,7 +231,9 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
 
     def _handle_post(self, path: str, payload: dict[str, Any]) -> tuple[dict[str, Any] | None, HTTPStatus]:
         if path == "/formal-analysis":
-            return invoke_formal_analysis(MetaAnalysisRequest(**payload)), HTTPStatus.OK
+            response = invoke_formal_analysis(MetaAnalysisRequest(**payload))
+            status = HTTPStatus.OK if "error" not in response else HTTPStatus.BAD_GATEWAY
+            return response, status
         if path == "/agent/run":
             response = run_agent_loop(AgentLoopRequest(**payload), root=self._server_root())
             status = HTTPStatus.OK if "error" not in response else HTTPStatus.BAD_GATEWAY
@@ -221,10 +299,27 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
     def _server_root(self) -> Path | None:
         return cast(SidecarHTTPServer, self.server).root
 
+    def _log_health_transition(self, health: dict[str, Any]) -> None:
+        status_label = health.get("status_label")
+        if not isinstance(status_label, str) or not status_label:
+            return
+        previous_status_label = cast(SidecarHTTPServer, self.server).remember_health_status(status_label)
+        if previous_status_label == status_label:
+            return
+        log_event(
+            "sidecar.health.transition",
+            request_id=self._request_id,
+            previous_status_label=previous_status_label,
+            status_label=status_label,
+            degraded=bool(health.get("degraded")),
+        )
+
     def _write_json(self, status: HTTPStatus, payload: dict[str, Any]) -> None:
         body = json.dumps(payload).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
+        self.send_header("X-Pyc-Sidecar-Api-Version", SIDECAR_API_VERSION)
+        self.send_header("X-Pyc-Request-Id", self._request_id)
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
@@ -232,6 +327,8 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
     def _write_sse(self, events) -> None:
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "text/event-stream")
+        self.send_header("X-Pyc-Sidecar-Api-Version", SIDECAR_API_VERSION)
+        self.send_header("X-Pyc-Request-Id", self._request_id)
         self.send_header("Cache-Control", "no-cache")
         self.send_header("Connection", "close")
         self.end_headers()
@@ -244,8 +341,23 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
             self.wfile.flush()
 
     @staticmethod
-    def _error_payload(code: str, message: str, *, status: str = "error") -> dict[str, Any]:
-        return {"status": status, "error": {"code": code, "message": message}}
+    def _error_payload(
+        code: str,
+        category: str,
+        message: str,
+        *,
+        retryable: bool = False,
+        degraded: bool = False,
+        details: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        return make_error_response(
+            code,
+            category,
+            message,
+            retryable=retryable,
+            degraded=degraded,
+            details=details,
+        )
 
 
 def create_http_server(

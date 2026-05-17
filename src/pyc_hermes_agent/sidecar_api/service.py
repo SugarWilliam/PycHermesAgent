@@ -28,7 +28,7 @@ from pyc_hermes_agent.sidecar_api.logging import log_event
 
 
 _MRAG_SERVICES: dict[str, MRAGService] = {}
-_HERMES_FACADES: dict[str, HermesFacade] = {}
+SIDECAR_API_VERSION = "0.1"
 
 
 def _repo_root() -> Path:
@@ -160,12 +160,9 @@ def resolve_runtime_directories_root(root: Path | None = None) -> Path | None:
 
 def _get_hermes_facade(root: Path | None = None) -> HermesFacade:
     base = root or _repo_root()
-    cache_key = str(base.resolve())
-    facade = _HERMES_FACADES.get(cache_key)
-    if facade is None:
-        facade = HermesFacade(root=base)
-        _HERMES_FACADES[cache_key] = facade
-    return facade
+    # Hermes discovery and health reads should reflect current upstream state,
+    # not a process-lifetime snapshot captured by an earlier request.
+    return HermesFacade(root=base)
 
 
 def _event(source: str, event_type: str, task_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -185,6 +182,28 @@ def _error(code: str, category: str, message: str, *, retryable: bool = False, d
     )
 
 
+def make_error_response(
+    code: str,
+    category: str,
+    message: str,
+    *,
+    retryable: bool = False,
+    degraded: bool = False,
+    details: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    return {
+        "status": "error",
+        "error": _error(
+            code,
+            category,
+            message,
+            retryable=retryable,
+            degraded=degraded,
+            details=details,
+        ),
+    }
+
+
 def get_health(root: Path | None = None) -> dict:
     bridge_health = get_hermes_bridge_health(root)
     ready_state = "unavailable"
@@ -200,7 +219,7 @@ def get_health(root: Path | None = None) -> dict:
         "degraded": ready_state != "ready",
         "status_label": status_label,
         "version": __version__,
-        "sidecar_api_version": "0.1",
+        "sidecar_api_version": SIDECAR_API_VERSION,
         "hermes": {
             "ready_state": ready_state,
             "status_label": status_label,
@@ -398,15 +417,14 @@ def invoke_formal_analysis(request: MetaAnalysisRequest) -> Dict[str, Any]:
         }
     except Exception as exc:
         failure = _event("sidecar", "task.failed", task_id, {"mode": "formal-analysis"})
-        return {
-            "events": [started, failure],
-            "error": _error(
-                "FORMAL_ANALYSIS_FAILED",
-                "internal",
-                str(exc),
-                degraded=False,
-            ),
-        }
+        response = make_error_response(
+            "FORMAL_ANALYSIS_FAILED",
+            "internal",
+            str(exc),
+            degraded=False,
+        )
+        response["events"] = [started, failure]
+        return response
 
 
 def invoke_chat_completion(request: ChatCompletionRequest, root: Path | None = None) -> Dict[str, Any]:
@@ -454,16 +472,13 @@ def invoke_chat_completion(request: ChatCompletionRequest, root: Path | None = N
         )
     except Exception as exc:
         log_event("llm.chat.failed", error=str(exc))
-        return {
-            "status": "error",
-            "error": _error(
-                "LLM_CHAT_FAILED",
-                "provider",
-                str(exc),
-                retryable=True,
-                degraded=False,
-            )
-        }
+        return make_error_response(
+            "LLM_CHAT_FAILED",
+            "provider",
+            str(exc),
+            retryable=True,
+            degraded=False,
+        )
 
 
 def stream_chat_completion(request: ChatCompletionRequest, root: Path | None = None) -> Iterator[Dict[str, Any]]:
@@ -569,16 +584,13 @@ def run_agent_loop(request: AgentLoopRequest, root: Path | None = None) -> Dict[
         return _serialize(result)
     except Exception as exc:
         log_event("agent.loop.failed", error=str(exc))
-        return {
-            "status": "error",
-            "error": _error(
-                "AGENT_LOOP_FAILED",
-                "runtime",
-                str(exc),
-                retryable=False,
-                degraded=False,
-            ),
-        }
+        return make_error_response(
+            "AGENT_LOOP_FAILED",
+            "runtime",
+            str(exc),
+            retryable=False,
+            degraded=False,
+        )
 
 
 def stream_agent_loop(request: AgentLoopRequest, root: Path | None = None) -> Iterator[Dict[str, Any]]:
