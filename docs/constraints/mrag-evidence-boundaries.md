@@ -41,6 +41,12 @@ Index format changes require:
 - compatibility matrix update,
 - restart/persistence tests.
 
+### Runtime vs on-disk versions
+
+If on-disk `manifest_version` or `index_format_version` (including embedded chunk index markers) is **newer** than the running application supports, loaders must **reject** that knowledge base until the user upgrades the application. The HTTP sidecar surfaces this as a structured storage error (`MRAG_MANIFEST_INCOMPATIBLE`).
+
+`POST .../rebuild-index` rebuilds chunk storage from **already ingested document sources** when the runtime accepts the manifest; it does **not** downgrade or rewrite knowledge bases that require a newer runtime.
+
 ## 6. Retrieval Evolution
 
 The accepted evolution path is:
