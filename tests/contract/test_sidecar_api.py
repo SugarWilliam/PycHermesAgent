@@ -16,6 +16,7 @@ from pyc_hermes_agent.sidecar_api import (
     get_hermes_tools_snapshot,
     get_meta_harness_benchmark_smoke,
     get_meta_harness_dependency_snapshot,
+    get_meta_harness_value_proof_benchmark,
     ingest_file_document,
     ingest_text_document,
     ingest_url_document,
@@ -315,6 +316,14 @@ def test_sidecar_exposes_meta_harness_benchmark_smoke() -> None:
     assert smoke["failed_count"] == 0
 
 
+def test_sidecar_exposes_meta_harness_value_proof_benchmark() -> None:
+    report = get_meta_harness_value_proof_benchmark()
+
+    assert report["entrypoint"] == "MetaFramework.execute"
+    assert report["benchmark_id"] == "meta_harness.value_proof.v1"
+    assert report["passed"] is True
+
+
 def test_sidecar_hermes_capability_snapshot(tmp_path: Path) -> None:
     _make_fake_hermes_checkout(tmp_path)
 
@@ -425,6 +434,7 @@ def test_sidecar_formal_analysis_returns_standard_error_response_on_failure(monk
     assert response["status"] == "error"
     assert response["error"]["code"] == "FORMAL_ANALYSIS_FAILED"
     assert response["error"]["category"] == "internal"
+    assert response["error"]["domain"] == "meta_harness"
     assert response["error"]["retryable"] is False
     assert response["error"]["degraded"] is False
     assert response["events"][-1]["type"] == "task.failed"

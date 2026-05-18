@@ -6,6 +6,26 @@ from typing import Optional
 
 from pyc_hermes_agent.contracts import CapabilityDescriptor, MetaAnalysisRequest, MetaAnalysisResult
 
+# Shorthand phrases that often indicate causal over-certainty in user prompts (shared with value benchmarks).
+OVERCLAIM_PHRASES: tuple[str, ...] = (
+    "with certainty",
+    "proved causation",
+    "proven causal",
+    "100% caused",
+    "必然因果",
+    "铁证",
+    "毫无疑问的原因",
+)
+
+
+def request_has_overclaim_language(request: MetaAnalysisRequest) -> bool:
+    text = (request.problem_statement or "").lower()
+    return any(phrase in text for phrase in OVERCLAIM_PHRASES)
+
+
+def risks_include_overclaim_guardrail(risks: list[str]) -> bool:
+    return any("over-claim" in item.lower() for item in risks)
+
 
 class QualityChecker:
     def risks(self, request: MetaAnalysisRequest, selected: Optional[CapabilityDescriptor]) -> list[str]:
@@ -15,18 +35,7 @@ class QualityChecker:
             risks.append("No formal method selected; analysis is degraded.")
         elif selected.max_evidence_grade == "CE-C1":
             risks.append("Selected route is predictive-first and must not be presented as strong causal proof.")
-        if any(
-            phrase in text
-            for phrase in (
-                "with certainty",
-                "proved causation",
-                "proven causal",
-                "100% caused",
-                "必然因果",
-                "铁证",
-                "毫无疑问的原因",
-            )
-        ):
+        if any(phrase in text for phrase in OVERCLAIM_PHRASES):
             risks.append(
                 "Problem statement may over-claim causal certainty relative to the selected evidence grade; "
                 "treat outputs as hypotheses or scaffolded evidence, not intervention-grade claims."

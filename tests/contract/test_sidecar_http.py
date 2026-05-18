@@ -183,6 +183,7 @@ def test_sidecar_http_server_sets_api_version_header_on_json_error(tmp_path) -> 
     assert payload["status"] == "error"
     assert payload["error"]["code"] == "INVALID_REQUEST"
     assert payload["error"]["category"] == "request"
+    assert payload["error"]["domain"] == "http"
     assert payload["error"]["retryable"] is False
     assert payload["error"]["degraded"] is False
     assert payload["error"]["details"]["path"] == "/knowledge-bases"
@@ -211,6 +212,7 @@ def test_sidecar_http_server_returns_standard_error_response_for_unknown_route(t
     assert payload["status"] == "error"
     assert payload["error"]["code"] == "NOT_FOUND"
     assert payload["error"]["category"] == "transport"
+    assert payload["error"]["domain"] == "http"
     assert payload["error"]["details"]["path"] == "/unknown-route"
     assert payload["error"]["details"]["method"] == "POST"
     assert payload["error"]["details"]["http_status"] == 404
@@ -240,6 +242,7 @@ def test_sidecar_http_server_returns_storage_error_when_mrag_locked(tmp_path) ->
     assert payload["status"] == "error"
     assert payload["error"]["code"] == "MRAG_STORAGE_LOCKED"
     assert payload["error"]["category"] == "storage"
+    assert payload["error"]["domain"] == "mrag"
     assert payload["error"]["retryable"] is True
     assert payload["error"]["details"]["path"] == "/knowledge-bases"
     assert payload["error"]["details"]["http_status"] == 423
@@ -300,6 +303,22 @@ def test_sidecar_http_server_runs_meta_harness_benchmark_smoke(tmp_path) -> None
     assert payload["passed"] is True
 
 
+def test_sidecar_http_server_runs_meta_harness_value_proof(tmp_path) -> None:
+    server, thread = _start_server(root=tmp_path)
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+
+    try:
+        status_code, payload = _post_json(f"{base_url}/meta-harness/value-proof", {})
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert status_code == 200
+    assert payload["benchmark_id"] == "meta_harness.value_proof.v1"
+    assert payload["passed"] is True
+
+
 def test_sidecar_http_server_returns_error_status_for_failed_formal_analysis(tmp_path, monkeypatch) -> None:
     from pyc_hermes_agent.sidecar_api import service as sidecar_service
 
@@ -329,6 +348,7 @@ def test_sidecar_http_server_returns_error_status_for_failed_formal_analysis(tmp
     assert payload["status"] == "error"
     assert payload["error"]["code"] == "FORMAL_ANALYSIS_FAILED"
     assert payload["error"]["category"] == "internal"
+    assert payload["error"]["domain"] == "meta_harness"
     assert payload["events"][-1]["type"] == "task.failed"
     assert headers["X-Pyc-Sidecar-Api-Version"] == SIDECAR_API_VERSION
     assert headers["X-Pyc-Request-Id"]
@@ -594,6 +614,39 @@ def test_sidecar_http_server_creates_and_searches_knowledge_bases(tmp_path) -> N
     assert result["citations"]
 
 
+def test_sidecar_http_server_rebuilds_mrag_chunk_index(tmp_path) -> None:
+    server, thread = _start_server(root=tmp_path)
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+
+    try:
+        _create_status, knowledge_base = _post_json(f"{base_url}/knowledge-bases", {"name": "rebuild-http"})
+        assert _create_status == 201
+        kb_id = knowledge_base["knowledge_base_id"]
+        _doc_status, _ = _post_json(
+            f"{base_url}/knowledge-bases/{kb_id}/documents/text",
+            {"text": "rebuild route re-chunks from stored sources " * 40, "title": "long"},
+        )
+        assert _doc_status == 201
+        rebuild_status, rebuild_payload = _post_json(
+            f"{base_url}/knowledge-bases/{kb_id}/rebuild-index",
+            {},
+        )
+        search_status, result = _post_json(
+            f"{base_url}/knowledge-bases/{kb_id}/search",
+            {"query": "re-chunks", "top_k": 2},
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert rebuild_status == 200
+    assert rebuild_payload["status"] == "rebuilt"
+    assert rebuild_payload["chunk_count"] >= 1
+    assert search_status == 200
+    assert result["hits"]
+
+
 def test_sidecar_http_server_ingests_file_and_url_documents(tmp_path) -> None:
     source_path = tmp_path / "source.md"
     source_path.write_text("# Source\nHTTP file and URL ingest should be searchable evidence.", encoding="utf-8")
@@ -668,15 +721,213 @@ def test_sidecar_http_server_lists_assets_and_artifacts(tmp_path) -> None:
     assert len(scoped["items"]) == 1
 
 
+def test_sidecar_http_server_returns_asset_domain_error_when_inventory_fails(tmp_path, monkeypatch) -> None:
+    from pyc_hermes_agent.sidecar_api import http_server as hs
+
+    def _boom(root=None):
+        raise RuntimeError("simulated inventory failure")
+
+    monkeypatch.setattr(hs, "list_asset_inventory", _boom)
+    server, thread = _start_server(root=tmp_path)
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        try:
+            urlopen(f"{base_url}/assets", timeout=5)
+        except HTTPError as exc:
+            assert exc.code == 502
+            body = json.loads(exc.read().decode("utf-8"))
+        else:  # pragma: no cover
+            raise AssertionError("expected HTTP 502")
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert body["status"] == "error"
+    assert body["error"]["code"] == "ASSET_INVENTORY_FAILED"
+    assert body["error"]["domain"] == "asset"
+    assert body["error"]["category"] == "runtime"
+
+
+def test_sidecar_http_server_returns_artifact_domain_error_when_list_fails(tmp_path, monkeypatch) -> None:
+    from pyc_hermes_agent.sidecar_api import http_server as hs
+
+    def _boom(root, task_id=None):
+        raise RuntimeError("simulated artifact list failure")
+
+    monkeypatch.setattr(hs, "list_sidecar_artifacts", _boom)
+    server, thread = _start_server(root=tmp_path)
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        try:
+            urlopen(f"{base_url}/artifacts/task/demo-task", timeout=5)
+        except HTTPError as exc:
+            assert exc.code == 502
+            body = json.loads(exc.read().decode("utf-8"))
+        else:  # pragma: no cover
+            raise AssertionError("expected HTTP 502")
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert body["status"] == "error"
+    assert body["error"]["code"] == "ARTIFACT_LIST_FAILED"
+    assert body["error"]["domain"] == "artifact"
+    assert body["error"]["details"].get("task_id") == "demo-task"
+
+
+def test_sidecar_http_server_returns_hermes_domain_error_when_snapshot_fails(tmp_path, monkeypatch) -> None:
+    from pyc_hermes_agent.sidecar_api import http_server as hs
+
+    def _boom(root=None):
+        raise RuntimeError("simulated hermes probe failure")
+
+    monkeypatch.setattr(hs, "get_hermes_capability_snapshot", _boom)
+    server, thread = _start_server(root=tmp_path)
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        try:
+            urlopen(f"{base_url}/hermes/capability", timeout=5)
+        except HTTPError as exc:
+            assert exc.code == 502
+            body = json.loads(exc.read().decode("utf-8"))
+        else:  # pragma: no cover
+            raise AssertionError("expected HTTP 502")
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert body["error"]["code"] == "HERMES_SNAPSHOT_FAILED"
+    assert body["error"]["domain"] == "hermes"
+    assert body["error"]["details"].get("hermes_surface") == "capability"
+
+
+def test_sidecar_http_server_returns_mrag_domain_error_when_kb_list_fails(tmp_path, monkeypatch) -> None:
+    from pyc_hermes_agent.sidecar_api import http_server as hs
+
+    def _boom(root):
+        raise RuntimeError("simulated kb list failure")
+
+    monkeypatch.setattr(hs, "list_knowledge_bases", _boom)
+    server, thread = _start_server(root=tmp_path)
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        try:
+            urlopen(f"{base_url}/knowledge-bases", timeout=5)
+        except HTTPError as exc:
+            assert exc.code == 502
+            body = json.loads(exc.read().decode("utf-8"))
+        else:  # pragma: no cover
+            raise AssertionError("expected HTTP 502")
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert body["error"]["code"] == "MRAG_KNOWLEDGE_BASE_LIST_FAILED"
+    assert body["error"]["domain"] == "mrag"
+
+
+def test_sidecar_http_returns_manifest_incompatible_on_kb_list_get(tmp_path) -> None:
+    from pyc_hermes_agent.common import ensure_runtime_directories, resolve_runtime_paths
+    from pyc_hermes_agent.mrag_core import MRAGService
+    from pyc_hermes_agent.mrag_core.persistence import MRAG_MANIFEST_VERSION
+
+    paths = ensure_runtime_directories(resolve_runtime_paths(tmp_path))
+    service = MRAGService(storage_root=paths.mrag_dir)
+    kb = service.create_knowledge_base("future-manifest-http")
+    service.ingest_text(kb.knowledge_base_id, "hello", title="t")
+    service.close()
+
+    manifest_path = paths.mrag_dir / "knowledge_bases" / kb.knowledge_base_id / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["manifest_version"] = MRAG_MANIFEST_VERSION + 99
+    manifest_path.write_text(json.dumps(manifest, ensure_ascii=True, indent=2), encoding="utf-8")
+
+    server, thread = _start_server(root=tmp_path)
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        try:
+            urlopen(f"{base_url}/knowledge-bases", timeout=5)
+        except HTTPError as exc:
+            assert exc.code == 502
+            body = json.loads(exc.read().decode("utf-8"))
+        else:  # pragma: no cover
+            raise AssertionError("expected HTTP 502")
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert body["status"] == "error"
+    assert body["error"]["code"] == "MRAG_MANIFEST_INCOMPATIBLE"
+    assert body["error"]["domain"] == "mrag"
+    assert body["error"]["category"] == "storage"
+    assert body["error"]["details"]["knowledge_base_id"] == kb.knowledge_base_id
+
+
+def test_sidecar_http_server_returns_meta_harness_domain_error_when_dependency_probe_fails(tmp_path, monkeypatch) -> None:
+    from pyc_hermes_agent.sidecar_api import http_server as hs
+
+    def _boom():
+        raise RuntimeError("simulated meta harness deps failure")
+
+    monkeypatch.setattr(hs, "get_meta_harness_dependency_snapshot", _boom)
+    server, thread = _start_server(root=tmp_path)
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        try:
+            urlopen(f"{base_url}/meta-harness/dependencies", timeout=5)
+        except HTTPError as exc:
+            assert exc.code == 502
+            body = json.loads(exc.read().decode("utf-8"))
+        else:  # pragma: no cover
+            raise AssertionError("expected HTTP 502")
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert body["error"]["code"] == "META_HARNESS_DEPENDENCY_SNAPSHOT_FAILED"
+    assert body["error"]["domain"] == "meta_harness"
+
+
+def test_sidecar_http_server_returns_meta_harness_domain_error_when_benchmark_smoke_fails(tmp_path, monkeypatch) -> None:
+    from pyc_hermes_agent.sidecar_api import http_server as hs
+
+    def _boom():
+        raise RuntimeError("simulated smoke failure")
+
+    monkeypatch.setattr(hs, "get_meta_harness_benchmark_smoke", _boom)
+    server, thread = _start_server(root=tmp_path)
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        status, body, _ = _post_json_error_with_headers(f"{base_url}/meta-harness/benchmark-smoke", {})
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert status == 502
+    assert body["error"]["code"] == "META_HARNESS_BENCHMARK_FAILED"
+    assert body["error"]["domain"] == "meta_harness"
+    assert body["error"]["details"].get("benchmark_kind") == "smoke"
+
+
 def test_sidecar_http_merges_request_id_into_service_error_json(tmp_path, monkeypatch) -> None:
     from pyc_hermes_agent.sidecar_api import http_server as sidecar_http_server
     from pyc_hermes_agent.sidecar_api import service as sidecar_service
+
+    from pyc_hermes_agent.sidecar_api.error_domains import DOMAIN_META_HARNESS
 
     def _fake_formal(_req):
         return sidecar_service.make_error_response(
             "FORMAL_ANALYSIS_FAILED",
             "internal",
             "synthetic failure",
+            domain=DOMAIN_META_HARNESS,
             details={"synthetic": True},
         )
 
@@ -710,6 +961,7 @@ def test_sidecar_http_merges_request_id_into_service_error_json(tmp_path, monkey
         thread.join(timeout=5)
 
     assert body["error"]["code"] == "FORMAL_ANALYSIS_FAILED"
+    assert body["error"]["domain"] == "meta_harness"
     assert body["error"]["details"]["request_id"] == rid
     assert body["error"]["details"].get("synthetic") is True
 
@@ -1024,3 +1276,4 @@ def test_sidecar_http_server_streams_terminal_error_event_on_agent_loop_failure(
     assert bool(events[0]["trace_id"])
     assert events[0]["session_id"] == "session-error"
     assert events[0]["error"]["code"] == "AGENT_LOOP_STREAM_FAILED"
+    assert events[0]["error"]["domain"] == "agent"

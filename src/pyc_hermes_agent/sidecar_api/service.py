@@ -25,7 +25,14 @@ from pyc_hermes_agent.llm_gateway import (
     resolve_opencode_like_config,
 )
 from pyc_hermes_agent.meta_harness import MetaFramework
+from pyc_hermes_agent.meta_harness.benchmark import run_value_proof_benchmark
 from pyc_hermes_agent.mrag_core import MRAGService
+from pyc_hermes_agent.sidecar_api.error_domains import (
+    DOMAIN_AGENT,
+    DOMAIN_INTERNAL,
+    DOMAIN_LLM,
+    DOMAIN_META_HARNESS,
+)
 from pyc_hermes_agent.sidecar_api.logging import log_event
 
 
@@ -193,11 +200,21 @@ def _event(source: str, event_type: str, task_id: str, payload: Dict[str, Any]) 
     return _serialize(EventEnvelope(source=source, type=event_type, task_id=task_id, payload=payload))
 
 
-def _error(code: str, category: str, message: str, *, retryable: bool = False, degraded: bool = False, details: Dict[str, Any] | None = None) -> Dict[str, Any]:
+def _error(
+    code: str,
+    category: str,
+    message: str,
+    *,
+    domain: str = DOMAIN_INTERNAL,
+    retryable: bool = False,
+    degraded: bool = False,
+    details: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
     return _serialize(
         ErrorEnvelope(
             code=code,
             category=category,
+            domain=domain,
             message=message,
             retryable=retryable,
             degraded=degraded,
@@ -211,6 +228,7 @@ def make_error_response(
     category: str,
     message: str,
     *,
+    domain: str = DOMAIN_INTERNAL,
     retryable: bool = False,
     degraded: bool = False,
     details: Dict[str, Any] | None = None,
@@ -221,6 +239,7 @@ def make_error_response(
             code,
             category,
             message,
+            domain=domain,
             retryable=retryable,
             degraded=degraded,
             details=details,
@@ -475,6 +494,7 @@ def invoke_formal_analysis(request: MetaAnalysisRequest) -> Dict[str, Any]:
             "FORMAL_ANALYSIS_FAILED",
             "internal",
             str(exc),
+            domain=DOMAIN_META_HARNESS,
             degraded=False,
         )
         response["events"] = [started, failure]
@@ -487,6 +507,10 @@ def get_meta_harness_dependency_snapshot() -> Dict[str, Any]:
 
 def get_meta_harness_benchmark_smoke() -> Dict[str, Any]:
     return MetaFramework().run_benchmark_smoke()
+
+
+def get_meta_harness_value_proof_benchmark() -> Dict[str, Any]:
+    return run_value_proof_benchmark()
 
 
 def invoke_chat_completion(request: ChatCompletionRequest, root: Path | None = None) -> Dict[str, Any]:
@@ -538,6 +562,7 @@ def invoke_chat_completion(request: ChatCompletionRequest, root: Path | None = N
             "LLM_CHAT_FAILED",
             "provider",
             str(exc),
+            domain=DOMAIN_LLM,
             retryable=True,
             degraded=False,
         )
@@ -602,6 +627,7 @@ def stream_chat_completion(request: ChatCompletionRequest, root: Path | None = N
                     "LLM_CHAT_STREAM_FAILED",
                     "provider",
                     str(exc),
+                    domain=DOMAIN_LLM,
                     retryable=True,
                     degraded=False,
                 ),
@@ -652,6 +678,7 @@ def run_agent_loop(request: AgentLoopRequest, root: Path | None = None) -> Dict[
             "AGENT_LOOP_FAILED",
             "runtime",
             str(exc),
+            domain=DOMAIN_AGENT,
             retryable=False,
             degraded=False,
         )
@@ -717,6 +744,7 @@ def stream_agent_loop(request: AgentLoopRequest, root: Path | None = None) -> It
                 "AGENT_LOOP_STREAM_FAILED",
                 "runtime",
                 str(exc),
+                domain=DOMAIN_AGENT,
                 retryable=False,
                 degraded=False,
             ),
@@ -783,3 +811,8 @@ def ingest_url_document(
 def search_knowledge_base(knowledge_base_id: str, request: RetrievalRequest, root: Path | None = None) -> Dict[str, Any]:
     result = _get_mrag_service(root).search(knowledge_base_id, request)
     return _serialize(result)
+
+
+def rebuild_mrag_chunk_index(knowledge_base_id: str, root: Path | None = None) -> Dict[str, Any]:
+    count = _get_mrag_service(root).rebuild_chunk_index(knowledge_base_id)
+    return {"knowledge_base_id": knowledge_base_id, "chunk_count": count, "status": "rebuilt"}

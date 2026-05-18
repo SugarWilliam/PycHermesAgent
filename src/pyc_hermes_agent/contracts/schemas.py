@@ -225,6 +225,7 @@ class ErrorEnvelope:
     schema_version: str = "1.0"
     code: str = "UNKNOWN"
     category: str = "internal"
+    domain: str = "internal"
     message: str = ""
     retryable: bool = False
     degraded: bool = False

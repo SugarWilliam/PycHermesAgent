@@ -69,6 +69,7 @@ Required fields:
 | `task_id` | Task or operation identity when available |
 | `error.code` | Stable machine-readable error |
 | `error.category` | Transport, validation, provider, storage, runtime, or degraded |
+| `error.domain` | Product slice: `http`, `llm`, `mrag`, `meta_harness`, `agent`, `asset`, `artifact`, `hermes`, `internal` |
 
 Every new route must specify whether it emits request IDs, trace IDs, or both.
 
@@ -138,6 +139,7 @@ Asset and artifact services are separate domains.
 - `artifact_engine` owns task outputs, metadata, checksums, and export records.
 - Neither service may store MRAG indexes or chat memory.
 - Sidecar routes for these services must be versioned and covered by contract tests before desktop integration.
+- Staging under runtime-local directories, checksum validation before promotion, and atomic rename/`replace` into the target layout are required for installs and exports (see `asset_manager` / `artifact_engine` implementations).
 
 ## 10. Desktop Design Preconditions
 

@@ -21,9 +21,16 @@ class MRAGService:
         self._storage_owner: MRAGStorageOwner | None = (
             acquire_mrag_storage_owner(self._storage_root) if self._storage_root is not None else None
         )
-        self._knowledge_bases: Dict[str, KnowledgeBase] = (
-            load_knowledge_bases(self._storage_root) if self._storage_root is not None else {}
-        )
+        self._knowledge_bases: Dict[str, KnowledgeBase] = {}
+        if self._storage_root is None:
+            return
+        try:
+            self._knowledge_bases = load_knowledge_bases(self._storage_root)
+        except Exception:
+            if self._storage_owner is not None:
+                self._storage_owner.close()
+                self._storage_owner = None
+            raise
 
     def create_knowledge_base(self, name: str) -> KnowledgeBase:
         kb = KnowledgeBase(knowledge_base_id=str(uuid4()), name=name)
@@ -66,6 +73,14 @@ class MRAGService:
     def search(self, knowledge_base_id: str, request: RetrievalRequest) -> RetrievalResult:
         kb = self._require_kb(knowledge_base_id)
         return retrieve(kb, request)
+
+    def rebuild_chunk_index(self, knowledge_base_id: str) -> int:
+        kb = self._require_kb(knowledge_base_id)
+        kb.chunks.clear()
+        for document in list(kb.documents.values()):
+            kb.add_chunks(chunk_document(document))
+        self._persist(kb)
+        return len(kb.chunks)
 
     def _store_document(self, kb: KnowledgeBase, document: KnowledgeDocument) -> None:
         kb.add_document(document)

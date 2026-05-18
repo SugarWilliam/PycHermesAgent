@@ -7,6 +7,7 @@ from pyc_hermes_agent.contracts import (
     ChatCompletionRequest,
     ChatMessage,
     CapabilityDescriptor,
+    ErrorEnvelope,
     EventEnvelope,
     HermesIntegrationSnapshot,
     HermesMemoryManagerDescriptor,
@@ -204,3 +205,9 @@ def test_hermes_memory_snapshot_defaults() -> None:
     assert snapshot.integration.surface == "memory"
     assert snapshot.manager.manager_path == "agent/memory_manager.py"
     assert snapshot.providers[0].id == "builtin"
+
+
+def test_error_envelope_includes_domain_dimension() -> None:
+    envelope = ErrorEnvelope(code="DEMO", category="internal", domain="meta_harness", message="m")
+    assert envelope.schema_version == "1.0"
+    assert envelope.domain == "meta_harness"

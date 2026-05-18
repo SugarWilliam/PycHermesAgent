@@ -3,7 +3,7 @@ import json
 import pytest
 
 from pyc_hermes_agent.contracts import RetrievalRequest
-from pyc_hermes_agent.mrag_core import MRAGService, MRAGStorageLockedError
+from pyc_hermes_agent.mrag_core import MRAGService, MRAGManifestIncompatibleError, MRAGStorageLockedError
 from pyc_hermes_agent.mrag_core.ownership import MRAG_LOCK_FILE
 from pyc_hermes_agent.mrag_core.persistence import MRAG_INDEX_FORMAT_VERSION, MRAG_MANIFEST_VERSION
 
@@ -157,6 +157,60 @@ def test_mrag_allows_same_process_to_share_storage_owner(tmp_path) -> None:
 
     assert persisted is not None
     assert persisted.name == "shared"
+
+
+def test_mrag_rejects_manifest_newer_than_runtime(tmp_path) -> None:
+    storage_root = tmp_path / "mrag-store"
+    service = MRAGService(storage_root=storage_root)
+    kb = service.create_knowledge_base("future")
+    service.ingest_text(kb.knowledge_base_id, "hello", title="t")
+    service.close()
+
+    manifest_path = storage_root / "knowledge_bases" / kb.knowledge_base_id / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["manifest_version"] = MRAG_MANIFEST_VERSION + 99
+    manifest_path.write_text(json.dumps(manifest, ensure_ascii=True, indent=2), encoding="utf-8")
+
+    with pytest.raises(MRAGManifestIncompatibleError) as exc:
+        MRAGService(storage_root=storage_root)
+    assert exc.value.knowledge_base_id == kb.knowledge_base_id
+
+
+def test_mrag_rejects_chunk_index_newer_than_runtime(tmp_path) -> None:
+    storage_root = tmp_path / "mrag-store"
+    service = MRAGService(storage_root=storage_root)
+    kb = service.create_knowledge_base("future-chunks")
+    service.ingest_text(kb.knowledge_base_id, "hello", title="t")
+    service.close()
+
+    chunks_path = storage_root / "indexes" / kb.knowledge_base_id / "chunks.json"
+    payload = json.loads(chunks_path.read_text(encoding="utf-8"))
+    payload["index_format_version"] = MRAG_INDEX_FORMAT_VERSION + 99
+    chunks_path.write_text(json.dumps(payload, ensure_ascii=True, indent=2), encoding="utf-8")
+
+    with pytest.raises(MRAGManifestIncompatibleError):
+        MRAGService(storage_root=storage_root)
+
+
+def test_mrag_rebuild_chunk_index_from_sources(tmp_path) -> None:
+    storage_root = tmp_path / "mrag-store"
+    service = MRAGService(storage_root=storage_root)
+    kb = service.create_knowledge_base("rebuild-me")
+    service.ingest_text(kb.knowledge_base_id, "alpha beta gamma " * 200, title="long")
+    kb_loaded = service.get_knowledge_base(kb.knowledge_base_id)
+    assert kb_loaded is not None
+    original_count = len(kb_loaded.chunks)
+    kb_loaded.chunks.clear()
+    assert len(kb_loaded.chunks) == 0
+    service._persist(kb_loaded)
+
+    same_service = MRAGService(storage_root=storage_root)
+    assert len(same_service.get_knowledge_base(kb.knowledge_base_id).chunks) == 0
+    rebuilt = same_service.rebuild_chunk_index(kb.knowledge_base_id)
+    assert rebuilt == len(same_service.get_knowledge_base(kb.knowledge_base_id).chunks)
+    assert rebuilt == original_count
+    result = same_service.search(kb.knowledge_base_id, RetrievalRequest(query="gamma", top_k=3))
+    assert result.hits
 
 
 def test_mrag_close_releases_storage_owner(tmp_path) -> None:

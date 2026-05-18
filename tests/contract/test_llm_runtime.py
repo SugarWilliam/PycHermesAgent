@@ -287,6 +287,7 @@ def test_sidecar_http_transport_returns_error_payload_for_chat_failures(tmp_path
 
     assert response["status"] == "error"
     assert response["error"]["code"] == "LLM_CHAT_FAILED"
+    assert response["error"]["domain"] == "llm"
 
 
 def test_llm_gateway_executes_github_copilot_chat(tmp_path) -> None:
@@ -392,6 +393,7 @@ def test_llm_gateway_rejects_classic_pat_for_github_copilot(tmp_path) -> None:
 
     assert response["status"] == "error"
     assert response["error"]["code"] == "LLM_CHAT_FAILED"
+    assert response["error"]["domain"] == "llm"
     assert "does not support classic GitHub PATs" in response["error"]["message"]
 
 

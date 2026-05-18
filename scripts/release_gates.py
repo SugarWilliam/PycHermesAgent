@@ -5,11 +5,14 @@ Usage (from repo root):
 
     ./.venv/bin/python scripts/release_gates.py
     ./.venv/bin/python scripts/release_gates.py --no-pytest   # only whitespace + secret scan
+    ./.venv/bin/python scripts/release_gates.py --export-meta-benchmarks DIR
+        # after gates pass, run export_meta_harness_benchmarks and require smoke/value_proof passed
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import subprocess
 import sys
@@ -105,6 +108,13 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Skip pytest (run whitespace + secret checks only)",
     )
+    parser.add_argument(
+        "--export-meta-benchmarks",
+        type=Path,
+        default=None,
+        metavar="DIR",
+        help="After gates pass, write meta_harness_benchmarks.json under DIR and verify smoke/value_proof passed",
+    )
     args = parser.parse_args(argv)
 
     if not args.no_pytest:
@@ -127,6 +137,28 @@ def main(argv: list[str] | None = None) -> int:
         for hit in secret_hits:
             print(" ", hit, flush=True)
         return 1
+
+    if args.export_meta_benchmarks is not None:
+        out_dir = args.export_meta_benchmarks.resolve()
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / "meta_harness_benchmarks.json"
+        export_script = ROOT / "scripts" / "export_meta_harness_benchmarks.py"
+        if _run([sys.executable, str(export_script), "-o", str(out_path)]) != 0:
+            return 1
+        try:
+            data = json.loads(out_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"release_gates: could not read benchmark export: {exc}", flush=True)
+            return 1
+        smoke = data.get("benchmark_smoke") or {}
+        proof = data.get("value_proof") or {}
+        if not smoke.get("passed"):
+            print("release_gates: benchmark_smoke did not pass", flush=True)
+            return 1
+        if not proof.get("passed"):
+            print("release_gates: value_proof benchmark did not pass", flush=True)
+            return 1
+        print(f"release_gates: wrote {out_path}", flush=True)
 
     print("release_gates: OK", flush=True)
     return 0

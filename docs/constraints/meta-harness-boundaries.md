@@ -48,6 +48,6 @@ MetaHarness is not production-grade until:
 
 - capability availability reflects real dependency and bridge state,
 - routing uses method preconditions and data shape,
-- benchmark smoke tests exist,
+- value-proof benchmark compares a simulated LLM-only baseline to `MetaFramework.execute()` outputs (contract-tested),
 - degraded-state behavior is tested,
 - CE/SR separation is contract-tested.

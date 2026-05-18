@@ -15,6 +15,71 @@ MRAG_MANIFEST_VERSION = 1
 MRAG_INDEX_FORMAT_VERSION = 1
 
 
+class MRAGManifestIncompatibleError(RuntimeError):
+    """Raised when on-disk manifest or chunk index is newer than this runtime supports."""
+
+    def __init__(self, knowledge_base_id: str, message: str) -> None:
+        self.knowledge_base_id = knowledge_base_id
+        super().__init__(message)
+
+
+def _normalize_manifest_versions(manifest: dict[str, Any]) -> tuple[int, int]:
+    raw_mv = manifest.get("manifest_version", 1)
+    raw_iv = manifest.get("index_format_version", 1)
+    try:
+        mv = int(raw_mv) if raw_mv is not None else 1
+    except (TypeError, ValueError) as exc:
+        raise MRAGManifestIncompatibleError(
+            str(manifest.get("knowledge_base_id") or ""),
+            f"Invalid manifest_version: {raw_mv!r}",
+        ) from exc
+    try:
+        iv = int(raw_iv) if raw_iv is not None else 1
+    except (TypeError, ValueError) as exc:
+        raise MRAGManifestIncompatibleError(
+            str(manifest.get("knowledge_base_id") or ""),
+            f"Invalid index_format_version in manifest: {raw_iv!r}",
+        ) from exc
+    if mv < 1:
+        mv = 1
+    if iv < 1:
+        iv = 1
+    return mv, iv
+
+
+def _validate_manifest_for_load(knowledge_base_id: str, manifest: dict[str, Any]) -> None:
+    mv, iv = _normalize_manifest_versions(manifest)
+    if mv > MRAG_MANIFEST_VERSION:
+        raise MRAGManifestIncompatibleError(
+            knowledge_base_id,
+            f"manifest_version {mv} exceeds supported {MRAG_MANIFEST_VERSION}; upgrade the application.",
+        )
+    if iv > MRAG_INDEX_FORMAT_VERSION:
+        raise MRAGManifestIncompatibleError(
+            knowledge_base_id,
+            f"index_format_version {iv} in manifest exceeds supported {MRAG_INDEX_FORMAT_VERSION}; upgrade the application.",
+        )
+
+
+def _validate_chunks_file_for_load(knowledge_base_id: str, raw_chunks_payload: Any) -> None:
+    if isinstance(raw_chunks_payload, dict):
+        v = raw_chunks_payload.get("index_format_version")
+        if v is None:
+            return
+        try:
+            iv = int(v)
+        except (TypeError, ValueError) as exc:
+            raise MRAGManifestIncompatibleError(
+                knowledge_base_id,
+                f"Invalid index_format_version in chunks.json: {v!r}",
+            ) from exc
+        if iv > MRAG_INDEX_FORMAT_VERSION:
+            raise MRAGManifestIncompatibleError(
+                knowledge_base_id,
+                f"chunks.json index_format_version {iv} exceeds supported {MRAG_INDEX_FORMAT_VERSION}; upgrade the application.",
+            )
+
+
 def load_knowledge_bases(storage_root: Path) -> dict[str, KnowledgeBase]:
     manifests_root = storage_root / "knowledge_bases"
     sources_root = storage_root / "sources"
@@ -32,6 +97,8 @@ def load_knowledge_bases(storage_root: Path) -> dict[str, KnowledgeBase]:
         if not knowledge_base_id:
             continue
 
+        _validate_manifest_for_load(knowledge_base_id, manifest)
+
         documents: dict[str, KnowledgeDocument] = {}
         for document_path in sorted((sources_root / knowledge_base_id).glob("*.json")):
             document = KnowledgeDocument(**_read_json(document_path))
@@ -40,7 +107,9 @@ def load_knowledge_bases(storage_root: Path) -> dict[str, KnowledgeBase]:
         chunks_path = indexes_root / knowledge_base_id / "chunks.json"
         chunks = []
         if chunks_path.exists():
-            chunks = [DocumentChunk(**chunk) for chunk in _read_chunk_payload(_read_json(chunks_path))]
+            raw_chunks = _read_json(chunks_path)
+            _validate_chunks_file_for_load(knowledge_base_id, raw_chunks)
+            chunks = [DocumentChunk(**chunk) for chunk in _read_chunk_payload(raw_chunks)]
 
         knowledge_bases[knowledge_base_id] = KnowledgeBase(
             knowledge_base_id=knowledge_base_id,
@@ -116,6 +185,7 @@ def _write_json_atomic(path: Path, payload) -> None:
 __all__ = [
     "MRAG_INDEX_FORMAT_VERSION",
     "MRAG_MANIFEST_VERSION",
+    "MRAGManifestIncompatibleError",
     "load_knowledge_bases",
     "persist_knowledge_base",
 ]

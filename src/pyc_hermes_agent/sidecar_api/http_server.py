@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+from collections.abc import Callable
 from dataclasses import asdict, is_dataclass
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -15,7 +16,17 @@ from urllib.parse import unquote, urlparse
 from uuid import uuid4
 
 from pyc_hermes_agent.contracts import AgentLoopRequest, ChatCompletionRequest, MetaAnalysisRequest, RetrievalRequest
-from pyc_hermes_agent.mrag_core import MRAGStorageLockedError
+from pyc_hermes_agent.mrag_core import MRAGManifestIncompatibleError, MRAGStorageLockedError
+from pyc_hermes_agent.sidecar_api.error_domains import (
+    DOMAIN_ARTIFACT,
+    DOMAIN_ASSET,
+    DOMAIN_HERMES,
+    DOMAIN_HTTP,
+    DOMAIN_INTERNAL,
+    DOMAIN_LLM,
+    DOMAIN_META_HARNESS,
+    DOMAIN_MRAG,
+)
 from pyc_hermes_agent.sidecar_api.logging import log_event
 from pyc_hermes_agent.sidecar_api.service import (
     SIDECAR_API_VERSION,
@@ -30,6 +41,7 @@ from pyc_hermes_agent.sidecar_api.service import (
     get_hermes_tools_snapshot,
     get_meta_harness_benchmark_smoke,
     get_meta_harness_dependency_snapshot,
+    get_meta_harness_value_proof_benchmark,
     ingest_file_document,
     ingest_text_document,
     ingest_url_document,
@@ -43,6 +55,7 @@ from pyc_hermes_agent.sidecar_api.service import (
     list_sidecar_artifacts,
     list_skills,
     make_error_response,
+    rebuild_mrag_chunk_index,
     run_agent_loop,
     search_knowledge_base,
     stream_agent_loop,
@@ -56,6 +69,34 @@ _KB_DOCUMENT_TEXT_PATTERN = re.compile(r"^/knowledge-bases/([^/]+)/documents/tex
 _KB_DOCUMENT_FILE_PATTERN = re.compile(r"^/knowledge-bases/([^/]+)/documents/file$")
 _KB_DOCUMENT_URL_PATTERN = re.compile(r"^/knowledge-bases/([^/]+)/documents/url$")
 _KB_SEARCH_PATTERN = re.compile(r"^/knowledge-bases/([^/]+)/search$")
+_KB_REBUILD_INDEX_PATTERN = re.compile(r"^/knowledge-bases/([^/]+)/rebuild-index$")
+
+
+def _get_or_bad_gateway(
+    factory: Callable[[], dict[str, Any]],
+    *,
+    code: str,
+    domain: str,
+    details: dict[str, Any] | None = None,
+) -> tuple[dict[str, Any], HTTPStatus]:
+    try:
+        return factory(), HTTPStatus.OK
+    except MRAGStorageLockedError:
+        raise
+    except MRAGManifestIncompatibleError:
+        raise
+    except Exception as exc:
+        return (
+            make_error_response(
+                code,
+                "runtime",
+                str(exc),
+                domain=domain,
+                degraded=False,
+                details=dict(details or {}),
+            ),
+            HTTPStatus.BAD_GATEWAY,
+        )
 
 
 class SidecarHTTPServer(ThreadingHTTPServer):
@@ -108,6 +149,7 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
                 "INVALID_JSON",
                 "request",
                 str(exc),
+                domain=DOMAIN_HTTP,
                 details={
                     "method": method,
                     "path": path,
@@ -121,6 +163,7 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
                 "NOT_FOUND",
                 "transport",
                 str(exc),
+                domain=DOMAIN_HTTP,
                 details={
                     "method": method,
                     "path": path,
@@ -134,6 +177,7 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
                 "INVALID_REQUEST",
                 "request",
                 str(exc),
+                domain=DOMAIN_HTTP,
                 details={
                     "method": method,
                     "path": path,
@@ -147,6 +191,7 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
                 "MRAG_STORAGE_LOCKED",
                 "storage",
                 str(exc),
+                domain=DOMAIN_MRAG,
                 retryable=True,
                 details={
                     "method": method,
@@ -157,11 +202,28 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
                 },
             )
             status = HTTPStatus.LOCKED
+        except MRAGManifestIncompatibleError as exc:
+            payload = self._error_payload(
+                "MRAG_MANIFEST_INCOMPATIBLE",
+                "storage",
+                str(exc),
+                domain=DOMAIN_MRAG,
+                retryable=False,
+                details={
+                    "method": method,
+                    "path": path,
+                    "http_status": int(HTTPStatus.BAD_GATEWAY),
+                    "request_id": request_id,
+                    "knowledge_base_id": exc.knowledge_base_id,
+                },
+            )
+            status = HTTPStatus.BAD_GATEWAY
         except Exception as exc:  # pragma: no cover - defensive boundary
             payload = self._error_payload(
                 "INTERNAL_ERROR",
                 "internal",
                 str(exc),
+                domain=DOMAIN_INTERNAL,
                 details={
                     "method": method,
                     "path": path,
@@ -191,6 +253,7 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
             has_error="error" in payload,
             error_code=error.get("code") if isinstance(error, dict) else None,
             error_category=error.get("category") if isinstance(error, dict) else None,
+            error_domain=error.get("domain") if isinstance(error, dict) else None,
         )
         if isinstance(payload, dict):
             self._ensure_error_correlates_request(payload, request_id)
@@ -200,78 +263,181 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
         root = self._server_root()
 
         if path == "/":
-            health = get_health(root)
-            return {
-                "service": "pyc-hermes-agent-sidecar",
-                "version": health["version"],
-                "sidecar_api_version": health["sidecar_api_version"],
-                "routes": [
-                    "/health",
-                    "/config",
-                    "/providers",
-                    "/models",
-                    "/rules",
-                    "/skills",
-                    "/assets",
-                    "/artifacts",
-                    "/artifacts/task/{task_id}",
-                    "/hermes/capability",
-                    "/hermes/bridge-health",
-                    "/hermes/sessions",
-                    "/hermes/memory",
-                    "/hermes/skills",
-                    "/hermes/tools",
-                    "/agent/run",
-                    "/agent/run/stream",
-                    "/llm/chat",
-                    "/llm/chat/stream",
-                    "/formal-analysis",
-                    "/meta-harness/dependencies",
-                    "/meta-harness/benchmark-smoke",
-                    "/knowledge-bases",
-                    "/knowledge-bases/{id}/documents/text",
-                    "/knowledge-bases/{id}/documents/file",
-                    "/knowledge-bases/{id}/documents/url",
-                    "/knowledge-bases/{id}/search",
-                ],
-            }, HTTPStatus.OK
+            try:
+                health = get_health(root)
+                return {
+                    "service": "pyc-hermes-agent-sidecar",
+                    "version": health["version"],
+                    "sidecar_api_version": health["sidecar_api_version"],
+                    "routes": [
+                        "/health",
+                        "/config",
+                        "/providers",
+                        "/models",
+                        "/rules",
+                        "/skills",
+                        "/assets",
+                        "/artifacts",
+                        "/artifacts/task/{task_id}",
+                        "/hermes/capability",
+                        "/hermes/bridge-health",
+                        "/hermes/sessions",
+                        "/hermes/memory",
+                        "/hermes/skills",
+                        "/hermes/tools",
+                        "/agent/run",
+                        "/agent/run/stream",
+                        "/llm/chat",
+                        "/llm/chat/stream",
+                        "/formal-analysis",
+                        "/meta-harness/dependencies",
+                        "/meta-harness/benchmark-smoke",
+                        "/meta-harness/value-proof",
+                        "/knowledge-bases",
+                        "/knowledge-bases/{id}/documents/text",
+                        "/knowledge-bases/{id}/documents/file",
+                        "/knowledge-bases/{id}/documents/url",
+                        "/knowledge-bases/{id}/search",
+                        "/knowledge-bases/{id}/rebuild-index",
+                    ],
+                }, HTTPStatus.OK
+            except Exception as exc:
+                return (
+                    make_error_response(
+                        "HEALTH_SNAPSHOT_FAILED",
+                        "runtime",
+                        str(exc),
+                        domain=DOMAIN_INTERNAL,
+                        degraded=False,
+                        details={"path": "/"},
+                    ),
+                    HTTPStatus.BAD_GATEWAY,
+                )
         if path == "/health":
-            health = get_health(root)
-            self._log_health_transition(health)
-            return health, HTTPStatus.OK
+            try:
+                health = get_health(root)
+                self._log_health_transition(health)
+                return health, HTTPStatus.OK
+            except Exception as exc:
+                return (
+                    make_error_response(
+                        "HEALTH_SNAPSHOT_FAILED",
+                        "runtime",
+                        str(exc),
+                        domain=DOMAIN_INTERNAL,
+                        degraded=False,
+                        details={"path": "/health"},
+                    ),
+                    HTTPStatus.BAD_GATEWAY,
+                )
         if path == "/config":
-            return get_config_snapshot(root), HTTPStatus.OK
+            return _get_or_bad_gateway(
+                lambda: get_config_snapshot(root),
+                code="CONFIG_SNAPSHOT_FAILED",
+                domain=DOMAIN_INTERNAL,
+                details={},
+            )
         if path == "/providers":
-            return {"items": list_providers(root)}, HTTPStatus.OK
+            return _get_or_bad_gateway(
+                lambda: {"items": list_providers(root)},
+                code="PROVIDER_LIST_FAILED",
+                domain=DOMAIN_INTERNAL,
+                details={},
+            )
         if path == "/models":
-            return {"items": list_models(root)}, HTTPStatus.OK
+            return _get_or_bad_gateway(
+                lambda: {"items": list_models(root)},
+                code="MODEL_LIST_FAILED",
+                domain=DOMAIN_LLM,
+                details={},
+            )
         if path == "/rules":
-            return {"items": list_rules(root)}, HTTPStatus.OK
+            return _get_or_bad_gateway(
+                lambda: {"items": list_rules(root)},
+                code="RULE_LIST_FAILED",
+                domain=DOMAIN_INTERNAL,
+                details={},
+            )
         if path == "/skills":
-            return {"items": list_skills(root)}, HTTPStatus.OK
+            return _get_or_bad_gateway(
+                lambda: {"items": list_skills(root)},
+                code="SKILL_LIST_FAILED",
+                domain=DOMAIN_INTERNAL,
+                details={},
+            )
         if path == "/assets":
-            return list_asset_inventory(root), HTTPStatus.OK
+            return _get_or_bad_gateway(
+                lambda: list_asset_inventory(root),
+                code="ASSET_INVENTORY_FAILED",
+                domain=DOMAIN_ASSET,
+                details={},
+            )
         artifacts_match = _ARTIFACTS_PATTERN.fullmatch(path)
         if artifacts_match:
             raw_task = artifacts_match.group(1)
             task_id = unquote(raw_task) if raw_task else None
-            return list_sidecar_artifacts(root, task_id=task_id), HTTPStatus.OK
+            return _get_or_bad_gateway(
+                lambda: list_sidecar_artifacts(root, task_id=task_id),
+                code="ARTIFACT_LIST_FAILED",
+                domain=DOMAIN_ARTIFACT,
+                details={"task_id": task_id} if task_id else {},
+            )
         if path == "/hermes/capability":
-            return get_hermes_capability_snapshot(root), HTTPStatus.OK
+            return _get_or_bad_gateway(
+                lambda: get_hermes_capability_snapshot(root),
+                code="HERMES_SNAPSHOT_FAILED",
+                domain=DOMAIN_HERMES,
+                details={"hermes_surface": "capability"},
+            )
         if path == "/hermes/bridge-health":
-            return get_hermes_bridge_health(root), HTTPStatus.OK
+            return _get_or_bad_gateway(
+                lambda: get_hermes_bridge_health(root),
+                code="HERMES_SNAPSHOT_FAILED",
+                domain=DOMAIN_HERMES,
+                details={"hermes_surface": "bridge-health"},
+            )
         if path == "/hermes/sessions":
-            return get_hermes_sessions_snapshot(root), HTTPStatus.OK
+            return _get_or_bad_gateway(
+                lambda: get_hermes_sessions_snapshot(root),
+                code="HERMES_SNAPSHOT_FAILED",
+                domain=DOMAIN_HERMES,
+                details={"hermes_surface": "sessions"},
+            )
         if path == "/hermes/memory":
-            return get_hermes_memory_snapshot(root), HTTPStatus.OK
+            return _get_or_bad_gateway(
+                lambda: get_hermes_memory_snapshot(root),
+                code="HERMES_SNAPSHOT_FAILED",
+                domain=DOMAIN_HERMES,
+                details={"hermes_surface": "memory"},
+            )
         if path == "/hermes/skills":
-            return get_hermes_skills_snapshot(root), HTTPStatus.OK
+            return _get_or_bad_gateway(
+                lambda: get_hermes_skills_snapshot(root),
+                code="HERMES_SNAPSHOT_FAILED",
+                domain=DOMAIN_HERMES,
+                details={"hermes_surface": "skills"},
+            )
         if path == "/hermes/tools":
-            return get_hermes_tools_snapshot(root), HTTPStatus.OK
+            return _get_or_bad_gateway(
+                lambda: get_hermes_tools_snapshot(root),
+                code="HERMES_SNAPSHOT_FAILED",
+                domain=DOMAIN_HERMES,
+                details={"hermes_surface": "tools"},
+            )
         if path == "/meta-harness/dependencies":
-            return get_meta_harness_dependency_snapshot(), HTTPStatus.OK
+            return _get_or_bad_gateway(
+                lambda: get_meta_harness_dependency_snapshot(),
+                code="META_HARNESS_DEPENDENCY_SNAPSHOT_FAILED",
+                domain=DOMAIN_META_HARNESS,
+                details={},
+            )
         if path == "/knowledge-bases":
-            return {"items": list_knowledge_bases(root)}, HTTPStatus.OK
+            return _get_or_bad_gateway(
+                lambda: {"items": list_knowledge_bases(root)},
+                code="MRAG_KNOWLEDGE_BASE_LIST_FAILED",
+                domain=DOMAIN_MRAG,
+                details={},
+            )
         raise KeyError(f"Unknown route: {path}")
 
     def _handle_post(self, path: str, payload: dict[str, Any]) -> tuple[dict[str, Any] | None, HTTPStatus]:
@@ -280,7 +446,19 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
             status = HTTPStatus.OK if "error" not in response else HTTPStatus.BAD_GATEWAY
             return response, status
         if path == "/meta-harness/benchmark-smoke":
-            return get_meta_harness_benchmark_smoke(), HTTPStatus.OK
+            return _get_or_bad_gateway(
+                lambda: get_meta_harness_benchmark_smoke(),
+                code="META_HARNESS_BENCHMARK_FAILED",
+                domain=DOMAIN_META_HARNESS,
+                details={"benchmark_kind": "smoke"},
+            )
+        if path == "/meta-harness/value-proof":
+            return _get_or_bad_gateway(
+                lambda: get_meta_harness_value_proof_benchmark(),
+                code="META_HARNESS_BENCHMARK_FAILED",
+                domain=DOMAIN_META_HARNESS,
+                details={"benchmark_kind": "value_proof"},
+            )
         if path == "/agent/run":
             response = run_agent_loop(AgentLoopRequest(**payload), root=self._server_root())
             status = HTTPStatus.OK if "error" not in response else HTTPStatus.BAD_GATEWAY
@@ -300,6 +478,11 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
             if not isinstance(name, str) or not name.strip():
                 raise ValueError("Field 'name' is required.")
             return create_knowledge_base(name=name.strip(), root=self._server_root()), HTTPStatus.CREATED
+
+        rebuild_match = _KB_REBUILD_INDEX_PATTERN.fullmatch(path)
+        if rebuild_match:
+            knowledge_base_id = unquote(rebuild_match.group(1))
+            return rebuild_mrag_chunk_index(knowledge_base_id, root=self._server_root()), HTTPStatus.OK
 
         document_match = _KB_DOCUMENT_TEXT_PATTERN.fullmatch(path)
         if document_match:
@@ -447,6 +630,7 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
         category: str,
         message: str,
         *,
+        domain: str = DOMAIN_INTERNAL,
         retryable: bool = False,
         degraded: bool = False,
         details: dict[str, Any] | None = None,
@@ -455,6 +639,7 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
             code,
             category,
             message,
+            domain=domain,
             retryable=retryable,
             degraded=degraded,
             details=details,
