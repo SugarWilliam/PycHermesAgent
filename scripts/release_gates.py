@@ -10,8 +10,10 @@ Usage (from repo root):
     ./.venv/bin/python scripts/release_gates.py --with-mypy            # env RELEASE_GATES_MYPY=1
     ./.venv/bin/python scripts/release_gates.py --with-production      # env RELEASE_GATES_PRODUCTION=1
 
-Production extras (after ruff/mypy when enabled): ``uv lock --check``, MRAG migrate CLI on a temp dir,
-``npm ci`` + ``npm run dist:dir`` under ``desktop/`` (requires npm). See ``docs/deployment/Production_Release_Gates.md``.
+Production extras (after ruff/mypy when enabled): ``uv lock --check``, Python CycloneDX 1.5 SBOM export (``uv export``),
+MRAG migrate CLI on a temp dir with ``--backup-to``, ``npm ci`` + ``npm audit --omit=dev --audit-level=critical``
++ ``npm run dist:linux`` under ``desktop/`` (requires npm). Optional ``RELEASE_GATES_PYINSTALLER=1`` verifies the ``ga``
+extra (PyInstaller import). See ``docs/deployment/Production_Release_Gates.md``.
 
     ./.venv/bin/python scripts/release_gates.py --export-meta-benchmarks DIR
     ./.venv/bin/python scripts/release_gates.py --write-preview-release-notes FILE.md
@@ -182,7 +184,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--with-production",
         action="store_true",
-        help="After static checks: uv lock --check, MRAG migrate smoke, desktop npm dist:dir (RELEASE_GATES_PRODUCTION=1)",
+        help=(
+            "After static checks: uv lock --check, CycloneDX SBOM export, MRAG migrate+backup smoke, "
+            "npm audit (critical+) and desktop dist:linux (RELEASE_GATES_PRODUCTION=1)"
+        ),
     )
     args = parser.parse_args(argv)
 
@@ -211,8 +216,78 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         if _run([uv_bin, "lock", "--check"], cwd=ROOT) != 0:
             return 1
-        with tempfile.TemporaryDirectory() as tmp_mrag:
-            if _run([sys.executable, "-m", "pyc_hermes_agent.mrag_core.migrate", tmp_mrag, "--json"]) != 0:
+        (ROOT / "build").mkdir(exist_ok=True)
+        sbom_path = ROOT / "build" / "sbom-python.cdx.json"
+        if (
+            _run(
+                [
+                    uv_bin,
+                    "export",
+                    "-q",
+                    "--frozen",
+                    "--no-dev",
+                    "--format",
+                    "cyclonedx1.5",
+                    "-o",
+                    str(sbom_path),
+                ],
+                cwd=ROOT,
+            )
+            != 0
+        ):
+            return 1
+        try:
+            sbom_payload = json.loads(sbom_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"release_gates: CycloneDX export not readable JSON: {exc}", flush=True)
+            return 1
+        if sbom_payload.get("bomFormat") != "CycloneDX":
+            print("release_gates: CycloneDX export missing bomFormat=CycloneDX", flush=True)
+            return 1
+
+        want_pyinstaller = os.environ.get("RELEASE_GATES_PYINSTALLER", "").lower() in ("1", "true", "yes")
+        if want_pyinstaller:
+            if _run([uv_bin, "sync", "--frozen", "--extra", "dev", "--extra", "ga"], cwd=ROOT) != 0:
+                return 1
+            if (
+                subprocess.run([sys.executable, "-c", "import PyInstaller"], cwd=ROOT, check=False).returncode != 0
+            ):
+                print("release_gates: PyInstaller import failed (needs ga extra synced)", flush=True)
+                return 1
+            print("release_gates: PyInstaller (ga extra) import OK", flush=True)
+
+        with tempfile.TemporaryDirectory() as migrate_base:
+            mrag_storage = Path(migrate_base) / "mrag_store"
+            mrag_storage.mkdir()
+            backup_parent = Path(migrate_base) / "migrate_backups"
+            mrag_cli = shutil.which("pyc-hermes-mrag-migrate")
+            migrate_argv: list[str]
+            if mrag_cli:
+                migrate_argv = [
+                    mrag_cli,
+                    str(mrag_storage),
+                    "--json",
+                    "--backup-to",
+                    str(backup_parent),
+                ]
+            else:
+                migrate_argv = [
+                    sys.executable,
+                    "-m",
+                    "pyc_hermes_agent.mrag_core.migrate",
+                    str(mrag_storage),
+                    "--json",
+                    "--backup-to",
+                    str(backup_parent),
+                ]
+            if _run(migrate_argv) != 0:
+                return 1
+            backups = sorted(backup_parent.glob("mrag_backup_*"))
+            if not backups:
+                print(
+                    "release_gates: production: migrate --backup-to produced no mrag_backup_* dir",
+                    flush=True,
+                )
                 return 1
         desktop = ROOT / "desktop"
         npm_bin = shutil.which("npm")
@@ -225,7 +300,9 @@ def main(argv: list[str] | None = None) -> int:
                 return 1
             if _run([npm_bin, "ci"], cwd=desktop) != 0:
                 return 1
-            if _run([npm_bin, "run", "dist:dir"], cwd=desktop) != 0:
+            if _run([npm_bin, "audit", "--omit=dev", "--audit-level=critical"], cwd=desktop) != 0:
+                return 1
+            if _run([npm_bin, "run", "dist:linux"], cwd=desktop) != 0:
                 return 1
         print("release_gates: production packaging checks OK", flush=True)
 

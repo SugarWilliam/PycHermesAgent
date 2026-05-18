@@ -274,6 +274,19 @@ def get_health(root: Path | None = None) -> dict:
     status_label = ready_state
     if ready_state == "ready" and bridge_health["warnings"]:
         status_label = "ready-with-warnings"
+
+    observability: Dict[str, Any] = {
+        "structured_log_events": True,
+        "log_format_env": "PYC_HERMES_LOG_FORMAT",
+        "log_level_env": "PYC_HERMES_LOG_LEVEL",
+        "disable_file_log_env": "PYC_HERMES_DISABLE_FILE_LOG",
+    }
+    if root is not None:
+        resolved_root = Path(root).resolve()
+        paths = ensure_runtime_directories(resolve_runtime_paths(resolved_root))
+        observability["logs_dir"] = str(paths.logs_dir)
+        observability["sidecar_events_log"] = str(paths.logs_dir / "sidecar-events.log")
+
     return {
         "healthy": True,
         "degraded": ready_state != "ready",
@@ -283,11 +296,7 @@ def get_health(root: Path | None = None) -> dict:
         "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
         "platform": sys.platform,
         "mrag_retrieval_modes": ["lexical", "semantic", "hybrid"],
-        "observability": {
-            "structured_log_events": True,
-            "log_format_env": "PYC_HERMES_LOG_FORMAT",
-            "log_level_env": "PYC_HERMES_LOG_LEVEL",
-        },
+        "observability": observability,
         "hermes": {
             "ready_state": ready_state,
             "status_label": status_label,

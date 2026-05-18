@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 
@@ -282,3 +283,31 @@ def test_mrag_migrate_plan_detects_future_index_format(tmp_path) -> None:
     )
     notes = plan_migrations(tmp_path / "store")
     assert any("blocked" in n.lower() for n in notes)
+
+
+def test_mrag_migrate_backup_copies_storage_tree(tmp_path) -> None:
+    from pyc_hermes_agent.mrag_core import migrate as migrate_mod
+
+    store = tmp_path / "mrag_storage"
+    (store / "knowledge_bases" / "k1").mkdir(parents=True)
+    marker = store / ".sentinel"
+    marker.write_bytes(b"z")
+
+    backup_parent = tmp_path / "backups"
+    assert migrate_mod.main([str(store), "--backup-to", str(backup_parent)]) == 0
+    created = sorted(backup_parent.glob("mrag_backup_*"))
+    assert len(created) == 1
+    blob = created[0] / ".sentinel"
+    assert blob.read_bytes() == b"z"
+
+
+def test_mrag_migrate_json_reports_backup_when_requested(tmp_path, capsys) -> None:
+    from pyc_hermes_agent.mrag_core import migrate as migrate_mod
+
+    store = tmp_path / "stor"
+    store.mkdir()
+    bk = tmp_path / "bk"
+    assert migrate_mod.main([str(store), "--json", "--backup-to", str(bk)]) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert "backup_path" in out
+    assert Path(out["backup_path"]).exists()

@@ -1,5 +1,7 @@
 import json
+import logging
 import threading
+from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -198,8 +200,36 @@ def test_sidecar_http_server_sets_api_version_header_on_json_success(tmp_path) -
     assert payload["sidecar_api_version"] == SIDECAR_API_VERSION
     assert payload["mrag_retrieval_modes"] == ["lexical", "semantic", "hybrid"]
     assert payload["observability"]["structured_log_events"] is True
+    logs_dir_raw = payload["observability"].get("logs_dir")
+    sidecar_log_raw = payload["observability"].get("sidecar_events_log")
+    assert logs_dir_raw
+    assert sidecar_log_raw
+    assert logs_dir_raw in sidecar_log_raw or sidecar_log_raw.startswith(logs_dir_raw)
+    assert str(sidecar_log_raw).endswith("sidecar-events.log")
     assert headers["X-Pyc-Sidecar-Api-Version"] == SIDECAR_API_VERSION
     assert headers["X-Pyc-Request-Id"]
+
+
+def test_sidecar_http_writes_sidecar_events_log_when_root_given(monkeypatch, tmp_path) -> None:
+    monkeypatch.delenv("PYC_HERMES_DISABLE_FILE_LOG", raising=False)
+    _make_fake_hermes_checkout(tmp_path)
+    server, thread = _start_server(root=tmp_path)
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        _, payload = _get_json(f"{base_url}/health")
+        log_path_str = payload["observability"]["sidecar_events_log"]
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    log = logging.getLogger("pyc_hermes_agent.sidecar_api")
+    for handler in log.handlers:
+        handler.flush()
+
+    path = Path(log_path_str).resolve()
+    assert path.exists()
+    assert path.stat().st_size > 0
 
 
 def test_sidecar_http_server_sets_api_version_header_on_json_error(tmp_path) -> None:

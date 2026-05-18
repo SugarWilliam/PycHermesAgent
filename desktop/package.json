@@ -8,7 +8,8 @@
   "scripts": {
     "start": "electron .",
     "dist:dir": "electron-builder --dir",
-    "dist": "electron-builder"
+    "dist": "electron-builder",
+    "dist:linux": "electron-builder --linux"
   },
   "engines": {
     "node": ">=20"
@@ -35,7 +36,8 @@
     },
     "linux": {
       "target": [
-        "dir"
+        "dir",
+        "zip"
       ],
       "category": "Utility"
     },

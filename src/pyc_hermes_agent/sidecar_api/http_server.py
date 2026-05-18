@@ -671,6 +671,19 @@ def create_http_server(
     *,
     root: Path | None = None,
 ) -> SidecarHTTPServer:
+    logs_dir_path: Path | None = None
+    if root is not None:
+        from pyc_hermes_agent.common import ensure_runtime_directories, resolve_runtime_paths
+        from pyc_hermes_agent.common.logging_config import configure_sidecar_logging
+
+        resolved = Path(root).resolve()
+        paths = ensure_runtime_directories(resolve_runtime_paths(resolved))
+        logs_dir_path = paths.logs_dir
+        configure_sidecar_logging(logs_dir=logs_dir_path)
+    else:
+        from pyc_hermes_agent.common.logging_config import configure_sidecar_logging
+
+        configure_sidecar_logging(logs_dir=None)
     return SidecarHTTPServer((host, port), root=root)
 
 
@@ -680,9 +693,6 @@ def serve_http(
     *,
     root: Path | None = None,
 ) -> None:
-    from pyc_hermes_agent.common.logging_config import configure_sidecar_logging
-
-    configure_sidecar_logging()
     server = create_http_server(host=host, port=port, root=root)
     try:
         server.serve_forever()

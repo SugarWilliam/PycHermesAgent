@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
+import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 from pyc_hermes_agent.mrag_core.persistence import MRAG_INDEX_FORMAT_VERSION
@@ -55,11 +58,38 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Print a JSON object instead of line-oriented text.",
     )
+    parser.add_argument(
+        "--backup-to",
+        type=Path,
+        default=None,
+        metavar="DIR",
+        help=(
+            "Before planning, copy the entire storage_root tree into "
+            "DIR/mrag_backup_<storage_leaf>_<UTC-timestamp>/ "
+            "(copy runs only when storage_root exists; backup dir must not exist yet)."
+        ),
+    )
     args = parser.parse_args(argv)
-    notes = plan_migrations(args.storage_root.resolve())
+
+    storage_root = args.storage_root.resolve()
+    backup_path: Path | None = None
+    if args.backup_to is not None:
+        backup_parent = args.backup_to.resolve()
+        if not storage_root.exists():
+            print(f"backup skipped: storage root does not exist: {storage_root}", flush=True, file=sys.stderr)
+        else:
+            backup_parent.mkdir(parents=True, exist_ok=True)
+            stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            backup_path = backup_parent / f"mrag_backup_{storage_root.name}_{stamp}"
+            shutil.copytree(storage_root, backup_path, dirs_exist_ok=False)
+
+    notes = plan_migrations(storage_root)
     blocked = any(line.startswith("blocked:") for line in notes)
     if args.json:
-        print(json.dumps({"actions": notes, "blocked": blocked}, ensure_ascii=True, indent=2))
+        payload = {"actions": notes, "blocked": blocked}
+        if backup_path is not None:
+            payload["backup_path"] = str(backup_path)
+        print(json.dumps(payload, ensure_ascii=True, indent=2))
     else:
         for line in notes:
             print(line)
