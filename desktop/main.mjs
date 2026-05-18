@@ -6,7 +6,7 @@ import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import { spawn } from "node:child_process";
-import { app, BrowserWindow, Menu, shell } from "electron";
+import { app, BrowserWindow, Menu, shell, dialog } from "electron";
 
 const DEFAULT_SIDECAR_URL = "http://127.0.0.1:8765";
 /** Single-line base URL; lives next to Electron caches (see README). */
@@ -126,6 +126,36 @@ function maybeSpawnSidecar() {
   sidecarChild.on("error", (err) => console.error("sidecar spawn error:", err));
 }
 
+function createSidecarUrlTemplateIfMissing(win) {
+  const userDataDir = app.getPath("userData");
+  const fp = path.join(userDataDir, SIDECAR_URL_FILE);
+  if (fs.existsSync(fp)) {
+    void dialog.showMessageBox(win, {
+      type: "info",
+      title: SIDECAR_URL_FILE,
+      message: `${SIDECAR_URL_FILE} already exists.`,
+      detail: fp,
+    });
+    return;
+  }
+  const content = [
+    "# PycHermesAgent desktop — base URL for the Python sidecar HTTP API.",
+    "# First non-comment line is used as the URL (trailing slash optional).",
+    "# If PYC_HERMES_SIDECAR_URL is set in the environment, it overrides this file.",
+    DEFAULT_SIDECAR_URL,
+    "",
+  ].join("\n");
+  fs.mkdirSync(userDataDir, { recursive: true });
+  fs.writeFileSync(fp, content, "utf8");
+  void dialog.showMessageBox(win, {
+    type: "info",
+    title: SIDECAR_URL_FILE,
+    message: `Created ${SIDECAR_URL_FILE} with the default local URL.`,
+    detail: fp,
+  });
+  void loadSidecarStatusIntoWindow(win);
+}
+
 function escapeHtml(s) {
   return s
     .replace(/&/g, "&amp;")
@@ -167,6 +197,10 @@ function buildApplicationMenu(runtimePaths, win) {
     {
       label: "Open desktop config folder",
       click: () => void shell.openPath(userDataDir),
+    },
+    {
+      label: `Create ${SIDECAR_URL_FILE} template…`,
+      click: () => createSidecarUrlTemplateIfMissing(win),
     },
   ];
 

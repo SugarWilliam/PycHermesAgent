@@ -34,7 +34,7 @@ npm start
 
 Resolution order: **`PYC_HERMES_SIDECAR_URL`** (if set) → plain-text file **`sidecar_url.txt`** in the Electron **user data** directory (first non-empty, non-`#` line, full URL) → default `http://127.0.0.1:8765`.
 
-From the app menu use **View → Open desktop config folder**, then create or edit `sidecar_url.txt`. Restart is not required: **View → Refresh** reloads the file.
+From the app menu use **View → Open desktop config folder**, then create or edit `sidecar_url.txt`, or use **View → Create sidecar_url.txt template…** once to drop a commented default file. Restart is not required: **View → Refresh** reloads the file.
 
 On first connect failure the shell **retries up to 5 times** with increasing delay (helps if the sidecar starts slightly after the desktop window).
 
