@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Dict, Iterable, Optional
+from typing import Dict, Iterable, Optional, TYPE_CHECKING
 
 from pyc_hermes_agent.contracts import CapabilityDescriptor
+
+if TYPE_CHECKING:
+    from pyc_hermes_agent.meta_harness.bridge import LegacyMetaBridge
 
 
 _DEFAULT_CAPABILITIES = [
@@ -77,10 +79,11 @@ _DEFAULT_CAPABILITIES = [
 
 
 class CapabilityRegistry:
-    def __init__(self) -> None:
+    def __init__(self, bridge: Optional["LegacyMetaBridge"] = None) -> None:
         self._capabilities: Dict[str, CapabilityDescriptor] = {
             capability.id: capability for capability in _DEFAULT_CAPABILITIES
         }
+        self._bridge = bridge
 
     def register(self, descriptor: CapabilityDescriptor) -> None:
         self._capabilities[descriptor.id] = descriptor
@@ -95,4 +98,6 @@ class CapabilityRegistry:
         descriptor = self.get(capability_id)
         if descriptor is None:
             return False
-        return True
+        if self._bridge is None:
+            return True
+        return all(self._bridge.status(dep).available for dep in descriptor.dependencies)
