@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-"""Engineering-preview release gates: tests, git whitespace, and secret heuristics.
+"""Engineering and production-oriented release gates: tests, optional static checks, packaging probes.
 
 Usage (from repo root):
 
     ./.venv/bin/python scripts/release_gates.py
     ./.venv/bin/python scripts/release_gates.py --no-pytest
-        # only whitespace + secret scan; optional --with-ruff / --with-mypy still apply
-    ./.venv/bin/python scripts/release_gates.py --with-ruff   # after pytest: ruff check (also env RELEASE_GATES_RUFF=1)
-    ./.venv/bin/python scripts/release_gates.py --with-mypy   # optional mypy (RELEASE_GATES_MYPY=1; on in CI when package clean)
+        # whitespace + secret scan only; optional --with-ruff / --with-mypy / --with-production still apply
+    ./.venv/bin/python scripts/release_gates.py --with-ruff              # env RELEASE_GATES_RUFF=1
+    ./.venv/bin/python scripts/release_gates.py --with-mypy            # env RELEASE_GATES_MYPY=1
+    ./.venv/bin/python scripts/release_gates.py --with-production      # env RELEASE_GATES_PRODUCTION=1
 
-Ruff reads ``pyproject.toml`` (F + E + W; line-length 160). CI enables ``RELEASE_GATES_MYPY=1`` now that
-``mypy src/pyc_hermes_agent`` is clean; keep it green when adding modules under ``src``.
+Production extras (after ruff/mypy when enabled): ``uv lock --check``, MRAG migrate CLI on a temp dir,
+``npm ci`` + ``npm run dist:dir`` under ``desktop/`` (requires npm). See ``docs/deployment/Production_Release_Gates.md``.
+
     ./.venv/bin/python scripts/release_gates.py --export-meta-benchmarks DIR
-        # after gates pass, run export_meta_harness_benchmarks and require smoke/value_proof passed
     ./.venv/bin/python scripts/release_gates.py --write-preview-release-notes FILE.md
-        # after gates pass, write an auto-generated preview release-notes stub (human edit required)
 
 Whitespace checks: locally, unstaged and staged diffs are scanned. In GitHub Actions (set
 ``GITHUB_EVENT_NAME`` / ``GITHUB_BASE_REF``), pull requests use ``origin/<base>...HEAD``.
@@ -27,8 +27,10 @@ import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -69,9 +71,9 @@ _SENSITIVE_PATTERNS: list[tuple[re.Pattern[str], str]] = [
 ]
 
 
-def _run(cmd: list[str]) -> int:
+def _run(cmd: list[str], *, cwd: Path | None = None) -> int:
     print("+", " ".join(cmd), flush=True)
-    return subprocess.call(cmd, cwd=ROOT)
+    return subprocess.call(cmd, cwd=cwd)
 
 
 def _git_whitespace_gates() -> int:
@@ -177,6 +179,11 @@ def main(argv: list[str] | None = None) -> int:
         metavar="FILE",
         help="After gates pass, write preview release-notes draft (see scripts/generate_preview_release_notes.py)",
     )
+    parser.add_argument(
+        "--with-production",
+        action="store_true",
+        help="After static checks: uv lock --check, MRAG migrate smoke, desktop npm dist:dir (RELEASE_GATES_PRODUCTION=1)",
+    )
     args = parser.parse_args(argv)
 
     if not args.no_pytest:
@@ -192,6 +199,35 @@ def main(argv: list[str] | None = None) -> int:
     if want_mypy:
         if _run([sys.executable, "-m", "mypy", "-p", "pyc_hermes_agent"]) != 0:
             return 1
+
+    want_prod = (
+        args.with_production
+        or os.environ.get("RELEASE_GATES_PRODUCTION", "").lower() in ("1", "true", "yes")
+    )
+    if want_prod:
+        uv_bin = shutil.which("uv")
+        if not uv_bin:
+            print("release_gates: production requires uv on PATH", flush=True)
+            return 1
+        if _run([uv_bin, "lock", "--check"], cwd=ROOT) != 0:
+            return 1
+        with tempfile.TemporaryDirectory() as tmp_mrag:
+            if _run([sys.executable, "-m", "pyc_hermes_agent.mrag_core.migrate", tmp_mrag, "--json"]) != 0:
+                return 1
+        desktop = ROOT / "desktop"
+        npm_bin = shutil.which("npm")
+        if (desktop / "package.json").is_file():
+            if not npm_bin:
+                print("release_gates: production: npm not on PATH (desktop pack skipped — failing gate)", flush=True)
+                return 1
+            if not (desktop / "package-lock.json").is_file():
+                print("release_gates: production: desktop/package-lock.json missing", flush=True)
+                return 1
+            if _run([npm_bin, "ci"], cwd=desktop) != 0:
+                return 1
+            if _run([npm_bin, "run", "dist:dir"], cwd=desktop) != 0:
+                return 1
+        print("release_gates: production packaging checks OK", flush=True)
 
     if not (ROOT / ".git").is_dir():
         print("release_gates: no .git directory; skipping git and secret checks", flush=True)

@@ -110,10 +110,11 @@ Cursor may push, tag, or prepare release output only after these gates pass:
 
 1. **`scripts/release_gates.py`** succeeds (includes **`pytest tests`**, optional **`ruff`** when `RELEASE_GATES_RUFF=1` or `--with-ruff`; optional **`mypy`** when `--with-mypy` / `RELEASE_GATES_MYPY=1`), tracked-file secret heuristics, **`git diff --check`** per environment (see script docstring).
 2. Optional gate steps when cutting preview artifacts: **`--export-meta-benchmarks`**, **`--write-preview-release-notes`** (see script `--help`).
-3. **CI** job **contract-tests** passes on **`main`/`master`** (Python 3.11 + 3.12, packaging probe).
+3. **CI** jobs **contract-tests** and **production-gates** pass on **`main`/`master`** (Python matrix + packaging probe; production job adds lockfile, MRAG migrate smoke, desktop `dist:dir`).
 4. Working tree is classified and intentional; no secrets or runtime assets staged.
 5. `AGENTS.md` boundaries still hold; compatibility matrix and human-edited release notes updated when contracts change.
 6. Tag name matches policy; no force push to protected branches, no skipped hooks unless explicitly approved.
+7. **Production-oriented automation:** when cutting artifacts intended for broader distribution, enable `RELEASE_GATES_PRODUCTION=1` (or `--with-production`) so `uv lock --check`, MRAG migrate planner, and `desktop` `npm ci` + `npm run dist:dir` run; see `docs/deployment/Production_Release_Gates.md`. Signing, store upload, and updater channels remain explicitly human-gated.
 
 ## 6. Release Tag Policy
 

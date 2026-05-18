@@ -196,6 +196,8 @@ def test_sidecar_http_server_sets_api_version_header_on_json_success(tmp_path) -
 
     assert status_code == 200
     assert payload["sidecar_api_version"] == SIDECAR_API_VERSION
+    assert payload["mrag_retrieval_modes"] == ["lexical", "semantic", "hybrid"]
+    assert payload["observability"]["structured_log_events"] is True
     assert headers["X-Pyc-Sidecar-Api-Version"] == SIDECAR_API_VERSION
     assert headers["X-Pyc-Request-Id"]
 

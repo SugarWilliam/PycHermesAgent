@@ -52,7 +52,7 @@ from pyc_hermes_agent.sidecar_api.logging import log_event
 
 
 _MRAG_SERVICES: dict[str, MRAGService] = {}
-SIDECAR_API_VERSION = "0.4"
+SIDECAR_API_VERSION = "0.5"
 
 
 def _artifact_record_payload(record: ArtifactRecord) -> Dict[str, Any]:
@@ -282,6 +282,12 @@ def get_health(root: Path | None = None) -> dict:
         "sidecar_api_version": SIDECAR_API_VERSION,
         "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
         "platform": sys.platform,
+        "mrag_retrieval_modes": ["lexical", "semantic", "hybrid"],
+        "observability": {
+            "structured_log_events": True,
+            "log_format_env": "PYC_HERMES_LOG_FORMAT",
+            "log_level_env": "PYC_HERMES_LOG_LEVEL",
+        },
         "hermes": {
             "ready_state": ready_state,
             "status_label": status_label,

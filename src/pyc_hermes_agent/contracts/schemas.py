@@ -472,6 +472,10 @@ class RetrievalRequest:
     modalities: List[str] = field(default_factory=lambda: ["text"])
     top_k: int = 5
     include_citations: bool = True
+    #: lexical | semantic | hybrid — hybrid combines normalized lexical with semantic-style trigram vectors.
+    retrieval_mode: str = "lexical"
+    #: Weight for semantic component in hybrid mode (0..1). Ignored when retrieval_mode is lexical or semantic.
+    semantic_weight: float = 0.35
 
 
 @dataclass(slots=True)

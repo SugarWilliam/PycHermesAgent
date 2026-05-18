@@ -28,6 +28,6 @@ MRAG currently uses JSON-backed chunk stores with lexical retrieval. Phase 1 add
 | **A (now)** | Lexical | Current chunk index; citations and sidecar contracts stay stable. |
 | **B** | SQLite + FTS5 (optional) | Replaces or augments lexical *engine* for concurrency/metadata; still not “semantic search” by default. |
 | **C** | Embeddings / vector index (optional) | Same chunks; extra index or posting structure; **no** chat-memory mixing. |
-| **D** | Hybrid | Lexical + vector scoring inside `mrag_core`; policy and ordering documented; compatibility matrix updated. |
+| **D (v0.2.x hybrid)** | Hybrid | **`RetrievalRequest.retrieval_mode`:** `lexical` (default), `semantic` (deterministic character-trigram vectors + cosine; not a neural encoder), `hybrid` (weighted mix via `semantic_weight`). Uses existing JSON chunk store (`index_format_version` **1**); optional neural encoders remain future work. |
 
 **Rules:** Any new index kind bumps manifest metadata; rebuild covers all kinds for a KB; vector backends do not land without migration/rebuild docs (original Decision §3).

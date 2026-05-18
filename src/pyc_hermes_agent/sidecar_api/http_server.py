@@ -680,6 +680,9 @@ def serve_http(
     *,
     root: Path | None = None,
 ) -> None:
+    from pyc_hermes_agent.common.logging_config import configure_sidecar_logging
+
+    configure_sidecar_logging()
     server = create_http_server(host=host, port=port, root=root)
     try:
         server.serve_forever()

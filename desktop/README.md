@@ -39,4 +39,14 @@ From the app menu use **View → Open desktop config folder**, then create or ed
 
 On first connect failure the shell **retries up to 5 times** with increasing delay (linear: `baseMs * (1..5)`; helps if the sidecar starts slightly after the desktop window).
 
-Packaging, auto-update, and install-directory boundaries are **not** implemented in this preview; see `docs/constraints/windows-packaging.md` and governance documents.
+## Packaged directory build (CI / local smoke)
+
+`electron-builder` can emit an **unpackaged** application directory (no installer, no signing):
+
+```bash
+cd desktop
+npm ci
+npm run dist:dir   # output under desktop/dist/<platform>-unpacked
+```
+
+Full installers, code signing, and auto-update are **out of scope** for this preview; see `docs/constraints/windows-packaging.md`, `docs/deployment/Production_Release_Gates.md`, and governance documents.

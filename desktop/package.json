@@ -6,12 +6,43 @@
   "type": "module",
   "main": "main.mjs",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "dist:dir": "electron-builder --dir",
+    "dist": "electron-builder"
   },
   "engines": {
     "node": ">=20"
   },
   "devDependencies": {
-    "electron": "^33.2.0"
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.pyc.hermes.agent",
+    "productName": "PycHermesAgent",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.mjs",
+      "package.json"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        "dir"
+      ]
+    },
+    "linux": {
+      "target": [
+        "dir"
+      ],
+      "category": "Utility"
+    },
+    "mac": {
+      "target": [
+        "dir"
+      ]
+    }
   }
 }

@@ -147,6 +147,8 @@ def test_retrieval_request_defaults() -> None:
     request = RetrievalRequest(query="hello world")
     assert request.top_k == 5
     assert request.include_citations is True
+    assert request.retrieval_mode == "lexical"
+    assert request.semantic_weight == 0.35
 
 
 def test_knowledge_document_defaults() -> None:

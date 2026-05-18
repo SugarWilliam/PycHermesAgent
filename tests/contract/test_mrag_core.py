@@ -223,3 +223,62 @@ def test_mrag_close_releases_storage_owner(tmp_path) -> None:
     assert not (storage_root / MRAG_LOCK_FILE).exists()
     replacement = MRAGService(storage_root=storage_root)
     replacement.create_knowledge_base("replacement")
+
+
+def test_mrag_semantic_retrieval_returns_hits(tmp_path) -> None:
+    service = MRAGService(storage_root=tmp_path / "sem")
+    kb = service.create_knowledge_base("sem")
+    service.ingest_text(kb.knowledge_base_id, "The quick brown fox jumps over the lazy dog.", title="animals")
+    result = service.search(
+        kb.knowledge_base_id,
+        RetrievalRequest(query="quick fox jumping", top_k=2, retrieval_mode="semantic"),
+    )
+    assert result.hits
+    assert any("trigram" in w.lower() for w in result.warnings)
+
+
+def test_mrag_hybrid_retrieval_combines_signals(tmp_path) -> None:
+    service = MRAGService(storage_root=tmp_path / "hyb")
+    kb = service.create_knowledge_base("hyb")
+    service.ingest_text(kb.knowledge_base_id, "alpha beta gamma delta", title="doc-a")
+    service.ingest_text(kb.knowledge_base_id, "omega psi tau rho", title="doc-b")
+    hybrid = service.search(
+        kb.knowledge_base_id,
+        RetrievalRequest(query="alpha gamma", top_k=2, retrieval_mode="hybrid", semantic_weight=0.5),
+    )
+    lexical = service.search(
+        kb.knowledge_base_id,
+        RetrievalRequest(query="alpha gamma", top_k=2, retrieval_mode="lexical"),
+    )
+    assert hybrid.hits and lexical.hits
+    assert any("hybrid" in w.lower() for w in hybrid.warnings)
+
+
+def test_mrag_unknown_retrieval_mode_returns_warning() -> None:
+    service = MRAGService()
+    kb = service.create_knowledge_base("bad-mode")
+    service.ingest_text(kb.knowledge_base_id, "hello world", title="t")
+    result = service.search(kb.knowledge_base_id, RetrievalRequest(query="hello", retrieval_mode="quantum"))
+    assert result.warnings
+    assert not result.hits
+
+
+def test_mrag_migrate_plan_detects_future_index_format(tmp_path) -> None:
+    from pyc_hermes_agent.mrag_core.migrate import plan_migrations
+
+    kb_root = tmp_path / "store" / "knowledge_bases" / "kb1"
+    kb_root.mkdir(parents=True)
+    (kb_root / "manifest.json").write_text(
+        json.dumps(
+            {
+                "knowledge_base_id": "kb1",
+                "name": "x",
+                "manifest_version": 1,
+                "index_format_version": MRAG_INDEX_FORMAT_VERSION + 50,
+            },
+            ensure_ascii=True,
+        ),
+        encoding="utf-8",
+    )
+    notes = plan_migrations(tmp_path / "store")
+    assert any("blocked" in n.lower() for n in notes)
