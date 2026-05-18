@@ -82,7 +82,7 @@ function escapeHtml(s) {
     .replace(/"/g, "&quot;");
 }
 
-function setAppMenu(runtimePaths) {
+function buildApplicationMenu(runtimePaths, win) {
   const logsDir = runtimePaths?.logs_dir;
   const localData = runtimePaths?.local_data_dir;
   const fileSubmenu = [
@@ -104,7 +104,19 @@ function setAppMenu(runtimePaths) {
   if (process.platform !== "darwin") {
     fileSubmenu.push({ type: "separator" }, { role: "quit" });
   }
-  const template = [{ label: "File", submenu: fileSubmenu }];
+
+  const viewSubmenu = [
+    {
+      label: "Refresh sidecar status",
+      accelerator: "CmdOrCtrl+R",
+      click: () => void loadSidecarStatusIntoWindow(win),
+    },
+  ];
+
+  const template = [
+    { label: "File", submenu: fileSubmenu },
+    { label: "View", submenu: viewSubmenu },
+  ];
   if (process.platform === "darwin") {
     template.unshift({
       label: app.name,
@@ -114,13 +126,8 @@ function setAppMenu(runtimePaths) {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-async function createWindow() {
-  maybeSpawnSidecar();
-  const win = new BrowserWindow({
-    width: 960,
-    height: 720,
-    webPreferences: { nodeIntegration: false, contextIsolation: true },
-  });
+async function loadSidecarStatusIntoWindow(win) {
+  if (!win || win.isDestroyed()) return;
 
   let runtimePaths = null;
   try {
@@ -156,16 +163,27 @@ async function createWindow() {
     } catch {
       /* optional */
     }
-    setAppMenu(runtimePaths);
+    buildApplicationMenu(runtimePaths, win);
     const title = status === 200 ? "PycHermesAgent — sidecar health" : "PycHermesAgent — sidecar error";
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title><style>body{font-family:system-ui,sans-serif;margin:1.5rem}code{background:#f4f4f4;padding:0.1em 0.3em;word-break:break-all}</style></head><body><h1>${title}</h1><p>HTTP ${status} from <code>${escapeHtml(sidecarUrl)}</code></p>${summary}${pathsSummary}<h2>Raw health JSON</h2><pre>${pre}</pre></body></html>`;
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title><style>body{font-family:system-ui,sans-serif;margin:1.5rem}code{background:#f4f4f4;padding:0.1em 0.3em;word-break:break-all}</style></head><body><h1>${title}</h1><p>HTTP ${status} from <code>${escapeHtml(sidecarUrl)}</code></p>${summary}<p><em>View → Refresh sidecar status (Ctrl+R / Cmd+R)</em></p>${pathsSummary}<h2>Raw health JSON</h2><pre>${pre}</pre></body></html>`;
     await win.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(html));
   } catch (e) {
-    setAppMenu(null);
+    if (win.isDestroyed()) return;
+    buildApplicationMenu(null, win);
     const msg = escapeHtml(String(e));
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Sidecar unreachable</title></head><body><h1>Sidecar unreachable</h1><p>Start <code>pyc-hermes-sidecar</code> or set <code>PYC_HERMES_SIDECAR_URL</code>.</p><pre>${msg}</pre><p>Target: <code>${escapeHtml(sidecarUrl)}</code></p></body></html>`;
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Sidecar unreachable</title></head><body><h1>Sidecar unreachable</h1><p>Start <code>pyc-hermes-sidecar</code> or set <code>PYC_HERMES_SIDECAR_URL</code>.</p><p><em>View → Refresh sidecar status (Ctrl+R / Cmd+R)</em></p><pre>${msg}</pre><p>Target: <code>${escapeHtml(sidecarUrl)}</code></p></body></html>`;
     await win.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(html));
   }
+}
+
+async function createWindow() {
+  maybeSpawnSidecar();
+  const win = new BrowserWindow({
+    width: 960,
+    height: 720,
+    webPreferences: { nodeIntegration: false, contextIsolation: true },
+  });
+  await loadSidecarStatusIntoWindow(win);
 }
 
 app.whenReady().then(createWindow);
