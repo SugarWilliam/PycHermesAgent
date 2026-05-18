@@ -42,6 +42,7 @@ from pyc_hermes_agent.sidecar_api.service import (
     get_meta_harness_benchmark_smoke,
     get_meta_harness_dependency_snapshot,
     get_meta_harness_value_proof_benchmark,
+    get_runtime_paths_snapshot,
     ingest_file_document,
     ingest_text_document,
     ingest_url_document,
@@ -271,6 +272,7 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
                     "sidecar_api_version": health["sidecar_api_version"],
                     "routes": [
                         "/health",
+                        "/runtime-paths",
                         "/config",
                         "/providers",
                         "/models",
@@ -330,6 +332,13 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
                     ),
                     HTTPStatus.BAD_GATEWAY,
                 )
+        if path == "/runtime-paths":
+            return _get_or_bad_gateway(
+                lambda: get_runtime_paths_snapshot(root),
+                code="RUNTIME_PATHS_SNAPSHOT_FAILED",
+                domain=DOMAIN_INTERNAL,
+                details={},
+            )
         if path == "/config":
             return _get_or_bad_gateway(
                 lambda: get_config_snapshot(root),

@@ -1,6 +1,6 @@
 # PycHermesAgent desktop shell (preview)
 
-Engineering-preview **Electron** wrapper around the **Python sidecar** (`pyc-hermes-sidecar`). It does not bundle Python; it displays `/health` from a running sidecar.
+Engineering-preview **Electron** wrapper around the **Python sidecar** (`pyc-hermes-sidecar`). It does not bundle Python; it displays `/health` (summary + raw JSON) and key paths from **`GET /runtime-paths`**. **File → Open logs folder / Open local data folder** uses `shell.openPath` when paths are available.
 
 ## Prerequisites
 

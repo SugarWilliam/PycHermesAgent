@@ -278,6 +278,23 @@ def get_health(root: Path | None = None) -> dict:
     }
 
 
+def get_runtime_paths_snapshot(root: Path | None = None) -> Dict[str, str]:
+    """Resolved writable runtime directories (strings for JSON and desktop shells)."""
+    base = resolve_runtime_directories_root(root)
+    paths = ensure_runtime_directories(resolve_runtime_paths(base))
+    return {
+        "config_dir": str(paths.config_dir),
+        "local_data_dir": str(paths.local_data_dir),
+        "logs_dir": str(paths.logs_dir),
+        "cache_dir": str(paths.cache_dir),
+        "downloads_dir": str(paths.downloads_dir),
+        "indexes_dir": str(paths.indexes_dir),
+        "models_dir": str(paths.models_dir),
+        "artifacts_dir": str(paths.artifacts_dir),
+        "mrag_dir": str(paths.mrag_dir),
+    }
+
+
 def get_config_snapshot(root: Path | None = None) -> Dict[str, Any]:
     base = root or _repo_root()
     resolved = resolve_opencode_like_config(base)

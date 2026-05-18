@@ -147,6 +147,26 @@ def test_sidecar_http_server_serves_health_and_http_client(tmp_path) -> None:
     assert client_status.degraded is False
 
 
+def test_sidecar_http_server_serves_runtime_paths(tmp_path) -> None:
+    server, thread = _start_server(root=tmp_path)
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+
+    try:
+        status_code, payload = _get_json(f"{base_url}/runtime-paths")
+        client_snap = SidecarClient(base_url=base_url).get_runtime_paths_snapshot()
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert status_code == 200
+    for key in ("config_dir", "local_data_dir", "logs_dir", "mrag_dir", "models_dir", "artifacts_dir"):
+        assert key in payload
+        assert isinstance(payload[key], str)
+        assert payload[key] == client_snap[key]
+    assert ".pyc_hermes_agent_runtime" in payload["local_data_dir"].replace("\\", "/")
+
+
 def test_sidecar_http_server_sets_api_version_header_on_json_success(tmp_path) -> None:
     _make_fake_hermes_checkout(tmp_path)
     server, thread = _start_server(root=tmp_path)

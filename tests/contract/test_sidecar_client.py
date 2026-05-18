@@ -2,6 +2,14 @@ from pyc_hermes_agent import SidecarClient, SidecarHealthStatus
 from pyc_hermes_agent.contracts import AgentLoopRequest, MetaAnalysisRequest, RetrievalRequest
 
 
+def test_sidecar_client_runtime_paths_in_process(tmp_path) -> None:
+    client = SidecarClient(root=tmp_path)
+    snap = client.get_runtime_paths_snapshot()
+    assert snap["logs_dir"]
+    assert "mrag_core" in snap["mrag_dir"].replace("\\", "/")
+    assert ".pyc_hermes_agent_runtime" in snap["config_dir"].replace("\\", "/")
+
+
 def test_sidecar_client_reads_top_level_status_label_only() -> None:
     client = SidecarClient(
         health_fetcher=lambda _root: {

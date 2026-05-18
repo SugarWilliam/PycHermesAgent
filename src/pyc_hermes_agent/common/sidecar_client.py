@@ -21,6 +21,7 @@ from pyc_hermes_agent.sidecar_api.service import (
     create_knowledge_base,
     get_config_snapshot,
     get_health,
+    get_runtime_paths_snapshot,
     get_hermes_bridge_health,
     get_hermes_capability_snapshot,
     get_hermes_memory_snapshot,
@@ -174,6 +175,11 @@ class SidecarClient:
 
     def get_health(self) -> dict[str, Any]:
         return dict(self._health_fetcher(self._root))
+
+    def get_runtime_paths_snapshot(self) -> dict[str, Any]:
+        if self._base_url is not None:
+            return self._http_get("/runtime-paths")
+        return get_runtime_paths_snapshot(self._root)
 
     def get_config_snapshot(self) -> dict[str, Any]:
         if self._base_url is not None:

@@ -7,7 +7,30 @@ def test_meta_framework_selects_scm_for_causal_request() -> None:
     result = framework.execute(MetaAnalysisRequest(problem_statement="因果分析：X 对 Y 的影响"))
     assert result.selected_method == "A-12-SCM"
     assert result.evidence_grade == "CE-C3"
+    assert result.sr_grade == "SR-C1"
     assert result.degraded is False
+
+
+def test_meta_framework_keeps_ce_and_sr_grade_dimensions_distinct() -> None:
+    """CE (causal evidence) and SR (structural/representational) must stay separate fields."""
+    framework = MetaFramework()
+    causal = framework.execute(MetaAnalysisRequest(problem_statement="因果分析：X 对 Y 的影响"))
+    assert causal.evidence_grade.startswith("CE-")
+    assert causal.sr_grade.startswith("SR-")
+    assert causal.evidence_grade != causal.sr_grade
+
+    forecast = framework.execute(
+        MetaAnalysisRequest(
+            problem_statement="forecast weekly orders",
+            data={"series": [10.0, 12.0, 11.5]},
+        )
+    )
+    assert forecast.evidence_grade.startswith("CE-")
+    assert forecast.sr_grade.startswith("SR-")
+
+    degraded = framework.execute(MetaAnalysisRequest(problem_statement="please do something vague"))
+    assert degraded.evidence_grade.startswith("CE-")
+    assert degraded.sr_grade.startswith("SR-")
 
 
 def test_meta_framework_degrades_on_unknown_request() -> None:
