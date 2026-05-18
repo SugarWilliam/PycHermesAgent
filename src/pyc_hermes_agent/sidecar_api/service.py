@@ -37,7 +37,7 @@ from pyc_hermes_agent.sidecar_api.logging import log_event
 
 
 _MRAG_SERVICES: dict[str, MRAGService] = {}
-SIDECAR_API_VERSION = "0.3"
+SIDECAR_API_VERSION = "0.4"
 
 _SKILLS_RUNTIME_POLICY: Dict[str, str] = {
     "activation_mode": "explicit_only",

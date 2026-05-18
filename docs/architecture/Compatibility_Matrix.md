@@ -51,7 +51,7 @@ The current repository line is `v0.2.0` engineering preview. Production `v1.0.0`
 | Axis | Current value | Notes |
 |------|---------------|-------|
 | `app_version` | `0.2.0` (`pyc_hermes_agent.__version__`) | Engineering preview |
-| `sidecar_api_version` | `0.3` | Adds `GET /runtime-paths` (writable layout snapshot for shells and ops); includes `0.2` routes (`GET /assets`, `/artifacts`, MRAG ingest, error domains, etc.) |
+| `sidecar_api_version` | `0.4` | Adds no-body `GET /favicon.ico` (204) for browser/Electron noise; includes `0.3` routes |
 | `contract_version` | (implicit `0.x`; bump when dataclasses break) | No bump in this change set |
 | `index_format_version` | `1` (MRAG manifest) | See `docs/design/MRAG_Index_Strategy_Decision_v0.2.0.md` |
 | `model_manifest_version` | `1` (asset manifest schema) | Unchanged |

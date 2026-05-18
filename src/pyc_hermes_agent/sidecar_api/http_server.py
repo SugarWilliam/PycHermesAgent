@@ -260,9 +260,12 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
             self._ensure_error_correlates_request(payload, request_id)
         self._write_json(status, payload)
 
-    def _handle_get(self, path: str) -> tuple[dict[str, Any], HTTPStatus]:
+    def _handle_get(self, path: str) -> tuple[dict[str, Any] | None, HTTPStatus]:
         root = self._server_root()
 
+        if path == "/favicon.ico":
+            self._write_no_content(HTTPStatus.NO_CONTENT)
+            return None, HTTPStatus.NO_CONTENT
         if path == "/":
             try:
                 health = get_health(root)
@@ -273,6 +276,7 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
                     "routes": [
                         "/health",
                         "/runtime-paths",
+                        "/favicon.ico",
                         "/config",
                         "/providers",
                         "/models",
@@ -605,6 +609,12 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
             details = {}
             err["details"] = details
         details.setdefault("request_id", request_id)
+
+    def _write_no_content(self, status: HTTPStatus) -> None:
+        self.send_response(status)
+        self.send_header("X-Pyc-Sidecar-Api-Version", SIDECAR_API_VERSION)
+        self.send_header("X-Pyc-Request-Id", self._request_id)
+        self.end_headers()
 
     def _write_json(self, status: HTTPStatus, payload: dict[str, Any]) -> None:
         body = json.dumps(payload).encode("utf-8")

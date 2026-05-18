@@ -167,6 +167,21 @@ def test_sidecar_http_server_serves_runtime_paths(tmp_path) -> None:
     assert ".pyc_hermes_agent_runtime" in payload["local_data_dir"].replace("\\", "/")
 
 
+def test_sidecar_http_favicon_returns_no_content(tmp_path) -> None:
+    server, thread = _start_server(root=tmp_path)
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        request = Request(f"{base_url}/favicon.ico", method="GET")
+        with urlopen(request, timeout=5) as response:
+            assert response.status == 204
+            assert response.read() == b""
+            assert response.headers["X-Pyc-Sidecar-Api-Version"] == SIDECAR_API_VERSION
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
 def test_sidecar_http_server_sets_api_version_header_on_json_success(tmp_path) -> None:
     _make_fake_hermes_checkout(tmp_path)
     server, thread = _start_server(root=tmp_path)
