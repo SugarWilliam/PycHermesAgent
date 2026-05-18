@@ -12,6 +12,7 @@
 | `model_manifest_version` | `asset_manager` | Increment on asset manifest changes | model install compatibility |
 | `index_format_version` | `mrag_core` | Increment on index layout changes | migration or rebuild required |
 | `artifact_format_version` | `artifact_engine` | Increment on artifact metadata changes | artifact consumers |
+| `skills_runtime_policy_id` | `hermes_engine` / ADR | Document in matrix + roadmap when policy dict or Phase 1 scope changes | agent loop + sidecar skill listing tests |
 | `desktop_ipc_version` | desktop shell | Planned | desktop/sidecar compatibility |
 
 ## 2. Tag Classes
@@ -42,6 +43,7 @@ Before a tag is created, update this table when applicable:
 | MRAG persistence/index | `index_format_version` | restart + migration/rebuild tests |
 | Asset manifest/promotion | `model_manifest_version` | asset manager tests |
 | Artifact metadata | `artifact_format_version` | artifact engine tests |
+| Skill runtime policy (Phase 1 dict / `start` payload) | `skills_runtime_policy_id` in §5 | agent loop + `list_skills` contract tests |
 | Desktop IPC | `desktop_ipc_version` | desktop integration tests |
 
 ## 5. Current Baseline
@@ -56,4 +58,5 @@ The current repository line is `v0.2.0` engineering preview. Production `v1.0.0`
 | `index_format_version` | `1` (MRAG manifest) | See `docs/design/MRAG_Index_Strategy_Decision_v0.2.0.md` |
 | `model_manifest_version` | `1` (asset manifest schema) | Unchanged |
 | `artifact_format_version` | `1` | Unchanged |
+| `skills_runtime_policy_id` | `skill-runtime-permissions-phase1-v0.2.0` | Shared dict `SKILLS_RUNTIME_POLICY` in `hermes_engine.skill_context`; sidecar skill listings + AgentLoop `start` payload; ADR defines deferrals |
 | `desktop_ipc_version` | n/a (preview) | **Preview** Electron shell ships as dev workflow (`desktop/`); no stable desktop IPC contract yet — treat as non-production |

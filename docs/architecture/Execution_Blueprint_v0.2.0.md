@@ -22,16 +22,16 @@ A production release must satisfy all of the following:
 
 ## 3. Immediate Execution Priorities
 
-**Engineering-preview baseline (contract-tested today):** MRAG storage ownership MVP; HTTP **`X-Pyc-Request-Id`** correlation; explicit skill activation surfaces; **MetaHarness** dependency-aware routing with **`MethodRoutingPolicy`**, data-shape scoring, **`meta_routing`** overlays (**`data_shape_bonus`**, **`data_shape_rules`**, **`pin_method`**), **`SrGradingPolicy`**; benchmark smoke + value_proof; MRAG ingest, manifest/index guards, rebuild; asset/artifact inventory; **`scripts/release_gates.py`** (pytest **`tests`**, CI-aware whitespace, secret heuristics, optional benchmark export and preview release notes); **GitHub CI** via **uv** + **`uv.lock`**; preview **desktop** shell (health, runtime paths, URL file, spawn hardening — see `desktop/README.md`).
+**Engineering-preview baseline (contract-tested today):** Phase 1 roadmap **closed** for declared preview scope: MRAG storage ownership MVP; HTTP **`X-Pyc-Request-Id`** correlation; explicit skill activation surfaces with **auditable `start` payload** (`activated_skills`, `skills_runtime_policy`); **MetaHarness** dependency-aware routing with **`MethodRoutingPolicy`**, data-shape scoring, **`meta_routing`** overlays (**`data_shape_bonus`**, **`data_shape_rules`**, **`pin_method`**), **`SrGradingPolicy`**; benchmark smoke + value_proof; MRAG ingest, manifest/index guards, rebuild; asset/artifact inventory; **`scripts/release_gates.py`** (pytest **`tests`**, **ruff** + **mypy** in CI, whitespace + secret heuristics; optional benchmark export and preview release notes); **GitHub CI** via **uv** + **`uv.lock`**; preview **desktop** shell (health, runtime paths, URL file, spawn hardening — see `desktop/README.md`).
 
 **Next waves toward production:**
 
 | Order | Workstream | Goal | Primary Docs |
 |-------|------------|------|--------------|
-| 1 | Skill lifecycle | Permission model and auditable execution path (sandbox later) | opencode constraints, governance |
+| 1 | Skill execution | Permission + sandbox ADR for optional script hooks | `ADR_Skill_Runtime_Permissions_Phase1_v0.2.0.md` follow-ups |
 | 2 | MRAG semantics | Embedding/rerank per index strategy ADR; keep lexical baseline | `docs/design/MRAG_Index_Strategy_Decision_v0.2.0.md` |
 | 3 | Desktop packaging | Installer, signing, updater, CSP/sandbox | `docs/constraints/windows-packaging.md` |
-| 4 | Release hardening | **Ruff** in CI/gates; **mypy** opt-in until clean; dependency audit optional | governance, compatibility matrix |
+| 4 | Dependency & supply chain | Audit locks, SBOM optional | governance, compatibility matrix |
 | 5 | Observability | Structured logs/metrics beyond health and runtime-paths | deployment guide |
 
 ## 4. Implementation Slices

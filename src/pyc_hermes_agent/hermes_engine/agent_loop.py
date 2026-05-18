@@ -21,7 +21,7 @@ from pyc_hermes_agent.hermes_engine.memory_injection import build_prompt_message
 from pyc_hermes_agent.hermes_engine.planner import build_agent_plan
 from pyc_hermes_agent.hermes_engine.session_context import bind_session_context
 from pyc_hermes_agent.hermes_engine.session_store import AgentSessionStore
-from pyc_hermes_agent.hermes_engine.skill_context import build_skill_context_messages
+from pyc_hermes_agent.hermes_engine.skill_context import SKILLS_RUNTIME_POLICY, build_skill_context_messages
 from pyc_hermes_agent.hermes_engine.tool_registry import ToolRegistry
 from pyc_hermes_agent.llm_gateway import LLMChatChunk, LLMChatRequest, LLMChatResponse, LLMMessage, execute_chat
 from pyc_hermes_agent.meta_harness import MetaFramework
@@ -131,6 +131,7 @@ class AgentLoop:
         registry = tool_registry or self._tool_registry
         tools = _resolve_loop_tools(request, registry)
         plan = build_agent_plan(messages, tools) if planning_enabled else None
+        normalized_activated_skills = [name.strip() for name in (activated_skills or []) if name.strip()]
         skill_messages = build_skill_context_messages(self._root, activated_skills)
         tool_results: list[ToolCallResult] = []
         last_response = LLMChatResponse()
@@ -184,6 +185,8 @@ class AgentLoop:
                 "max_iterations": max_iterations,
                 "planning_enabled": planning_enabled,
                 "retry_budget": retry_budget,
+                "activated_skills": normalized_activated_skills,
+                "skills_runtime_policy": dict(SKILLS_RUNTIME_POLICY),
             },
         )
         if plan is not None:

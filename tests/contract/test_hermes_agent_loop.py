@@ -337,6 +337,68 @@ Use this skill only when explicitly activated.
     assert result.content == "Skill-bound reply."
 
 
+def test_agent_loop_start_event_records_skill_activation_audit_metadata(tmp_path: Path) -> None:
+    skill_dir = tmp_path / ".opencode" / "skills" / "demo-skill"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text(
+        """---
+name: demo-skill
+description: Demo
+---
+
+Skill body
+""",
+        encoding="utf-8",
+    )
+
+    def fake_llm_executor(request, _root):
+        return LLMChatResponse(
+            model="openai-compatible/demo-model",
+            provider_id="openai-compatible",
+            content="ok",
+            finish_reason="stop",
+        )
+
+    loop = AgentLoop(root=tmp_path, llm_executor=fake_llm_executor)
+    events = list(
+        loop.stream(
+            ChatCompletionRequest(
+                model="openai-compatible/demo-model",
+                messages=[ChatMessage(role="user", content="hi")],
+            ),
+            activated_skills=["demo-skill"],
+        )
+    )
+    start = events[0]
+    assert start.event == "start"
+    assert start.payload["activated_skills"] == ["demo-skill"]
+    policy = start.payload["skills_runtime_policy"]
+    assert policy["activation_mode"] == "explicit_only"
+    assert policy["script_execution"] == "disabled"
+    assert policy["policy_id"] == "skill-runtime-permissions-phase1-v0.2.0"
+
+
+def test_agent_loop_start_event_lists_empty_activated_skills_by_default(tmp_path: Path) -> None:
+    def fake_llm_executor(request, _root):
+        return LLMChatResponse(
+            model="openai-compatible/demo-model",
+            provider_id="openai-compatible",
+            content="ok",
+            finish_reason="stop",
+        )
+
+    loop = AgentLoop(root=tmp_path, llm_executor=fake_llm_executor)
+    events = list(
+        loop.stream(
+            ChatCompletionRequest(
+                model="openai-compatible/demo-model",
+                messages=[ChatMessage(role="user", content="hi")],
+            ),
+        )
+    )
+    assert events[0].payload["activated_skills"] == []
+
+
 def test_agent_loop_rejects_unknown_activated_skill(tmp_path: Path) -> None:
     loop = AgentLoop(root=tmp_path, llm_executor=lambda request, root: LLMChatResponse())
 

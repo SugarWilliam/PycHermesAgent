@@ -29,6 +29,7 @@ from pyc_hermes_agent.contracts import (
     ToolDefinition,
 )
 from pyc_hermes_agent.hermes_engine import AgentLoop, HermesFacade
+from pyc_hermes_agent.hermes_engine.skill_context import SKILLS_RUNTIME_POLICY
 from pyc_hermes_agent.llm_gateway import (
     discover_rule_files,
     execute_chat,
@@ -52,12 +53,6 @@ from pyc_hermes_agent.sidecar_api.logging import log_event
 
 _MRAG_SERVICES: dict[str, MRAGService] = {}
 SIDECAR_API_VERSION = "0.4"
-
-_SKILLS_RUNTIME_POLICY: Dict[str, str] = {
-    "activation_mode": "explicit_only",
-    "script_execution": "disabled",
-    "agent_loop_field": "activated_skills",
-}
 
 
 def _artifact_record_payload(record: ArtifactRecord) -> Dict[str, Any]:
@@ -469,7 +464,7 @@ def list_skills(root: Path | None = None) -> List[Dict[str, Any]]:
                 "compatibility": skill.compatibility,
                 "metadata": skill.metadata,
                 "runtime": {
-                    "policy": dict(_SKILLS_RUNTIME_POLICY),
+                    "policy": dict(SKILLS_RUNTIME_POLICY),
                     "source": {
                         "kind": "SKILL.md",
                         "path": str(skill.path),

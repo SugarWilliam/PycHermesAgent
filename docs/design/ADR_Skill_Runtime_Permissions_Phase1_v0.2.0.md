@@ -14,11 +14,12 @@ Skills are discovered via OpenCode/Cursor-compatible layouts (`.cursor/skills/`,
    - **Explicit-only activation**: skills apply only when the caller lists them; no implicit “auto-run”.  
    - **Context binding**: SKILL.md text may be injected into the prompt path when activation is requested.  
    - **No script execution**: no subprocess/sandbox execution of skill entrypoints in this phase.
+   - **Auditable activation metadata (Phase 1, non-durable):** **`AgentLoop` stream `start` event** includes `activated_skills` and canonical `skills_runtime_policy` (same dict as sidecar skill listings) for correlation with logs/traces. Centralized durable audit logs remain deferred.
 
 2. **Deferred to Phase 2+ (requires separate ADR)**  
    - **Permission model**: principals (user vs agent vs tool), allowlists, per-skill capabilities, revocation.  
    - **Script execution**: optional `SKILL.md` front-matter hooks, argv/env sandbox, timeouts, resource caps.  
-   - **Audit trail**: durable logs of activation, denylists, and policy version.
+   - **Durable audit trail**: long-term storage of activation history, denylists, policy version rollouts.
 
 3. **Explicit deferral statement**  
    Full “Discover → Parse → Activate → **Execute** → Audit” is **not** a Phase 1 exit requirement. Phase 1 exit for skills is satisfied when **explicit activation + metadata + no unsafe execution** are contract-tested and documented—which is the current line.
@@ -32,4 +33,4 @@ Skills are discovered via OpenCode/Cursor-compatible layouts (`.cursor/skills/`,
 ## Follow-ups
 
 - When prioritizing Phase 2: draft `ADR_Skill_Script_Execution_v0.x.md` referencing Windows packaging and `AGENTS.md` boundaries.  
-- Link this ADR from `docs/constraints/opencode-compatibility.md` if skill semantics are described there.
+- Link from `docs/constraints/opencode-compatibility.md` is maintained (skill lifecycle section).

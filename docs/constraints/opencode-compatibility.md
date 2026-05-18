@@ -25,7 +25,8 @@ Skill compatibility evolves through explicit phases:
 2. parse metadata,
 3. explicit activation,
 4. controlled context binding,
-5. audited runtime behavior,
+5. audited runtime behavior (Phase 1: policy metadata on listings + `AgentLoop` `start` payload; see
+   [`ADR_Skill_Runtime_Permissions_Phase1_v0.2.0.md`](../design/ADR_Skill_Runtime_Permissions_Phase1_v0.2.0.md)),
 6. permission-gated script execution later.
 
 Implicit execution of discovered skills is forbidden. Script execution requires a future permission model and audit trail.

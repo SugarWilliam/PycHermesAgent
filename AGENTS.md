@@ -4,6 +4,7 @@
 - Date: 2026-05-14
 - Version: v0.2.0
 - Author: 彭耀成
+- Phase 1 (engineering preview): **roadmap complete** for declared scope — see `docs/architecture/Phase1_Roadmap_v0.2.0.md` §10 (not production).
 
 ## Project Identity
 - Product name: `PycHermesAgent`
