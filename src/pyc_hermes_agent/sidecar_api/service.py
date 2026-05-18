@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from uuid import uuid4
@@ -263,6 +264,8 @@ def get_health(root: Path | None = None) -> dict:
         "status_label": status_label,
         "version": __version__,
         "sidecar_api_version": SIDECAR_API_VERSION,
+        "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+        "platform": sys.platform,
         "hermes": {
             "ready_state": ready_state,
             "status_label": status_label,

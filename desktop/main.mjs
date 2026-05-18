@@ -238,6 +238,8 @@ async function loadSidecarStatusIntoWindow(win) {
           h.degraded != null && `degraded: ${h.degraded}`,
           h.sidecar_api_version && `sidecar_api_version: ${h.sidecar_api_version}`,
           h.version && `package_version: ${h.version}`,
+          h.python_version && `python_version: ${h.python_version}`,
+          h.platform && `platform: ${h.platform}`,
         ].filter(Boolean);
         if (parts.length) summary = `<ul>${parts.map((p) => `<li>${escapeHtml(p)}</li>`).join("")}</ul>`;
       } catch {
@@ -260,15 +262,19 @@ async function loadSidecarStatusIntoWindow(win) {
     }
     buildApplicationMenu(runtimePaths, win);
     const title = status === 200 ? "PycHermesAgent — sidecar health" : "PycHermesAgent — sidecar error";
+    const refreshedAt = new Date().toISOString();
     const sourceNote = `<p><small>URL source: <code>${escapeHtml(urlSource)}</code> — <em>View → Open desktop config folder</em> to edit <code>${escapeHtml(SIDECAR_URL_FILE)}</code> (optional; env wins).</small></p>`;
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title><style>body{font-family:system-ui,sans-serif;margin:1.5rem}code{background:#f4f4f4;padding:0.1em 0.3em;word-break:break-all}</style></head><body><h1>${title}</h1><p>HTTP ${status} from <code>${escapeHtml(sidecarUrl)}</code></p>${sourceNote}${summary}<p><em>View → Refresh sidecar status (Ctrl+R / Cmd+R)</em> — up to 5 connection attempts with backoff.</p>${pathsSummary}<h2>Raw health JSON</h2><pre>${pre}</pre></body></html>`;
+    const footer = `<p><small>Desktop view refreshed: <code>${escapeHtml(refreshedAt)}</code></small></p>`;
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title><style>body{font-family:system-ui,sans-serif;margin:1.5rem}code{background:#f4f4f4;padding:0.1em 0.3em;word-break:break-all}</style></head><body><h1>${title}</h1><p>HTTP ${status} from <code>${escapeHtml(sidecarUrl)}</code></p>${sourceNote}${summary}<p><em>View → Refresh sidecar status (Ctrl+R / Cmd+R)</em> — up to 5 connection attempts with backoff.</p>${pathsSummary}<h2>Raw health JSON</h2><pre>${pre}</pre>${footer}</body></html>`;
     await win.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(html));
   } catch (e) {
     if (win.isDestroyed()) return;
     buildApplicationMenu(null, win);
     const msg = escapeHtml(String(e));
     const ud = escapeHtml(app.getPath("userData"));
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Sidecar unreachable</title></head><body><h1>Sidecar unreachable</h1><p>Start <code>pyc-hermes-sidecar</code>, set <code>PYC_HERMES_SIDECAR_URL</code>, or create <code>${escapeHtml(SIDECAR_URL_FILE)}</code> under <code>${ud}</code>.</p><p><small>URL tried: <code>${escapeHtml(sidecarUrl)}</code> (${escapeHtml(urlSource)})</small></p><p><em>View → Refresh</em> retries with backoff; <em>View → Open desktop config folder</em> for <code>${escapeHtml(SIDECAR_URL_FILE)}</code>.</p><pre>${msg}</pre></body></html>`;
+    const refreshedAt = new Date().toISOString();
+    const footer = `<p><small>Desktop view refreshed: <code>${escapeHtml(refreshedAt)}</code></small></p>`;
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Sidecar unreachable</title></head><body><h1>Sidecar unreachable</h1><p>Start <code>pyc-hermes-sidecar</code>, set <code>PYC_HERMES_SIDECAR_URL</code>, or create <code>${escapeHtml(SIDECAR_URL_FILE)}</code> under <code>${ud}</code>.</p><p><small>URL tried: <code>${escapeHtml(sidecarUrl)}</code> (${escapeHtml(urlSource)})</small></p><p><em>View → Refresh</em> retries with backoff; <em>View → Open desktop config folder</em> for <code>${escapeHtml(SIDECAR_URL_FILE)}</code>.</p><pre>${msg}</pre>${footer}</body></html>`;
     await win.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(html));
   }
 }

@@ -193,11 +193,15 @@ def _make_fake_hermes_checkout(root: Path, *, missing: set[str] | None = None) -
 
 
 def test_sidecar_health() -> None:
+    import sys
+
     health = get_health()
     assert health["healthy"] is True
     assert isinstance(health["degraded"], bool)
     assert health["status_label"] == health["hermes"]["status_label"]
     assert "version" in health
+    assert health["python_version"] == f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+    assert health["platform"] == sys.platform
     assert "hermes" in health
     assert health["hermes"]["ready_state"] in {"ready", "degraded", "unavailable"}
     assert health["hermes"]["status_label"] in {"ready", "ready-with-warnings", "degraded", "unavailable"}
