@@ -73,7 +73,7 @@ A preview release candidate may be tagged only when:
 - docs are updated,
 - compatibility matrix is updated for format/API changes,
 - no secrets or runtime assets are staged,
-- release notes exist.
+- release notes exist (start from `scripts/generate_preview_release_notes.py` or `scripts/release_gates.py --write-preview-release-notes`; see `docs/releases/README.md`).
 
 ## 10. Phase 1 Exit Criteria
 

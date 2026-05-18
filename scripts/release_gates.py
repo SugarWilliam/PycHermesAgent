@@ -7,6 +7,8 @@ Usage (from repo root):
     ./.venv/bin/python scripts/release_gates.py --no-pytest   # only whitespace + secret scan
     ./.venv/bin/python scripts/release_gates.py --export-meta-benchmarks DIR
         # after gates pass, run export_meta_harness_benchmarks and require smoke/value_proof passed
+    ./.venv/bin/python scripts/release_gates.py --write-preview-release-notes FILE.md
+        # after gates pass, write an auto-generated preview release-notes stub (human edit required)
 """
 
 from __future__ import annotations
@@ -115,6 +117,13 @@ def main(argv: list[str] | None = None) -> int:
         metavar="DIR",
         help="After gates pass, write meta_harness_benchmarks.json under DIR and verify smoke/value_proof passed",
     )
+    parser.add_argument(
+        "--write-preview-release-notes",
+        type=Path,
+        default=None,
+        metavar="FILE",
+        help="After gates pass, write preview release-notes draft (see scripts/generate_preview_release_notes.py)",
+    )
     args = parser.parse_args(argv)
 
     if not args.no_pytest:
@@ -159,6 +168,13 @@ def main(argv: list[str] | None = None) -> int:
             print("release_gates: value_proof benchmark did not pass", flush=True)
             return 1
         print(f"release_gates: wrote {out_path}", flush=True)
+
+    if args.write_preview_release_notes is not None:
+        out = args.write_preview_release_notes.resolve()
+        gen_script = ROOT / "scripts" / "generate_preview_release_notes.py"
+        if _run([sys.executable, str(gen_script), "-o", str(out)]) != 0:
+            return 1
+        print(f"release_gates: wrote preview release notes draft {out}", flush=True)
 
     print("release_gates: OK", flush=True)
     return 0
