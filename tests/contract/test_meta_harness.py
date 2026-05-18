@@ -106,3 +106,155 @@ def test_meta_framework_runs_benchmark_smoke_through_execute() -> None:
     assert any(case["selected_method"] == "A-22" for case in smoke["cases"])
     assert any(case["selected_method"] == "A-12-FORECAST" for case in smoke["cases"])
     assert all(case["duration_ms"] >= 0 for case in smoke["cases"])
+
+
+def test_meta_framework_vague_request_earns_lower_sr_grade() -> None:
+    framework = MetaFramework()
+    result = framework.execute(MetaAnalysisRequest(problem_statement="please do something vague"))
+    assert result.sr_grade == "SR-C2"
+
+
+def test_meta_routing_pin_method_selects_capability() -> None:
+    framework = MetaFramework()
+    result = framework.execute(
+        MetaAnalysisRequest(
+            problem_statement="generic planning task",
+            meta_routing={"pin_method": "A-13"},
+        )
+    )
+    assert result.selected_method == "A-13"
+    assert "Pinned" in result.method_rationale
+
+
+def test_meta_routing_keyword_overlay_can_raise_method_priority() -> None:
+    framework = MetaFramework()
+    result = framework.execute(
+        MetaAnalysisRequest(
+            problem_statement="xyzzy analysis for our roadmap",
+            meta_routing={"keyword_boosts": {"A-13": ["xyzzy"]}},
+        )
+    )
+    assert result.selected_method == "A-13"
+
+
+def test_target_sr_grade_override_is_respected() -> None:
+    framework = MetaFramework()
+    result = framework.execute(
+        MetaAnalysisRequest(
+            problem_statement="please do something vague",
+            target_sr_grade="SR-C9",
+        )
+    )
+    assert result.sr_grade == "SR-C9"
+
+
+def test_allowed_methods_constrains_routing() -> None:
+    framework = MetaFramework()
+    result = framework.execute(
+        MetaAnalysisRequest(
+            problem_statement="因果分析：X 对 Y 的影响",
+            allowed_methods=["A-12-FORECAST"],
+        )
+    )
+    assert result.selected_method != "A-12-SCM"
+    assert result.selected_method == "manual-review"
+
+
+def test_meta_routing_data_shape_bonus_adds_score_without_builtin_match() -> None:
+    framework = MetaFramework()
+    result = framework.execute(
+        MetaAnalysisRequest(
+            problem_statement="quarterly portfolio discussion",
+            data={},
+            meta_routing={"data_shape_bonus": {"A-13": 40}},
+        )
+    )
+    assert result.selected_method == "A-13"
+
+
+def test_meta_routing_data_shape_bonus_stacks_with_builtin_shape_rules() -> None:
+    framework = MetaFramework()
+    result = framework.execute(
+        MetaAnalysisRequest(
+            problem_statement="map influence given the graph",
+            data={"adjacency": [[0.0, 1.0], [1.0, 0.0]]},
+            meta_routing={"data_shape_bonus": {"A-22": 2}},
+        )
+    )
+    assert result.selected_method == "A-22"
+
+
+def test_meta_routing_data_shape_rules_any_keys() -> None:
+    framework = MetaFramework()
+    result = framework.execute(
+        MetaAnalysisRequest(
+            problem_statement="internal portfolio discussion",
+            data={"custom_signal_feed": [0.1, 0.2]},
+            meta_routing={
+                "data_shape_rules": [
+                    {"capability_id": "A-13", "any_keys": ["custom_signal_feed"], "points": 70},
+                ],
+            },
+        )
+    )
+    assert result.selected_method == "A-13"
+
+
+def test_meta_routing_data_shape_rules_all_keys_conjunctive() -> None:
+    framework = MetaFramework()
+    result = framework.execute(
+        MetaAnalysisRequest(
+            problem_statement="reflection",
+            data={"ledger": 1, "notes": "x"},
+            meta_routing={
+                "data_shape_rules": [
+                    {"capability_id": "A-14", "all_keys": ["ledger", "notes"], "points": 80},
+                ],
+            },
+        )
+    )
+    assert result.selected_method == "A-14"
+
+
+def test_meta_routing_data_shape_rules_any_and_all_both_required() -> None:
+    framework = MetaFramework()
+    result_ok = framework.execute(
+        MetaAnalysisRequest(
+            problem_statement="mixed keys",
+            data={"flag": 1, "x": 1, "y": 1},
+            meta_routing={
+                "data_shape_rules": [
+                    {"capability_id": "A-15", "any_keys": ["flag"], "all_keys": ["x", "y"], "points": 90},
+                ],
+            },
+        )
+    )
+    assert result_ok.selected_method == "A-15"
+
+    result_fail = framework.execute(
+        MetaAnalysisRequest(
+            problem_statement="missing all_keys",
+            data={"flag": 1, "x": 1},
+            meta_routing={
+                "data_shape_rules": [
+                    {"capability_id": "A-15", "any_keys": ["flag"], "all_keys": ["x", "y"], "points": 90},
+                ],
+            },
+        )
+    )
+    assert result_fail.selected_method != "A-15"
+
+
+def test_meta_routing_data_shape_rules_sum_with_data_shape_bonus() -> None:
+    framework = MetaFramework()
+    result = framework.execute(
+        MetaAnalysisRequest(
+            problem_statement="routing contest",
+            data={"custom_signal_feed": [1]},
+            meta_routing={
+                "data_shape_bonus": {"A-13": 10},
+                "data_shape_rules": [{"capability_id": "A-13", "any_keys": ["custom_signal_feed"], "points": 50}],
+            },
+        )
+    )
+    assert result.selected_method == "A-13"

@@ -10,17 +10,26 @@ from pyc_hermes_agent.contracts import CapabilityDescriptor, MetaAnalysisRequest
 from pyc_hermes_agent.meta_harness.bridge import LegacyMetaBridge
 from pyc_hermes_agent.meta_harness.judge.review import MethodJudge
 from pyc_hermes_agent.meta_harness.quality.checks import QualityChecker
+from pyc_hermes_agent.meta_harness.quality.sr_grade import SrGradingPolicy
 from pyc_hermes_agent.meta_harness.registry.catalog import CapabilityRegistry
+from pyc_hermes_agent.meta_harness.router.policy import MethodRoutingPolicy
 from pyc_hermes_agent.meta_harness.router.selector import MethodSelector
 
 
 class MetaFramework:
     """Stable formal-analysis entry point."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        routing_policy: MethodRoutingPolicy | None = None,
+        sr_policy: SrGradingPolicy | None = None,
+    ) -> None:
         self.bridge = LegacyMetaBridge()
         self.registry = CapabilityRegistry(self.bridge)
-        self.selector = MethodSelector(self.registry, self.bridge)
+        self._routing_policy = routing_policy or MethodRoutingPolicy.builtin()
+        self.selector = MethodSelector(self.registry, self.bridge, routing_policy=self._routing_policy)
+        self._sr_policy = sr_policy or SrGradingPolicy()
         self.judge = MethodJudge()
         self.quality = QualityChecker()
 
@@ -37,7 +46,7 @@ class MetaFramework:
             logic_review=self.judge.logic_review(request, selected),
             reasonableness_review=self.judge.reasonableness_review(request, selected),
             evidence_grade=selected.max_evidence_grade if selected else "CE-C1",
-            sr_grade="SR-C1",
+            sr_grade=self._sr_policy.grade(request, selected, degraded, execution_details),
             degraded=degraded,
             risks=base_risks,
             recommendations=self.quality.recommendations(request, selected),

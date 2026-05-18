@@ -6,7 +6,7 @@ import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import { spawn } from "node:child_process";
-import { app, BrowserWindow, Menu, shell, dialog } from "electron";
+import { app, BrowserWindow, Menu, shell, dialog, clipboard } from "electron";
 
 const DEFAULT_SIDECAR_URL = "http://127.0.0.1:8765";
 /** Single-line base URL; lives next to Electron caches (see README). */
@@ -201,6 +201,14 @@ function buildApplicationMenu(runtimePaths, win) {
     {
       label: `Create ${SIDECAR_URL_FILE} template…`,
       click: () => createSidecarUrlTemplateIfMissing(win),
+    },
+    {
+      label: "Copy resolved sidecar URL",
+      accelerator: "CmdOrCtrl+Shift+C",
+      click: () => {
+        const { url } = getSidecarResolution();
+        clipboard.writeText(url);
+      },
     },
   ];
 

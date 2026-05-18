@@ -9,12 +9,17 @@ Usage (from repo root):
         # after gates pass, run export_meta_harness_benchmarks and require smoke/value_proof passed
     ./.venv/bin/python scripts/release_gates.py --write-preview-release-notes FILE.md
         # after gates pass, write an auto-generated preview release-notes stub (human edit required)
+
+Whitespace checks: locally, unstaged and staged diffs are scanned. In GitHub Actions (set
+``GITHUB_EVENT_NAME`` / ``GITHUB_BASE_REF``), pull requests use ``origin/<base>...HEAD``.
+Override with ``RELEASE_GATES_DIFF_RANGE`` (e.g. ``origin/main...HEAD``).
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -61,6 +66,38 @@ _SENSITIVE_PATTERNS: list[tuple[re.Pattern[str], str]] = [
 def _run(cmd: list[str]) -> int:
     print("+", " ".join(cmd), flush=True)
     return subprocess.call(cmd, cwd=ROOT)
+
+
+def _git_whitespace_gates() -> int:
+    """Reject conflict markers / bad whitespace in meaningful diffs (CI-aware)."""
+    diff_range = os.environ.get("RELEASE_GATES_DIFF_RANGE", "").strip()
+    if diff_range:
+        return _run(["git", "diff", "--check", diff_range])
+
+    event = os.environ.get("GITHUB_EVENT_NAME", "")
+    if event == "pull_request":
+        base = os.environ.get("GITHUB_BASE_REF", "").strip()
+        if base:
+            return _run(["git", "diff", "--check", f"origin/{base}...HEAD"])
+
+    if event == "push":
+        try:
+            subprocess.run(
+                ["git", "rev-parse", "--verify", "HEAD~1"],
+                cwd=ROOT,
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except subprocess.CalledProcessError:
+            return 0
+        return _run(["git", "diff", "--check", "HEAD~1", "HEAD"])
+
+    if _run(["git", "diff", "--check"]) != 0:
+        return 1
+    if _run(["git", "diff", "--cached", "--check"]) != 0:
+        return 1
+    return 0
 
 
 def _should_scan_path(rel: str) -> bool:
@@ -127,7 +164,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if not args.no_pytest:
-        if _run([sys.executable, "-m", "pytest", "tests/contract", "-q"]) != 0:
+        if _run([sys.executable, "-m", "pytest", "tests", "-q"]) != 0:
             return 1
 
     if not (ROOT / ".git").is_dir():
@@ -135,9 +172,7 @@ def main(argv: list[str] | None = None) -> int:
         print("release_gates: OK", flush=True)
         return 0
 
-    if _run(["git", "diff", "--check"]) != 0:
-        return 1
-    if _run(["git", "diff", "--cached", "--check"]) != 0:
+    if _git_whitespace_gates() != 0:
         return 1
 
     secret_hits = _scan_tracked_files_for_secrets()

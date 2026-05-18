@@ -139,6 +139,8 @@ def test_capability_descriptor_fields() -> None:
 def test_meta_request_defaults() -> None:
     request = MetaAnalysisRequest(problem_statement="causal effect of x on y")
     assert request.target_evidence_grade == "CE-C1"
+    assert request.target_sr_grade == ""
+    assert request.meta_routing == {}
 
 
 def test_retrieval_request_defaults() -> None:

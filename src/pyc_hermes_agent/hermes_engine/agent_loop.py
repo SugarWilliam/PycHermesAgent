@@ -496,6 +496,8 @@ def create_meta_harness_tool_registry() -> ToolRegistry:
                 "objectives": {"type": "array", "items": {"type": "string"}},
                 "allowed_methods": {"type": "array", "items": {"type": "string"}},
                 "target_evidence_grade": {"type": "string"},
+                "target_sr_grade": {"type": "string"},
+                "meta_routing": {"type": "object"},
             },
             "required": ["problem_statement"],
         },
@@ -517,6 +519,8 @@ def _run_formal_analysis(arguments: dict[str, Any]) -> dict[str, Any]:
         objectives=_string_list(arguments.get("objectives")),
         allowed_methods=_string_list(arguments.get("allowed_methods")),
         target_evidence_grade=str(arguments.get("target_evidence_grade", "CE-C1") or "CE-C1"),
+        target_sr_grade=str(arguments.get("target_sr_grade", "") or "").strip(),
+        meta_routing=_mapping(arguments.get("meta_routing")),
     )
     return asdict(MetaFramework().execute(request))
 

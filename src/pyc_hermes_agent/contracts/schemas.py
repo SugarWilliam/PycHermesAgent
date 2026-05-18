@@ -191,6 +191,10 @@ class MetaAnalysisRequest:
     objectives: List[str] = field(default_factory=list)
     allowed_methods: List[str] = field(default_factory=list)
     target_evidence_grade: str = "CE-C1"
+    # SR dimension override for formal runs (empty = computed by MetaHarness SR policy).
+    target_sr_grade: str = ""
+    # Optional routing overlays: keyword_boosts, data_shape_bonus, data_shape_rules, pin_method, …
+    meta_routing: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)

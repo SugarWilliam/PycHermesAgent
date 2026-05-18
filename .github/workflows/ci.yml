@@ -1,4 +1,4 @@
-# PycHermesAgent — contract tests and preview release gates on push/PR.
+# PycHermesAgent — contract tests and release gates on push/PR (see scripts/release_gates.py).
 name: CI
 
 on:
@@ -7,24 +7,32 @@ on:
   pull_request:
     branches: [main, master]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   contract-tests:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          fetch-depth: 0
 
-      - name: Install package and dev tools
-        run: |
-          python -m pip install -U pip
-          python -m pip install -e ".[dev]"
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Sync dependencies (uv.lock + dev)
+        run: uv sync --extra dev --python ${{ matrix.python-version }}
 
       - name: Packaging probe smoke (simulated Windows-style dirs on Linux)
         run: |
@@ -36,7 +44,10 @@ jobs:
           export LOCALAPPDATA="$ROOT/Local"
           export PYC_HERMES_ENFORCE_PACKAGING_RULES=1
           export PYC_HERMES_INSTALL_DIR="$INSTALL"
-          pyc-hermes-packaging-probe --workspace-root "$INSTALL" --mkdirs
+          uv run pyc-hermes-packaging-probe --workspace-root "$INSTALL" --mkdirs
 
-      - name: Quality gates (tests + whitespace + secret heuristics)
-        run: python scripts/release_gates.py
+      - name: Quality gates (pytest + whitespace + secret heuristics)
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+        run: uv run python scripts/release_gates.py

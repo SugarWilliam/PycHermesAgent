@@ -7,6 +7,11 @@ from typing import TYPE_CHECKING, Optional
 
 from pyc_hermes_agent.contracts import CapabilityDescriptor, MetaAnalysisRequest
 from pyc_hermes_agent.meta_harness.registry.catalog import CapabilityRegistry
+from pyc_hermes_agent.meta_harness.router.policy import (
+    MethodRoutingPolicy,
+    default_params_bonus,
+    routing_pin_method_id,
+)
 from pyc_hermes_agent.meta_harness.router.preconditions import capability_preconditions_met
 
 if TYPE_CHECKING:
@@ -21,18 +26,27 @@ class CandidateScore:
 
 
 class MethodSelector:
-    def __init__(self, registry: CapabilityRegistry, bridge: LegacyMetaBridge | None = None) -> None:
+    def __init__(
+        self,
+        registry: CapabilityRegistry,
+        bridge: LegacyMetaBridge | None = None,
+        *,
+        routing_policy: MethodRoutingPolicy | None = None,
+    ) -> None:
         self.registry = registry
         self._bridge = bridge
+        self._routing_policy = routing_policy or MethodRoutingPolicy.builtin()
 
-    def _dependency_penalty(self, capability: CapabilityDescriptor) -> int:
+    def _allowed_method_ids(self, request: MetaAnalysisRequest) -> frozenset[str] | None:
+        raw = getattr(request, "allowed_methods", None) or []
+        filtered = frozenset(str(x).strip() for x in raw if str(x).strip())
+        return filtered or None
+
+    def _dependency_penalty(self, capability: CapabilityDescriptor, policy: MethodRoutingPolicy) -> int:
         if self._bridge is None:
             return 0
-        penalty = 0
-        for dependency in capability.dependencies:
-            if not self._bridge.status(dependency).available:
-                penalty += 4
-        return penalty
+        missing = sum(1 for dependency in capability.dependencies if not self._bridge.status(dependency).available)
+        return missing * policy.dependency_penalty_per_missing
 
     def _deps_satisfied_count(self, capability: CapabilityDescriptor) -> int:
         if self._bridge is None:
@@ -40,69 +54,37 @@ class MethodSelector:
         return sum(1 for d in capability.dependencies if self._bridge.status(d).available)
 
     def select(self, request: MetaAnalysisRequest) -> Optional[CapabilityDescriptor]:
+        policy = self._routing_policy.with_request_overlay(request)
         text = request.problem_statement.lower()
+        allowed = self._allowed_method_ids(request)
+
+        pin_id = routing_pin_method_id(request)
+        if pin_id:
+            pinned = self.registry.get(pin_id)
+            if pinned is not None and capability_preconditions_met(pinned.id, request):
+                if allowed is None or pinned.id in allowed:
+                    return pinned
+
         candidates: list[CandidateScore] = []
 
         for capability in self.registry.all():
+            if allowed is not None and capability.id not in allowed:
+                continue
             if not capability_preconditions_met(capability.id, request):
                 continue
 
             score = 0
+            score += policy.language_bonus(capability.id, text)
+            score += policy.evidence_target_bonus(request, capability.max_evidence_grade)
 
-            if capability.id == "A-12-SCM" and any(
-                token in text for token in ("causal", "因果", "instrument", "backdoor", "did")
-            ):
-                score += 5
-            if capability.id == "A-12-FORECAST" and any(
-                token in text for token in ("forecast", "predict", "预测", "time series", "时序")
-            ):
-                score += 5
-            if capability.id == "A-13" and any(
-                token in text for token in ("organization", "project", "组织", "项目", "churn", "evm")
-            ):
-                score += 5
-            if capability.id == "A-14" and any(
-                token in text for token in ("personal", "habit", "learning", "个人", "习惯", "成长")
-            ):
-                score += 5
-            if capability.id == "A-15" and any(
-                token in text for token in ("team", "conflict", "productivity", "团队", "冲突", "协作")
-            ):
-                score += 5
-            if capability.id == "A-18" and any(
-                token in text for token in ("complex", "emergence", "复杂系统", "涌现", "entropy")
-            ):
-                score += 5
-            if capability.id == "A-22" and any(
-                token in text for token in ("network", "传播", "拓扑", "pagerank", "percolation")
-            ):
-                score += 5
-            if capability.id == "A-23" and any(
-                token in text for token in ("agent-based", "abm", "schelling", "opinion", "智能体")
-            ):
-                score += 5
-
-            if request.target_evidence_grade in ("CE-C3", "CE-C4") and capability.max_evidence_grade in ("CE-C3", "CE-C4"):
-                score += 1
-
-            if request.data:
+            if isinstance(request.data, dict):
                 data_keys = set(request.data.keys())
-                if capability.id == "A-12-FORECAST" and ("series" in data_keys or "time_series" in data_keys):
-                    score += 3
-                if capability.id == "A-12-SCM" and {"df", "cause", "effect"}.issubset(data_keys):
-                    score += 3
-                if capability.id == "A-22" and ({"adjacency", "adjacency_matrix"} & data_keys):
-                    score += 6
-                if capability.id == "A-18" and "micro_states" in data_keys:
-                    score += 3
-                if capability.id == "A-23" and "agents" in data_keys:
-                    score += 3
+                score += policy.data_shape_score(capability.id, data_keys)
 
             params = request.params if isinstance(request.params, dict) else {}
-            if capability.id == "A-22" and str(params.get("analysis", "")).lower() in ("pagerank", "percolation", "sir"):
-                score += 3
+            score += default_params_bonus(capability.id, params)
 
-            score -= self._dependency_penalty(capability)
+            score -= self._dependency_penalty(capability, policy)
             deps_sat = self._deps_satisfied_count(capability)
 
             if score > 0:
@@ -121,6 +103,12 @@ class MethodSelector:
         bridge: LegacyMetaBridge | None = None,
     ) -> str:
         bridge = bridge or self._bridge
+        pin_id = routing_pin_method_id(request)
+        if selected is not None and pin_id and selected.id == pin_id:
+            return (
+                f"Pinned {selected.id} via meta_routing (preconditions satisfied; "
+                f"max evidence {selected.max_evidence_grade})."
+            )
         if selected is None:
             return (
                 "No direct method match was found after precondition checks; "
@@ -141,6 +129,11 @@ class MethodSelector:
         return base
 
     def assumptions(self, request: MetaAnalysisRequest, selected: Optional[CapabilityDescriptor]) -> list[str]:
+        if routing_pin_method_id(request) and selected is not None:
+            return [
+                "Formal method was pinned via meta_routing; confirm this matches governance and task intent.",
+                "Data adequacy and identification claims remain subject to bridge-level validation.",
+            ]
         if selected is None:
             return [
                 "Task requires manual review before formal methodology execution.",

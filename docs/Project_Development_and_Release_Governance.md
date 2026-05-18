@@ -23,7 +23,9 @@ The current repository has these validated capabilities:
 - Local asset promotion and artifact export foundations.
 - Sidecar inventory routes for installed model assets and exported artifacts (`GET /assets`, `GET /artifacts`).
 
-The current repository is not yet production-ready because it lacks production storage migration at scale, broad semantic retrieval, hardened release automation in CI, Electron desktop packaging, production observability, and end-to-end install/upgrade verification. Cross-process MRAG ownership guardrails, trace-aware sidecar surfaces, explicit skill runtime metadata, MetaHarness benchmark smoke, MRAG ingest/manifest evolution, and local asset/artifact inventory routes are implemented for the engineering-preview line.
+**Engineering-preview line (contract-tested)** also includes MRAG storage ownership/locks; sidecar request-ID and AgentLoop/SSE correlation; explicit skill runtime metadata on sidecar listing surfaces; MetaHarness dependency snapshots plus benchmark smoke and value-proof export hooks; MRAG file/URL ingest, on-disk manifest/index version gates, and chunk-index rebuild; structured HTTP error domains; `GET /runtime-paths` and `GET /favicon.ico` (204); preview Electron shell (health, runtime paths, `sidecar_url.txt`, refresh with backoff); and `scripts/release_gates.py` with optional MetaHarness export plus preview release-notes generation.
+
+The repository remains **not production-ready** because it still lacks production-scale storage migration, broad semantic retrieval, hardened desktop packaging/updater/CI, full observability, and verified end-to-end install/upgrade beyond the preview scope.
 
 ## 3. Product Direction
 
