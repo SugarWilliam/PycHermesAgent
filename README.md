@@ -95,6 +95,9 @@ print(result["content"])
 
 ## Key Documents
 
+- `docs/assessment/Reassessment_v4_FactChecked_and_Upgraded.md` — architecture/评估 **事实校对** 稿
+- `docs/architecture/Phase2_Toward_GA_v0.2.1.md` — Phase 2 朝向 GA / 生产 / 商业 **工作草案**
+- `docs/deployment/Windows_Sidecar_Binary.md` — Windows 侧车 **PyInstaller** 产物说明
 - `docs/architecture/PycHermesAgent_Architecture_v0.2.0.md`
 - `docs/architecture/PycHermesAgent_Solution_Architecture_v0.2.0.md`
 - `docs/architecture/Execution_Blueprint_v0.2.0.md`
@@ -105,6 +108,8 @@ print(result["content"])
 - `docs/deployment/PycHermesAgent_Usage_Deployment_Guide_v0.2.0.md`
 
 ## Release Status
+
+Tagged releases (**`v*.*.*`**) trigger **`.github/workflows/release.yml`**, which builds **`pyc-hermes-sidecar.exe`** (Windows) and publishes a **GitHub Release** with checksums. Release notes stub: `docs/releases/v0.2.1.md`.
 
 The repository is suitable for architecture validation, contract validation, and internal engineering preview work.
 It is not yet a production release.

@@ -1,6 +1,6 @@
 """PycHermesAgent runtime skeleton."""
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 from .common import RuntimePaths, SidecarClient, SidecarHealthStatus, ensure_runtime_directories, resolve_runtime_paths
 

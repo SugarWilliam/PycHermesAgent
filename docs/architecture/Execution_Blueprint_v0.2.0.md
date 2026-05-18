@@ -30,7 +30,7 @@ A production release must satisfy all of the following:
 |-------|------------|------|--------------|
 | 1 | Skill execution | Permission + sandbox ADR for optional script hooks | `ADR_Skill_Runtime_Permissions_Phase1_v0.2.0.md` follow-ups |
 | 2 | MRAG semantics | Embedding/rerank per index strategy ADR; keep lexical baseline | `docs/design/MRAG_Index_Strategy_Decision_v0.2.0.md` |
-| 3 | Desktop packaging | Installer, signing, updater, CSP/sandbox | `docs/constraints/windows-packaging.md` |
+| 3 | Desktop packaging | Installer, signing, updater, CSP/sandbox; **Windows sidecar exe** as release artifact (PyInstaller) | `docs/constraints/windows-packaging.md`, `docs/deployment/Windows_Sidecar_Binary.md`, `.github/workflows/release.yml` |
 | 4 | Dependency & supply chain | Audit locks, SBOM optional | governance, compatibility matrix |
 | 5 | Observability | Structured logs/metrics beyond health and runtime-paths | deployment guide |
 

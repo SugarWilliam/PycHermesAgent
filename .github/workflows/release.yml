@@ -1,0 +1,41 @@
+# Tagged releases: Windows sidecar .exe + GitHub Release assets
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  windows-sidecar:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Sync (runtime + PyInstaller)
+        run: uv sync --frozen --extra ga --python 3.11
+
+      - name: Build onefile executable
+        run: uv run pyinstaller --noconfirm packaging/pyinstaller/pyc_hermes_sidecar_onefile.spec
+
+      - name: SHA256 checksum
+        shell: pwsh
+        run: |
+          $h = Get-FileHash dist/pyc-hermes-sidecar.exe -Algorithm SHA256
+          "$($h.Hash.ToLower())  pyc-hermes-sidecar.exe" | Out-File -Encoding utf8 dist/pyc-hermes-sidecar.exe.sha256
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: docs/releases/v0.2.1.md
+          files: |
+            dist/pyc-hermes-sidecar.exe
+            dist/pyc-hermes-sidecar.exe.sha256

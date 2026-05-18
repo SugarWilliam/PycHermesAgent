@@ -42,7 +42,7 @@ class AssetManager:
         self,
         *,
         root: Path | None = None,
-        app_version: str = "0.2.0",
+        app_version: str = "0.2.1",
         index_format_version: int = 1,
     ) -> None:
         self._paths = ensure_runtime_directories(resolve_runtime_paths(root))

@@ -48,11 +48,11 @@ Before a tag is created, update this table when applicable:
 
 ## 5. Current Baseline
 
-The current repository line is `v0.2.0` engineering preview. Production `v1.0.0` cannot be tagged until desktop packaging, release gates, storage migration, and installation verification exist.
+The current repository line is **`v0.2.1`** engineering preview (patch: Windows sidecar PyInstaller artifact + assessment/Phase 2 docs). Production `v1.0.0` cannot be tagged until desktop packaging, signing/updater, storage migration hardening, and installation verification meet production criteria.
 
 | Axis | Current value | Notes |
 |------|---------------|-------|
-| `app_version` | `0.2.0` (`pyc_hermes_agent.__version__`) | Engineering preview |
+| `app_version` | `0.2.1` (`pyc_hermes_agent.__version__`) | Engineering preview; **GitHub Release** may ship `pyc-hermes-sidecar.exe` (see `docs/deployment/Windows_Sidecar_Binary.md`) |
 | `sidecar_api_version` | `0.5` | Health exposes `mrag_retrieval_modes` + observability env hints; retrieval supports lexical / semantic / hybrid (`RetrievalRequest`) |
 | `contract_version` | (implicit `0.x`; document breaking `MetaAnalysisRequest` / result fields) | `target_sr_grade`, `meta_routing` on formal analysis requests are additive; bump when removing/renaming |
 | `index_format_version` | `1` (MRAG manifest) | See `docs/design/MRAG_Index_Strategy_Decision_v0.2.0.md` |

@@ -1,7 +1,7 @@
 {
   "name": "pyc-hermes-desktop",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Minimal Electron shell for the PycHermesAgent Python sidecar (engineering preview)",
   "type": "module",
   "main": "main.mjs",

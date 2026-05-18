@@ -89,4 +89,6 @@ Phase 1 **engineering-preview** exit is **satisfied** as of this document revisi
 
 **Phase 2+** explicitly includes: skill script execution ADR, semantic MRAG, production desktop, and broader audit/durable logging — **not** Phase 1 exit requirements.
 
+**Fact-checked reassessment + Phase 2 working draft:** `docs/assessment/Reassessment_v4_FactChecked_and_Upgraded.md`, `docs/architecture/Phase2_Toward_GA_v0.2.1.md`.
+
 The repository must still state clearly whether it is engineering preview, release candidate, or production release.
