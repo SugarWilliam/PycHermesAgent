@@ -7,14 +7,27 @@ from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from uuid import uuid4
 from collections.abc import Iterator
-from typing import Any, Dict, List
+from typing import Any, Dict, List, TypedDict
 
 from pyc_hermes_agent import __version__
 from pyc_hermes_agent.asset_manager import AssetManager
 from pyc_hermes_agent.artifact_engine import ArtifactEngine, ArtifactRecord
 from pyc_hermes_agent.common import ensure_runtime_directories, resolve_runtime_paths
-from pyc_hermes_agent.contracts import AgentLoopEvent, AgentLoopRequest, ChatCompletionChunk, ChatCompletionRequest, ChatCompletionResult, ChatMessage, ErrorEnvelope, EventEnvelope, MetaAnalysisRequest, TaskResult, ToolCall, ToolDefinition
-from pyc_hermes_agent.contracts import RetrievalRequest
+from pyc_hermes_agent.contracts import (
+    AgentLoopEvent,
+    AgentLoopRequest,
+    ChatCompletionChunk,
+    ChatCompletionRequest,
+    ChatCompletionResult,
+    ChatMessage,
+    ErrorEnvelope,
+    EventEnvelope,
+    MetaAnalysisRequest,
+    RetrievalRequest,
+    TaskResult,
+    ToolCall,
+    ToolDefinition,
+)
 from pyc_hermes_agent.hermes_engine import AgentLoop, HermesFacade
 from pyc_hermes_agent.llm_gateway import (
     discover_rule_files,
@@ -66,8 +79,16 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parents[3]
 
 
+class _AgentLoopRunKwargs(TypedDict, total=False):
+    max_iterations: int
+    session_id: str | None
+    activated_skills: list[str]
+    planning_enabled: bool
+    retry_budget: int
+
+
 def _serialize(value: Any) -> Any:
-    if is_dataclass(value):
+    if is_dataclass(value) and not isinstance(value, type):
         return asdict(value)
     if isinstance(value, Path):
         return str(value)
@@ -661,7 +682,7 @@ def run_agent_loop(request: AgentLoopRequest, root: Path | None = None) -> Dict[
         normalized_request = _normalize_agent_loop_request(request)
         model_id = normalized_request.model or resolve_opencode_like_config(base).default_model
         log_event("agent.loop.started", model=model_id, max_iterations=normalized_request.max_iterations)
-        run_kwargs = {
+        run_kwargs: _AgentLoopRunKwargs = {
             "max_iterations": normalized_request.max_iterations,
             "session_id": normalized_request.session_id,
         }
@@ -709,7 +730,7 @@ def stream_agent_loop(request: AgentLoopRequest, root: Path | None = None) -> It
     normalized_request = _normalize_agent_loop_request(request)
     model_id = normalized_request.model or resolve_opencode_like_config(base).default_model
     log_event("agent.loop.stream.started", model=model_id, max_iterations=normalized_request.max_iterations)
-    run_kwargs = {
+    run_kwargs: _AgentLoopRunKwargs = {
         "max_iterations": normalized_request.max_iterations,
         "session_id": normalized_request.session_id,
     }

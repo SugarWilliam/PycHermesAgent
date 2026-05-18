@@ -23,7 +23,9 @@ analysis = [
   "statsmodels>=0.14",
 ]
 dev = [
-  "pytest>=8.0",
+    "pytest>=8.0",
+    "ruff>=0.8",
+    "mypy>=1.11",
 ]
 
 [project.scripts]
@@ -39,3 +41,21 @@ where = ["src"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+src = ["src", "tests", "scripts"]
+line-length = 160
+
+[tool.ruff.lint]
+# Ruff: pyflakes + pycodestyle (errors/warnings). Phase includes line-length=160 to keep E501 tractable.
+select = ["F", "E", "W"]
+ignore = []
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = false
+warn_unused_ignores = true
+ignore_missing_imports = true
+explicit_package_bases = true
+mypy_path = "src"

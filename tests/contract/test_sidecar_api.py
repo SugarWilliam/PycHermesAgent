@@ -103,7 +103,8 @@ def _make_fake_hermes_checkout(root: Path, *, missing: set[str] | None = None) -
             "        self._sessions[session_id] = {'id': session_id, 'source': source}\n"
             "        return session_id\n"
             "    def get_session(self, session_id: str):\n        return self._sessions.get(session_id)\n"
-            "    def resolve_session_id(self, session_id_or_prefix: str):\n        return session_id_or_prefix if session_id_or_prefix in self._sessions else None\n"
+            "    def resolve_session_id(self, session_id_or_prefix: str):\n"
+            "        return session_id_or_prefix if session_id_or_prefix in self._sessions else None\n"
             "    def list_sessions_rich(self, *args, **kwargs):\n        return list(self._sessions.values())\n"
             "    def resolve_resume_session_id(self, session_id: str):\n        return session_id if session_id in self._sessions else None\n"
             "    def search_sessions(self, *args, **kwargs):\n        return []\n"
@@ -557,7 +558,15 @@ def test_sidecar_agent_loop_streams_events() -> None:
                 model=request.model,
                 tool_calls=[{"id": "call-1", "name": "echo_text", "arguments": '{"text":"he'}],
             )
-            yield AgentLoopEvent(event_id="event-3", trace_id="trace-1", sequence=3, event="assistant.delta", session_id=session_id or "session-1", model=request.model, delta="Hello")
+            yield AgentLoopEvent(
+                event_id="event-3",
+                trace_id="trace-1",
+                sequence=3,
+                event="assistant.delta",
+                session_id=session_id or "session-1",
+                model=request.model,
+                delta="Hello",
+            )
             yield AgentLoopEvent(
                 event_id="event-4",
                 trace_id="trace-1",

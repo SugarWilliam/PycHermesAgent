@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Generator, Iterator
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Callable
@@ -23,7 +23,7 @@ from pyc_hermes_agent.hermes_engine.session_context import bind_session_context
 from pyc_hermes_agent.hermes_engine.session_store import AgentSessionStore
 from pyc_hermes_agent.hermes_engine.skill_context import build_skill_context_messages
 from pyc_hermes_agent.hermes_engine.tool_registry import ToolRegistry
-from pyc_hermes_agent.llm_gateway import LLMChatChunk, LLMChatRequest, LLMChatResponse, LLMMessage, execute_chat, stream_chat
+from pyc_hermes_agent.llm_gateway import LLMChatChunk, LLMChatRequest, LLMChatResponse, LLMMessage, execute_chat
 from pyc_hermes_agent.meta_harness import MetaFramework
 
 
@@ -113,7 +113,7 @@ class AgentLoop:
         retry_budget: int,
         stream_llm_tokens: bool,
         activated_skills: list[str] | None,
-    ) -> Iterator[AgentLoopEvent]:
+    ) -> Generator[AgentLoopEvent, None, AgentLoopResult]:
         if max_iterations < 1:
             raise ValueError("Agent loop max_iterations must be at least 1.")
         if retry_budget < 0:
@@ -371,7 +371,7 @@ class AgentLoop:
         iteration: int,
         retry_count: int,
         emit_event: Callable[..., AgentLoopEvent],
-    ) -> Iterator[AgentLoopEvent]:
+    ) -> Generator[AgentLoopEvent, None, tuple[LLMChatResponse, bool]]:
         if self._llm_stream_executor is None:
             with bind_session_context(session_id):
                 return self._llm_executor(request, self._root), False
@@ -599,7 +599,9 @@ def _build_tool_error_recovery_message(
             "Recovery note: The previous tool attempt failed. "
             f"This is guided recovery attempt {retry_count} of {retry_budget}. "
             f"Observed failures: {failures}. "
-            "Reflect briefly on the failure, do not repeat the same failing tool call with the same arguments, and either fix the arguments, choose a different tool, or answer directly if no tool is required."
+            "Reflect briefly on the failure, do not repeat the same failing tool call with the same "
+            "arguments, and either fix the arguments, choose a different tool, or answer directly if no "
+            "tool is required."
         ),
     )
 

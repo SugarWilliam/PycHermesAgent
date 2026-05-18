@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import numpy as np
 
 from pyc_hermes_agent.contracts import MetaAnalysisRequest

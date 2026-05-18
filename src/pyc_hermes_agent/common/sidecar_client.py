@@ -60,7 +60,7 @@ def _make_http_health_fetcher(base_url: str, timeout: float) -> HealthFetcher:
 
 
 def _serialize_payload(value: Any) -> Any:
-    if is_dataclass(value):
+    if is_dataclass(value) and not isinstance(value, type):
         return asdict(value)
     if isinstance(value, Mapping):
         return dict(value)

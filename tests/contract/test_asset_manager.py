@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import pytest
 
 from pyc_hermes_agent.asset_manager import AssetManager, calculate_asset_checksum

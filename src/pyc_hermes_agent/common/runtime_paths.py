@@ -46,7 +46,8 @@ def resolve_runtime_paths(root: Path | None = None, *, app_name: str = "PycHerme
     """
     use_workspace_sandbox = root is not None and not _packaging_rules_enforced()
     if use_workspace_sandbox:
-        sandbox_root = Path(root).resolve() / ".pyc_hermes_agent_runtime"
+        assert root is not None
+        sandbox_root = root.resolve() / ".pyc_hermes_agent_runtime"
         config_dir = sandbox_root / "APPDATA" / app_name
         local_data_dir = sandbox_root / "LOCALAPPDATA" / app_name
     elif os.name == "nt":

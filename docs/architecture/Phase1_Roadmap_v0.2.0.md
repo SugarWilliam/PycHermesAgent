@@ -11,24 +11,28 @@ Phase 1 converts the current working MVP into a hardened local-first engineering
 
 Completed and contract-tested surfaces include:
 
-- Sidecar health, config, provider/model/rule/skill discovery.
-- HTTP JSON and SSE transport.
+- Sidecar health, config, provider/model/rule/skill discovery; `GET /runtime-paths`; structured HTTP error domains; `GET /favicon.ico` (204) for browser noise.
+- HTTP JSON and SSE transport with **`X-Pyc-Request-Id`** (accept or generate) echoed on responses and merged into error details where applicable.
 - Direct LLM runtime paths for configured OpenAI-compatible, OpenRouter, and GitHub Copilot style providers.
 - Product-owned `AgentLoop` with tool calls, session persistence, bounded memory injection, planning, retry budgeting, and event streaming.
-- `formal_analysis` tool integration through `MetaFramework.execute()`.
-- Text MRAG knowledge bases with lexical retrieval and JSON persistence.
-- Local asset and artifact foundations.
+- `formal_analysis` tool integration through `MetaFramework.execute()` with optional **`target_sr_grade`** and **`meta_routing`** (keyword overlays, `data_shape_bonus`, declarative `data_shape_rules`, `pin_method`, tunable scores).
+- **MetaHarness:** `MethodRoutingPolicy` + `MethodSelector` (language + data-shape + dependency penalty + `allowed_methods` filter); **`SrGradingPolicy`** (CE/SR dimensions kept separate; degraded/overclaim/execution failure map to SR bands); dependency snapshot; benchmark smoke + **value_proof** benchmark (contract-tested).
+- Text MRAG knowledge bases with lexical retrieval, **storage owner/lock** (`MRAGStorageOwner`), manifest/index version guards, file/URL ingest, chunk index rebuild sidecar surface.
+- Local asset and artifact foundations; sidecar inventory routes.
+- **Release gates:** `scripts/release_gates.py` runs **`pytest tests`**, optional **ruff** (`--with-ruff` / `RELEASE_GATES_RUFF=1`) and opt-in **mypy** (`--with-mypy`), CI-aware **`git diff --check`**, secret heuristics; optional `--export-meta-benchmarks`, `--write-preview-release-notes`.
+- **CI:** `.github/workflows/ci.yml` — **uv** + **`uv.lock`**, Python **3.11/3.12** matrix, packaging probe, gates with `GITHUB_EVENT_NAME` / `GITHUB_BASE_REF`.
+- **Desktop (preview):** Electron shell — health + runtime paths, URL resolution (env → `sidecar_url.txt` → default), probe retry (linear backoff), menus; optional sidecar auto-spawn via **`PYC_HERMES_SIDECAR_CMD`** (defaults to **no shell**; see `desktop/README.md`).
 
-## 3. Remaining Phase 1 Workstreams
+## 3. Phase 1 Workstreams (status)
 
-| Workstream | Required Result | Exit Gate |
-|------------|-----------------|-----------|
-| A: MRAG ownership | JSON storage guarded by owner/lock semantics | lock tests and restart tests pass |
-| B: Trace propagation | request ID and trace ID visible across service, logs, events, and errors | HTTP and SSE contract tests pass |
-| C: Skill lifecycle | explicit skill activation and context binding | no implicit execution; metadata visible |
-| D: MetaHarness value | dependency-aware capability status and benchmark foundation | benchmark smoke passes |
-| E: MRAG productization | file/url ingestion and index version behavior | retrieval and migration tests pass |
-| F: Release gates | documented checklist + `scripts/release_gates.py` | script passes locally |
+| Workstream | Status | Exit / notes |
+|------------|--------|----------------|
+| A: MRAG ownership | **Done (MVP)** | `mrag_core/ownership.py`, contract tests; multi-process lock errors structured |
+| B: Trace propagation | **Done (MVP)** | Request ID on HTTP/SSE/errors; AgentLoop `trace_id` separate |
+| C: Skill lifecycle | **Partial** | Explicit activation + metadata; script execution still disabled by policy |
+| D: MetaHarness value | **Advanced** | Routing policy + SR grading + benchmarks contract-tested; pluggable policies via ctor |
+| E: MRAG productization | **Partial** | Lexical retrieval + ingest + versioning + rebuild; vectors/semantic later |
+| F: Release gates | **Done (preview line)** | Gates + CI; **ruff** via `RELEASE_GATES_RUFF=1` / `--with-ruff`; **mypy** opt-in (`--with-mypy`) |
 
 ## 4. Workstream A: MRAG Ownership
 
@@ -48,7 +52,7 @@ Skill behavior must evolve in this order:
 4. Auditable activation metadata.
 5. Permission-gated script execution in a later phase.
 
-No skill script execution is allowed in Phase 1 without an explicit permission model.
+No skill script execution is allowed in Phase 1 without an explicit permission model. **See `docs/design/ADR_Skill_Runtime_Permissions_Phase1_v0.2.0.md`** for Phase 1 vs deferred scope.
 
 ## 7. Workstream D: MetaHarness Value
 
@@ -56,9 +60,10 @@ The evaluation report identified the most important risk: the methodology layer 
 
 - realistic capability availability checks,
 - method precondition checks,
+- configurable **`MethodRoutingPolicy`** and per-request **`meta_routing`** (without bypassing **`MetaFramework.execute()`**),
 - benchmark cases,
 - degraded-state correctness,
-- evidence-grade correctness.
+- evidence-grade and **SR-grade** correctness (separate dimensions).
 
 ## 8. Workstream E: MRAG Productization
 
@@ -68,21 +73,19 @@ MRAG remains local-first and evidence-grounded. Phase 1 may expose file and URL 
 
 A preview release candidate may be tagged only when:
 
-- `./.venv/bin/python -m pytest tests/contract` passes,
-- scope-specific tests pass,
-- docs are updated,
-- compatibility matrix is updated for format/API changes,
+- `./.venv/bin/python -m pytest tests -q` (or `uv run pytest tests -q`) passes — same scope as `scripts/release_gates.py`,
+- `scripts/release_gates.py` passes (whitespace + secret heuristics in repo with `.git`),
+- docs and **compatibility matrix** are updated for format/API changes,
 - no secrets or runtime assets are staged,
-- release notes exist (start from `scripts/generate_preview_release_notes.py` or `scripts/release_gates.py --write-preview-release-notes`; see `docs/releases/README.md`).
+- release notes stub or draft exists (`scripts/release_gates.py --write-preview-release-notes`; see `docs/releases/README.md`).
 
 ## 10. Phase 1 Exit Criteria
 
-Phase 1 exits when:
+Phase 1 **core exit** (engineering-preview hardening) is **largely satisfied** for items 1–2, 4–5 above; item 3 (skill lifecycle) remains **partial** until permission-gated execution is specified.
 
-1. Sidecar local transport has stable health, error, trace, and streaming semantics.
-2. MRAG persistence is protected and restart-tested.
-3. Skill lifecycle supports explicit activation without unsafe execution.
-4. MetaHarness has dependency-aware routing and benchmark smoke coverage.
-5. Release gates can produce a preview tag without manual reconstruction of the process (`scripts/release_gates.py` is the automated subset; human review remains required for secrets and policy).
+Formal **Phase 1 exit** declaration should still wait until:
+
+1. Skill workstream exit gate is explicit (or consciously deferred with ADR).
+2. Maintainers record current status in governance + compatibility matrix for any new contract fields (e.g. `MetaAnalysisRequest.meta_routing`).
 
 The repository must still state clearly whether it is engineering preview, release candidate, or production release.

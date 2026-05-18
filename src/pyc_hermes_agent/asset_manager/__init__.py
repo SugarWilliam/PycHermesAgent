@@ -214,8 +214,8 @@ class AssetManager:
 
 def calculate_asset_checksum(source: Path | bytes | bytearray) -> str:
     if isinstance(source, (bytes, bytearray)):
-        digest = hashlib.sha256(bytes(source)).hexdigest()
-        return f"sha256:{digest}"
+        digest_hex = hashlib.sha256(bytes(source)).hexdigest()
+        return f"sha256:{digest_hex}"
 
     path = Path(source).resolve()
     if not path.exists():

@@ -285,7 +285,6 @@ class LegacyMetaBridge:
 
     def run_network_science(self, data: Dict[str, Any], params: Dict[str, Any]) -> Dict[str, Any]:
         status = self.status("network_science_adapters")
-        analysis = params.get("analysis", "percolation")
         if not status.available or status.module is None:
             return self._run_network_fallback(data, params, status.error)
 
@@ -575,7 +574,7 @@ class LegacyMetaBridge:
                 "error": status.error or "statistical_rigor unavailable",
             }
 
-        return status.module.cusum_with_rigor(  # type: ignore[attr-defined]
+        return status.module.cusum_with_rigor(
             data,
             change_indices,
             n_boot=n_boot,
@@ -602,7 +601,7 @@ class LegacyMetaBridge:
                 "final_grade": "C1",
                 "recommendation": f"Upgrade unavailable: {status.error or 'statistical_rigor missing'}",
             }
-        return status.module.upgrade_causal(  # type: ignore[attr-defined]
+        return status.module.upgrade_causal(
             granger_result,
             scm_result,
             cause=cause,

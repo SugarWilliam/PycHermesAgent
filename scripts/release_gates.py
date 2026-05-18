@@ -4,7 +4,13 @@
 Usage (from repo root):
 
     ./.venv/bin/python scripts/release_gates.py
-    ./.venv/bin/python scripts/release_gates.py --no-pytest   # only whitespace + secret scan
+    ./.venv/bin/python scripts/release_gates.py --no-pytest
+        # only whitespace + secret scan; optional --with-ruff / --with-mypy still apply
+    ./.venv/bin/python scripts/release_gates.py --with-ruff   # after pytest: ruff check (also env RELEASE_GATES_RUFF=1)
+    ./.venv/bin/python scripts/release_gates.py --with-mypy   # optional mypy (RELEASE_GATES_MYPY=1; on in CI when package clean)
+
+Ruff reads ``pyproject.toml`` (F + E + W; line-length 160). CI enables ``RELEASE_GATES_MYPY=1`` now that
+``mypy src/pyc_hermes_agent`` is clean; keep it green when adding modules under ``src``.
     ./.venv/bin/python scripts/release_gates.py --export-meta-benchmarks DIR
         # after gates pass, run export_meta_harness_benchmarks and require smoke/value_proof passed
     ./.venv/bin/python scripts/release_gates.py --write-preview-release-notes FILE.md
@@ -148,6 +154,16 @@ def main(argv: list[str] | None = None) -> int:
         help="Skip pytest (run whitespace + secret checks only)",
     )
     parser.add_argument(
+        "--with-ruff",
+        action="store_true",
+        help="After pytest: run ruff check on src, tests, scripts (also RELEASE_GATES_RUFF=1)",
+    )
+    parser.add_argument(
+        "--with-mypy",
+        action="store_true",
+        help="After pytest: run mypy on package (RELEASE_GATES_MYPY=1 in CI)",
+    )
+    parser.add_argument(
         "--export-meta-benchmarks",
         type=Path,
         default=None,
@@ -165,6 +181,16 @@ def main(argv: list[str] | None = None) -> int:
 
     if not args.no_pytest:
         if _run([sys.executable, "-m", "pytest", "tests", "-q"]) != 0:
+            return 1
+
+    want_ruff = args.with_ruff or os.environ.get("RELEASE_GATES_RUFF", "").lower() in ("1", "true", "yes")
+    if want_ruff:
+        if _run([sys.executable, "-m", "ruff", "check", "src", "tests", "scripts"]) != 0:
+            return 1
+
+    want_mypy = args.with_mypy or os.environ.get("RELEASE_GATES_MYPY", "").lower() in ("1", "true", "yes")
+    if want_mypy:
+        if _run([sys.executable, "-m", "mypy", "-p", "pyc_hermes_agent"]) != 0:
             return 1
 
     if not (ROOT / ".git").is_dir():

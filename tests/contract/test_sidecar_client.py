@@ -191,7 +191,15 @@ def test_sidecar_client_streams_agent_loop_in_process(monkeypatch, tmp_path) -> 
                 model=request.model,
                 tool_calls=[{"id": "call-1", "name": "echo_text", "arguments": '{"text":"he'}],
             )
-            yield AgentLoopEvent(event_id="event-3", trace_id="trace-1", sequence=3, event="assistant.delta", session_id=session_id or "session-1", model=request.model, delta="Hello")
+            yield AgentLoopEvent(
+                event_id="event-3",
+                trace_id="trace-1",
+                sequence=3,
+                event="assistant.delta",
+                session_id=session_id or "session-1",
+                model=request.model,
+                delta="Hello",
+            )
             yield AgentLoopEvent(
                 event_id="event-4",
                 trace_id="trace-1",

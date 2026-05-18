@@ -32,6 +32,21 @@ from pyc_hermes_agent.contracts import (
 )
 
 
+def _coerce_runtime_int(value: object, *, default: int = 0) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str) and value.strip():
+        try:
+            return int(value, 10)
+        except ValueError:
+            return default
+    return default
+
+
 @dataclass(frozen=True, slots=True)
 class _SurfaceSpec:
     id: str
@@ -694,7 +709,7 @@ def _bridge_sessions_integration(
         bridge_ready=True,
         detected_entrypoints=_unique([*integration.detected_entrypoints, "SessionDB"]),
         planned_operations=_unique([*integration.planned_operations, *available_operations]),
-        discovered_count=int(runtime_result.get("list_count") or 0),
+        discovered_count=_coerce_runtime_int(runtime_result.get("list_count"), default=0),
         sample_paths=sample_paths[:20],
         warnings=_unique(warnings),
     )
@@ -739,7 +754,7 @@ def _bridge_tools_integration(
         bridge_ready=True,
         detected_entrypoints=_unique([*integration.detected_entrypoints, "get_all_tool_names", "get_available_toolsets"]),
         planned_operations=_unique([*integration.planned_operations, *available_operations]),
-        discovered_count=int(runtime_result.get("tool_count") or 0),
+        discovered_count=_coerce_runtime_int(runtime_result.get("tool_count"), default=0),
         sample_paths=_build_tools_runtime_sample_paths(runtime_tool_names, tools)[:20]
         or _unique([*integration.sample_paths, *[str(item) for item in runtime_toolset_names]])[:20],
         warnings=_unique(warnings),
@@ -774,7 +789,7 @@ def _bridge_memory_integration(
         bridge_ready=True,
         detected_entrypoints=_unique([*integration.detected_entrypoints, "MemoryManager", "build_memory_context_block"]),
         planned_operations=_unique([*integration.planned_operations, *available_operations]),
-        discovered_count=int(runtime_result.get("provider_count") or 0),
+        discovered_count=_coerce_runtime_int(runtime_result.get("provider_count"), default=0),
         sample_paths=sample_paths[:20],
         warnings=_unique(warnings),
     )
@@ -796,7 +811,8 @@ def _bridge_skills_integration(
     warnings = list(integration.warnings)
     if runtime_count != len(skills):
         warnings.append(
-            "Hermes skills runtime probe validates the active skill listing; packaged optional or platform-gated skills may remain metadata-only in this snapshot."
+            "Hermes skills runtime probe validates the active skill listing; packaged optional or "
+            "platform-gated skills may remain metadata-only in this snapshot."
         )
 
     return replace(

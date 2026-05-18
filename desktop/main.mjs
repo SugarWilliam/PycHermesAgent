@@ -1,6 +1,6 @@
 /**
  * Minimal desktop shell: probes the local sidecar /health and renders JSON in-window.
- * Start the Python sidecar first, or set PYC_HERMES_SIDECAR_CMD to spawn it (advanced).
+ * Start the Python sidecar first, or set PYC_HERMES_SIDECAR_CMD to spawn it (advanced; see README).
  */
 import fs from "node:fs";
 import http from "node:http";
@@ -122,7 +122,18 @@ function probeGet(urlString, pathname) {
 function maybeSpawnSidecar() {
   const cmd = process.env.PYC_HERMES_SIDECAR_CMD;
   if (!cmd || sidecarChild) return;
-  sidecarChild = spawn(cmd, { shell: true, stdio: "ignore", detached: false });
+  const trimmed = cmd.trim();
+  if (!trimmed) return;
+
+  const useShell = process.env.PYC_HERMES_SIDECAR_USE_SHELL === "1";
+  if (useShell) {
+    sidecarChild = spawn(trimmed, { shell: true, stdio: "ignore", detached: false });
+  } else {
+    const parts = trimmed.split(/\s+/).filter(Boolean);
+    if (!parts.length) return;
+    const [exe, ...argv] = parts;
+    sidecarChild = spawn(exe, argv, { shell: false, stdio: "ignore", detached: false });
+  }
   sidecarChild.on("error", (err) => console.error("sidecar spawn error:", err));
 }
 

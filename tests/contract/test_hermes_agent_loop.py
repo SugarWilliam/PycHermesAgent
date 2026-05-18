@@ -67,7 +67,11 @@ def test_agent_loop_uses_builtin_formal_analysis_tool(tmp_path: Path) -> None:
                     ToolCall(
                         id="call-formal-analysis",
                         name="formal_analysis",
-                        arguments='{"problem_statement": "network pagerank analysis", "data": {"adjacency": [[0.0, 1.0], [1.0, 0.0]]}, "params": {"analysis": "pagerank"}}',
+                        arguments=(
+                            '{"problem_statement": "network pagerank analysis", '
+                            '"data": {"adjacency": [[0.0, 1.0], [1.0, 0.0]]}, '
+                            '"params": {"analysis": "pagerank"}}'
+                        ),
                     )
                 ],
             )

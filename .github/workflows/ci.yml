@@ -46,8 +46,10 @@ jobs:
           export PYC_HERMES_INSTALL_DIR="$INSTALL"
           uv run pyc-hermes-packaging-probe --workspace-root "$INSTALL" --mkdirs
 
-      - name: Quality gates (pytest + whitespace + secret heuristics)
+      - name: Quality gates (pytest + ruff + mypy + whitespace + secret heuristics)
         env:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           GITHUB_BASE_REF: ${{ github.base_ref }}
+          RELEASE_GATES_RUFF: "1"
+          RELEASE_GATES_MYPY: "1"
         run: uv run python scripts/release_gates.py

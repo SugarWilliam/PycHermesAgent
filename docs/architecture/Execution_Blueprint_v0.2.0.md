@@ -22,16 +22,17 @@ A production release must satisfy all of the following:
 
 ## 3. Immediate Execution Priorities
 
+**Engineering-preview baseline (contract-tested today):** MRAG storage ownership MVP; HTTP **`X-Pyc-Request-Id`** correlation; explicit skill activation surfaces; **MetaHarness** dependency-aware routing with **`MethodRoutingPolicy`**, data-shape scoring, **`meta_routing`** overlays (**`data_shape_bonus`**, **`data_shape_rules`**, **`pin_method`**), **`SrGradingPolicy`**; benchmark smoke + value_proof; MRAG ingest, manifest/index guards, rebuild; asset/artifact inventory; **`scripts/release_gates.py`** (pytest **`tests`**, CI-aware whitespace, secret heuristics, optional benchmark export and preview release notes); **GitHub CI** via **uv** + **`uv.lock`**; preview **desktop** shell (health, runtime paths, URL file, spawn hardening — see `desktop/README.md`).
+
+**Next waves toward production:**
+
 | Order | Workstream | Goal | Primary Docs |
 |-------|------------|------|--------------|
-| 1 | MRAG ownership | Protect JSON persistence with single-process or lock guardrails | `mrag-evidence-boundaries.md`, detailed design |
-| 2 | Trace propagation | Correlate sidecar, AgentLoop, LLM, MRAG, and errors | detailed design, deployment guide |
-| 3 | Skill lifecycle | Move from metadata discovery to explicit runtime binding | opencode constraints, detailed design |
-| 4 | MetaHarness value proof | Prove routing, dependency status, and reliability improvement | evaluation report, detailed design |
-| 5 | MRAG productization | Add file/url ingest, migration rules, retrieval evolution | feature details, compatibility matrix |
-| 6 | Asset/artifact sidecar | Expose local asset and artifact foundations through contracts | deployment guide |
-| 7 | Desktop shell | Add Electron lifecycle after sidecar contracts are stable | deployment guide |
-| 8 | Release hardening | Automate checks, versioning, release notes, tag rules | governance, compatibility matrix |
+| 1 | Skill lifecycle | Permission model and auditable execution path (sandbox later) | opencode constraints, governance |
+| 2 | MRAG semantics | Embedding/rerank per index strategy ADR; keep lexical baseline | `docs/design/MRAG_Index_Strategy_Decision_v0.2.0.md` |
+| 3 | Desktop packaging | Installer, signing, updater, CSP/sandbox | `docs/constraints/windows-packaging.md` |
+| 4 | Release hardening | **Ruff** in CI/gates; **mypy** opt-in until clean; dependency audit optional | governance, compatibility matrix |
+| 5 | Observability | Structured logs/metrics beyond health and runtime-paths | deployment guide |
 
 ## 4. Implementation Slices
 
@@ -76,8 +77,9 @@ Acceptance:
 Acceptance:
 
 - Capability availability reflects actual dependency and bridge state.
-- Method selection uses method preconditions, not only keywords.
-- Benchmark cases exist for causal overclaim, risk detection, and degraded-state behavior.
+- Method selection uses preconditions, language and data-shape scoring, and dependency penalty; optional **`meta_routing`** and **`allowed_methods`** constrain or pin routes without bypassing **`MetaFramework.execute()`**.
+- **SR** outputs are computed by **`SrGradingPolicy`** (separate from CE **`evidence_grade`**); **`target_sr_grade`** may override when valid.
+- Benchmark cases exist for causal overclaim, graph routing, dependency visibility, and degraded behavior; **value_proof** benchmark compares guided vs baseline stub (contract-tested).
 - Benchmark results are documented before release claims.
 
 ### Slice 1E: MRAG Retrieval Productization
@@ -106,15 +108,12 @@ Acceptance:
 
 Cursor may push, tag, or prepare release output only after these gates pass:
 
-1. Contract tests pass.
-2. Scope-specific tests pass.
-3. Runtime smoke test passes for sidecar health.
-4. Working tree is classified and intentional.
-5. No secrets or runtime assets are staged.
-6. `AGENTS.md` boundaries still hold.
-7. Compatibility matrix and release notes are updated.
-8. Tag name is valid.
-9. No force push, skipped hooks, or destructive git command is required.
+1. **`scripts/release_gates.py`** succeeds (includes **`pytest tests`**, optional **`ruff`** when `RELEASE_GATES_RUFF=1` or `--with-ruff`; optional **`mypy`** when `--with-mypy` / `RELEASE_GATES_MYPY=1`), tracked-file secret heuristics, **`git diff --check`** per environment (see script docstring).
+2. Optional gate steps when cutting preview artifacts: **`--export-meta-benchmarks`**, **`--write-preview-release-notes`** (see script `--help`).
+3. **CI** job **contract-tests** passes on **`main`/`master`** (Python 3.11 + 3.12, packaging probe).
+4. Working tree is classified and intentional; no secrets or runtime assets staged.
+5. `AGENTS.md` boundaries still hold; compatibility matrix and human-edited release notes updated when contracts change.
+6. Tag name matches policy; no force push to protected branches, no skipped hooks unless explicitly approved.
 
 ## 6. Release Tag Policy
 

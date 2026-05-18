@@ -543,7 +543,7 @@ def _parse_tool_calls(raw_tool_calls: Any) -> list[ToolCall]:
 
 
 def _serialize_chat_message(message: LLMMessage) -> dict[str, Any]:
-    serialized = {
+    serialized: dict[str, Any] = {
         "role": message.role,
         "content": message.content,
     }

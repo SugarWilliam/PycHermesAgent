@@ -47,7 +47,14 @@ The evaluation report recommendation to make MetaHarness usable as a pluggable q
 MetaHarness is not production-grade until:
 
 - capability availability reflects real dependency and bridge state,
-- routing uses method preconditions and data shape,
+- routing uses preconditions, language and data-shape scoring, and configurable **`MethodRoutingPolicy`** / per-request **`meta_routing`** (without bypassing **`MetaFramework.execute()`**),
+- **SR** outputs are policy-driven (**`SrGradingPolicy`**) and verified separately from CE **`evidence_grade`**,
 - value-proof benchmark compares a simulated LLM-only baseline to `MetaFramework.execute()` outputs (contract-tested),
 - degraded-state behavior is tested,
 - CE/SR separation is contract-tested.
+
+## 7. Routing and SR Policy Boundaries
+
+- **`MethodRoutingPolicy`** / **`MethodSelector`** own scoring tables and overlays; **`DataShapeRule`** entries are parsed only from request **`meta_routing["data_shape_rules"]`** or injected policies—never from network SDK objects.
+- **`SrGradingPolicy`** must not collapse into CE fields; **`target_sr_grade`** is an explicit contract escape hatch with validated `SR-Cn` shape.
+- Future adapters (HTTP, LangGraph, etc.) pass **`MetaAnalysisRequest`** fields only; they must not embed provider-specific routing state inside `meta_harness` internals.

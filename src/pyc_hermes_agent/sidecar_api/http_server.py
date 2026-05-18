@@ -635,7 +635,7 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
         self.send_header("Connection", "close")
         self.end_headers()
         for event in events:
-            payload = asdict(event) if is_dataclass(event) else event
+            payload = asdict(event) if is_dataclass(event) and not isinstance(event, type) else event
             if not isinstance(payload, dict):
                 continue
             payload.setdefault("request_id", self._request_id)
