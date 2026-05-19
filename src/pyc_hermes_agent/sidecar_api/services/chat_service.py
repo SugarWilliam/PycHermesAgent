@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Dict, TypedDict
 from uuid import uuid4

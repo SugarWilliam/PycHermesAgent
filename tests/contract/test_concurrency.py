@@ -1,11 +1,10 @@
 """Concurrency tests for thread-safe components."""
 
 import threading
-import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-from pyc_hermes_agent.hermes_engine.memory import UserPreferences, preferences_path
+from pyc_hermes_agent.hermes_engine.memory import UserPreferences
 from pyc_hermes_agent.mrag_core.sqlite_store import ChunkRecord, SQLiteChunkStore
 from pyc_hermes_agent.sidecar_api.services.mrag_service import MRAGServiceRegistry
 
@@ -53,7 +52,6 @@ def test_sqlite_store_concurrent_inserts(tmp_path: Path) -> None:
     Uses per-thread connections (the production pattern) to avoid SQLite
     shared-connection threading issues on network filesystems.
     """
-    import sqlite3
 
     db_path = tmp_path / "chunks.db"
     # Initialize schema with a primary store
@@ -63,7 +61,7 @@ def test_sqlite_store_concurrent_inserts(tmp_path: Path) -> None:
 
     chunks_per_thread = 20
     barrier = threading.Barrier(5)
-    lock = threading.Lock()
+    threading.Lock()
 
     def _insert(thread_idx: int):
         barrier.wait()

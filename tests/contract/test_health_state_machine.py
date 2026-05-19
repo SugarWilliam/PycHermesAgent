@@ -1,6 +1,6 @@
 """Contract tests for the sidecar health state machine."""
 
-from pyc_hermes_agent.sidecar_api.health import ComponentHealth, HealthState, SidecarHealth
+from pyc_hermes_agent.sidecar_api.health import HealthState, SidecarHealth
 
 
 def test_health_state_enum_values():

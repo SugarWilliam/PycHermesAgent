@@ -109,7 +109,7 @@ print(result["content"])
 
 ## Release Status
 
-Tagged releases (**`v*.*.*`**) trigger **`.github/workflows/release.yml`**, which builds **`pyc-hermes-sidecar.exe`** (Windows) and publishes a **GitHub Release** with checksums. Release notes stub: `docs/releases/v0.2.1.md`.
+Tagged releases (**`v*.*.*`**) trigger **`.github/workflows/release.yml`**, which builds **`pyc-hermes-sidecar.exe`** (Windows) and publishes a **GitHub Release** with checksums. Current baseline notes live in **`docs/releases/v0.3.0.md`** (see also `docs/releases/v0.2.1.md` for older context).
 
 The repository is suitable for architecture validation, contract validation, and internal engineering preview work.
 It is not yet a production release.

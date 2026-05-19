@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 
 from pyc_hermes_agent.hermes_engine.skills.audit import SkillAuditor
 

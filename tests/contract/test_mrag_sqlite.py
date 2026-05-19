@@ -1,7 +1,6 @@
 """Contract tests for MRAG SQLite/FTS5 storage backend."""
 
 import time
-import tempfile
 from pathlib import Path
 
 import pytest

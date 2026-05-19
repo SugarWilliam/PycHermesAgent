@@ -10,10 +10,8 @@ import json
 from pathlib import Path
 
 from pyc_hermes_agent.common.runtime_paths import resolve_runtime_paths
-from pyc_hermes_agent.hermes_engine.memory import UserPreferences, preferences_path
+from pyc_hermes_agent.hermes_engine.memory import UserPreferences
 from pyc_hermes_agent.mrag_core.persistence import (
-    MRAG_INDEX_FORMAT_VERSION,
-    MRAG_MANIFEST_VERSION,
     load_knowledge_bases,
 )
 from pyc_hermes_agent.mrag_core.migrate import plan_migrations

@@ -112,7 +112,7 @@ class MethodJudge:
         findings: list[str] = []
         data = getattr(request, "data", None) or {}
         params = getattr(request, "params", None) or {}
-        problem = getattr(request, "problem_statement", "") or ""
+        getattr(request, "problem_statement", "") or ""
         method_id = selected.id or ""
         grade = selected.max_evidence_grade or "CE-C1"
 

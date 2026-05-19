@@ -239,7 +239,7 @@ def list_asset_inventory(root: Path | None = None) -> Dict[str, Any]:
 
 
 def list_sidecar_artifacts(root: Path | None = None, *, task_id: str | None = None) -> Dict[str, Any]:
-    from pyc_hermes_agent.artifact_engine import ArtifactEngine, ArtifactRecord
+    from pyc_hermes_agent.artifact_engine import ArtifactEngine
 
     base = root or _repo_root()
     engine = ArtifactEngine(root=base)

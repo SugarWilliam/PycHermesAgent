@@ -57,7 +57,7 @@ class PDFExtractionResult:
 
 def _extract_with_fitz(path: Optional[Path], data: Optional[bytes], title: str) -> PDFExtractionResult:
     """Extract using pymupdf (fitz)."""
-    import fitz  # type: ignore[import-untyped]
+    import fitz
 
     if data is not None:
         doc = fitz.open(stream=data, filetype="pdf")
@@ -89,7 +89,7 @@ def _extract_with_pdfplumber(path: Optional[Path], data: Optional[bytes], title:
     """Extract using pdfplumber."""
     import io
 
-    import pdfplumber  # type: ignore[import-untyped]
+    import pdfplumber
 
     open_arg = io.BytesIO(data) if data is not None else str(path)
     pages: List[PDFPage] = []

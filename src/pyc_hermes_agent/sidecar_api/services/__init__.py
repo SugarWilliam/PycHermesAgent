@@ -2,7 +2,6 @@
 
 from pyc_hermes_agent.sidecar_api.services.common import (
     SIDECAR_API_VERSION,
-    _serialize,
     get_config_snapshot,
     get_health,
     get_runtime_paths_snapshot,

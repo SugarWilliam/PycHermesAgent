@@ -3,7 +3,6 @@
 import json
 from pathlib import Path
 
-import pytest
 
 from pyc_hermes_agent.mrag_core.migrate_to_sqlite import (
     migrate_all,
@@ -80,7 +79,7 @@ class TestMigrateKnowledgeBase:
         kb_dir = tmp_path / "indexes" / "kb1"
         _make_chunks_json(kb_dir, _sample_chunks())
         # Create existing DB
-        with SQLiteChunkStore(kb_dir / "chunks.db") as store:
+        with SQLiteChunkStore(kb_dir / "chunks.db"):
             pass  # just create empty DB
 
         result = migrate_knowledge_base(kb_dir, backup=True)
@@ -101,7 +100,7 @@ class TestMigrateAll:
     def test_migrate_all_skips_already_migrated(self, tmp_path: Path) -> None:
         kb_dir = tmp_path / "indexes" / "kb1"
         _make_chunks_json(kb_dir, _sample_chunks())
-        with SQLiteChunkStore(kb_dir / "chunks.db") as store:
+        with SQLiteChunkStore(kb_dir / "chunks.db"):
             pass
 
         results = migrate_all(tmp_path, backup=False)

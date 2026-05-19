@@ -130,7 +130,7 @@ def _check_llm_gateway() -> ComponentHealth:
 def _check_meta_harness() -> ComponentHealth:
     """Check MetaHarness: can instantiate MetaFramework → ready."""
     try:
-        from pyc_hermes_agent.meta_harness import MetaFramework  # type: ignore[attr-defined]
+        from pyc_hermes_agent.meta_harness import MetaFramework
 
         MetaFramework()
         return ComponentHealth(name="meta_harness", state=HealthState.READY)
