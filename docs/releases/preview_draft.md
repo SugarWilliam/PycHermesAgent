@@ -1,11 +1,11 @@
 # PycHermesAgent v0.3.0-preview.1 Release Notes (draft)
 
-> Engineering preview draft. Regenerate the metadata block after the final release-prep commit and immediately before tagging.
+> Engineering preview draft. Regenerate the auto metadata only if new commits are added before tagging.
 
 ## Build metadata
 
-- **Draft generated (UTC):** 2026-05-19T11:34:47Z
-- **Draft base commit:** `b8a842a` on `main`
+- **Draft generated (UTC):** 2026-05-19T20:00:57Z
+- **Draft base commit:** `3777ec4` on `main`
 - **Package `__version__`:** `0.3.0`
 - **`sidecar_api_version`:** `0.6`
 
@@ -33,6 +33,8 @@
 - Added PDF extraction pipeline and citation UI surfaces.
 - Added desktop updater wiring and verified desktop build/startup on a local disk copy.
 - Corrected desktop sidecar default port to `8765` and inlined updater bootstrap into `desktop/electron/main.js`.
+- Aligned `/health` aggregate semantics so missing Hermes checkout reports `unavailable` consistently.
+- Bumped `sidecar_api_version` to `0.6` to match the new sidecar routes and payload shape.
 
 ## Migration Notes
 
@@ -45,20 +47,27 @@
 
 - `python scripts/release_gates.py --no-pytest`
 - `python -m pytest tests/contract tests/integration --tb=line -q --ignore=tests/contract/test_sidecar_http.py`
-- Result: `284 passed, 1 skipped`
-- Desktop verification: `electron-vite build` succeeds on local disk; Electron launches successfully against a mock sidecar with SSE streaming.
+- `python -m pytest tests/contract/test_sidecar_api.py tests/contract/test_sidecar_client.py tests/contract/test_health_state_machine.py --tb=line -q`
+- Results verified locally in this workspace:
+  - `284 passed, 1 skipped`
+  - `38 passed`
+- Desktop verification:
+  - `electron-vite build` succeeds on a local disk copy
+  - Electron launches successfully
+  - Mock sidecar SSE streaming validated end-to-end
 
 ## Known Limitations
 
 - The repository is still not production-ready.
 - Desktop packaging is preview-only: no code signing, no verified installer/upgrade path on clean Windows machines.
 - Neural embeddings and full production semantic retrieval are not implemented yet.
-- `tests/contract/test_sidecar_http.py` remains unsuitable as a release gate on the current SMB-backed workspace because of HTTP timeout/flakiness in this environment; release tagging should rely on the proven contract/integration suite above unless that environment issue is eliminated.
-- Final tag metadata and this document's build block must be regenerated after the last release-prep commit.
+- `tests/contract/test_sidecar_http.py` remains unsuitable as a release gate on the current SMB-backed workspace because of HTTP timeout/flakiness in this environment.
+- If any new commit is added before the tag, update the metadata block above before publishing.
 
 ## Recent Commits
 
 ```text
+3777ec4 Prepare v0.3.0 preview release metadata and health semantics
 b8a842a fix(desktop): inline updater into main.js, fix sidecar port to 8765
 654688d v0.3.0: Phase 2 complete - usable local analysis workbench with desktop shell
 b7294d5 v0.2.1: fact-checked reassessment, Phase 2 GA draft, Windows sidecar PyInstaller release
@@ -68,5 +77,4 @@ f653087 Close Phase 1 engineering preview: skill audit on AgentLoop start, docs 
 69b5ca9 Quality: Ruff E/W+F, mypy-clean src, CI gates; desktop sidecar spawn hardening.
 29c26cf MetaHarness routing policies, SR grading, and CI hardening.
 b429803 Health payload: python_version/platform; desktop shows runtime + refresh time.
-0dbc29b Add preview release-notes generator and gate integration.
 ```
