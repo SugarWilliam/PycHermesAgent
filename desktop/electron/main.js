@@ -1,9 +1,11 @@
 const { app, BrowserWindow, ipcMain } = require('electron')
 const { join } = require('path')
 const http = require('http')
-const { initAutoUpdater, checkForUpdates } = require('./updater')
 
-const SIDECAR_URL = process.env.PYC_HERMES_SIDECAR_URL || 'http://127.0.0.1:9810'
+let autoUpdater = null
+try { autoUpdater = require('electron-updater').autoUpdater } catch (e) { /* dev mode */ }
+
+const SIDECAR_URL = process.env.PYC_HERMES_SIDECAR_URL || 'http://127.0.0.1:8765'
 
 function checkSidecarHealth() {
   return new Promise((resolve) => {
@@ -45,6 +47,28 @@ function createWindow() {
 ipcMain.handle('sidecar:health', () => checkSidecarHealth())
 ipcMain.handle('sidecar:url', () => SIDECAR_URL)
 
+function initAutoUpdater() {
+  if (!autoUpdater) return
+  autoUpdater.autoDownload = false
+  autoUpdater.autoInstallOnAppQuit = true
+
+  function sendStatus(data) {
+    const win = BrowserWindow.getAllWindows()[0]
+    if (win && !win.isDestroyed()) win.webContents.send('updater:status', data)
+  }
+
+  autoUpdater.on('checking-for-update', () => sendStatus({ state: 'checking' }))
+  autoUpdater.on('update-available', (info) => sendStatus({ state: 'available', version: info.version }))
+  autoUpdater.on('update-not-available', () => sendStatus({ state: 'none' }))
+  autoUpdater.on('download-progress', (p) => sendStatus({ state: 'downloading', percent: Math.round(p.percent) }))
+  autoUpdater.on('update-downloaded', (info) => sendStatus({ state: 'ready', version: info.version }))
+  autoUpdater.on('error', (err) => sendStatus({ state: 'error', message: err?.message || 'Unknown' }))
+
+  ipcMain.handle('updater:check', () => autoUpdater.checkForUpdates())
+  ipcMain.handle('updater:download', () => autoUpdater.downloadUpdate())
+  ipcMain.handle('updater:install', () => autoUpdater.quitAndInstall())
+}
+
 app.whenReady().then(async () => {
   const healthy = await checkSidecarHealth()
   if (!healthy.ok) {
@@ -55,7 +79,7 @@ app.whenReady().then(async () => {
   const win = createWindow()
 
   win.once('show', () => {
-    setTimeout(() => checkForUpdates(), 5000)
+    if (autoUpdater) setTimeout(() => autoUpdater.checkForUpdates().catch(() => {}), 5000)
   })
   win.show()
 
