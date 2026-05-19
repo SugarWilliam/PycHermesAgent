@@ -1,4 +1,9 @@
-"""Capability catalog for initial MetaHarness routing."""
+"""Capability catalog for initial MetaHarness routing.
+
+NOTE: A-13, A-14, A-15 (org_personal_adapters) are available only in the
+standalone pyc-MetaFramework project. They may be re-enabled here when the
+bridge supports lazy adapter loading.
+"""
 
 from __future__ import annotations
 
@@ -27,30 +32,8 @@ _DEFAULT_CAPABILITIES = [
         dependencies=["structural_causal"],
         max_evidence_grade="CE-C3",
     ),
-    CapabilityDescriptor(
-        id="A-13",
-        kind="adapter",
-        input_schema="meta.analysis.request.v1",
-        output_schema="meta.analysis.result.v1",
-        dependencies=["org_personal_adapters"],
-        max_evidence_grade="CE-C2",
-    ),
-    CapabilityDescriptor(
-        id="A-14",
-        kind="adapter",
-        input_schema="meta.analysis.request.v1",
-        output_schema="meta.analysis.result.v1",
-        dependencies=["org_personal_adapters"],
-        max_evidence_grade="CE-C2",
-    ),
-    CapabilityDescriptor(
-        id="A-15",
-        kind="adapter",
-        input_schema="meta.analysis.request.v1",
-        output_schema="meta.analysis.result.v1",
-        dependencies=["org_personal_adapters"],
-        max_evidence_grade="CE-C2",
-    ),
+    # A-18: requires complex_systems_adapters (future — available only in
+    # standalone pyc-MetaFramework; re-enable when bridge supports lazy loading)
     CapabilityDescriptor(
         id="A-18",
         kind="adapter",

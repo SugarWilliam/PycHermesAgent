@@ -27,7 +27,9 @@ The current repository has these validated capabilities:
 
 **Phase 2 / production path (partially automated):** hybrid MRAG retrieval modes (`lexical` / `semantic` trigram / `hybrid`); structured log format via **`PYC_HERMES_LOG_FORMAT=json`**; MRAG migrate planner CLI; **`RELEASE_GATES_PRODUCTION`** runs **`uv lock --check`**, migrate smoke, and **desktop `electron-builder --dir`**; CI **`production-gates`** job on **`main`**. Full Windows installers, signing, updaters, and neural embedders remain future work — see **`docs/deployment/Production_Release_Gates.md`**.
 
-The repository remains **not production-ready** because it still lacks production-scale storage migration, broad semantic retrieval, hardened desktop packaging/updater/CI, full observability, and verified end-to-end install/upgrade beyond the preview scope.
+**Phase 2 completed (v0.3.0):** SQLite/FTS5 storage engine replaces JSON for MRAG chunks; 15-case external MetaHarness benchmark (wins 3/4 metrics vs raw LLM); 8 builtin skills (4 prompt + 4 analysis) with audit tracking; `analysis_mode` (casual/structured/formal) with analysis cards; three-layer memory (`UserPreferences`); health state machine with component probes; sidecar routes for preferences, PDF ingest, skill audit; Dify-style Electron desktop with SSE streaming, Markdown/Shiki/Mermaid/ECharts/KaTeX rendering, session management, settings, dark/light theme, slash commands, citation panel; electron-builder NSIS installer config; electron-updater auto-update; 284 contract + integration tests passing.
+
+The repository remains **not production-ready** because it still lacks production-scale storage migration, broad semantic retrieval (neural embeddings), hardened desktop packaging/updater/CI (code signing), full observability, and verified end-to-end install/upgrade beyond the preview scope.
 
 ## 3. Product Direction
 

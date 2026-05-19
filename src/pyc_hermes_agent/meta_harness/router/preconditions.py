@@ -55,7 +55,9 @@ def capability_preconditions_met(capability_id: str, request: MetaAnalysisReques
             return True
         return False
 
-    if capability_id in {"A-13", "A-14", "A-15"}:
-        return True
+    # NOTE: A-13, A-14, A-15 (org_personal_adapters) are available only in the
+    # standalone pyc-MetaFramework project. Their precondition block was removed
+    # because those methods are no longer in the default catalog. They may be
+    # re-enabled when the bridge supports lazy adapter loading.
 
     return True

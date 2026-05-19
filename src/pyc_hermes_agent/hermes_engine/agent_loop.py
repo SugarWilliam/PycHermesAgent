@@ -14,6 +14,7 @@ from pyc_hermes_agent.contracts import (
     ChatCompletionRequest,
     ChatMessage,
     MetaAnalysisRequest,
+    ToolCall,
     ToolCallResult,
     ToolDefinition,
 )
@@ -31,6 +32,16 @@ LLMExecutor = Callable[[LLMChatRequest, Path], LLMChatResponse]
 LLMStreamExecutor = Callable[[LLMChatRequest, Path], Iterator[LLMChatChunk]]
 _DEFAULT_MAX_ITERATIONS = 8
 _DEFAULT_RETRY_BUDGET = 1
+_VALID_ANALYSIS_MODES = ("casual", "structured", "formal")
+
+_STRUCTURED_MODE_SYSTEM_MESSAGE = (
+    "You MUST structure your response with the following sections:\n"
+    "## Summary\nBrief overview of findings.\n"
+    "## Evidence\nKey data points and supporting information.\n"
+    "## Risks\nIdentified risks and uncertainties.\n"
+    "## Recommendations\nActionable next steps.\n"
+    "Do not omit any section."
+)
 
 
 class AgentLoop:
@@ -60,6 +71,7 @@ class AgentLoop:
         planning_enabled: bool = True,
         retry_budget: int = _DEFAULT_RETRY_BUDGET,
         activated_skills: list[str] | None = None,
+        analysis_mode: str = "casual",
     ) -> AgentLoopResult:
         generator = self._run_generator(
             request,
@@ -70,6 +82,7 @@ class AgentLoop:
             retry_budget=retry_budget,
             stream_llm_tokens=False,
             activated_skills=activated_skills,
+            analysis_mode=analysis_mode,
         )
         while True:
             try:
@@ -90,6 +103,7 @@ class AgentLoop:
         planning_enabled: bool = True,
         retry_budget: int = _DEFAULT_RETRY_BUDGET,
         activated_skills: list[str] | None = None,
+        analysis_mode: str = "casual",
     ) -> Iterator[AgentLoopEvent]:
         yield from self._run_generator(
             request,
@@ -100,6 +114,7 @@ class AgentLoop:
             retry_budget=retry_budget,
             stream_llm_tokens=True,
             activated_skills=activated_skills,
+            analysis_mode=analysis_mode,
         )
 
     def _run_generator(
@@ -113,11 +128,14 @@ class AgentLoop:
         retry_budget: int,
         stream_llm_tokens: bool,
         activated_skills: list[str] | None,
+        analysis_mode: str = "casual",
     ) -> Generator[AgentLoopEvent, None, AgentLoopResult]:
         if max_iterations < 1:
             raise ValueError("Agent loop max_iterations must be at least 1.")
         if retry_budget < 0:
             raise ValueError("Agent loop retry_budget cannot be negative.")
+        if analysis_mode not in _VALID_ANALYSIS_MODES:
+            raise ValueError(f"Invalid analysis_mode '{analysis_mode}'. Must be one of: {', '.join(_VALID_ANALYSIS_MODES)}")
 
         resolved_session_id = (session_id or "").strip() or str(uuid4())
         with bind_session_context(resolved_session_id):
@@ -187,6 +205,7 @@ class AgentLoop:
                 "retry_budget": retry_budget,
                 "activated_skills": normalized_activated_skills,
                 "skills_runtime_policy": dict(SKILLS_RUNTIME_POLICY),
+                "analysis_mode": analysis_mode,
             },
         )
         if plan is not None:
@@ -197,6 +216,8 @@ class AgentLoop:
                 current_iteration = iteration
                 with bind_session_context(resolved_session_id):
                     extra_system_messages = [*skill_messages]
+                    if analysis_mode == "structured":
+                        extra_system_messages.append(ChatMessage(role="system", content=_STRUCTURED_MODE_SYSTEM_MESSAGE))
                     if recovery_message is not None:
                         extra_system_messages.append(recovery_message)
                     prompt_messages = build_prompt_messages(
@@ -276,6 +297,27 @@ class AgentLoop:
                 )
 
                 if not last_response.tool_calls:
+                    # In formal mode, auto-inject formal_analysis if it wasn't called this session.
+                    if analysis_mode == "formal" and not _has_formal_analysis_call(tool_results):
+                        auto_tool_call = ToolCall(
+                            name="formal_analysis",
+                            arguments='{"problem_statement": ' + _json_escape(last_response.content or "Analyze the conversation context.") + '}',
+                        )
+                        with bind_session_context(resolved_session_id):
+                            auto_result = registry.dispatch(auto_tool_call)
+                        tool_results.append(auto_result)
+                        messages.append(ChatMessage(role="tool", content=auto_result.content, tool_call_id=auto_result.tool_call_id))
+                        yield emit(
+                            "tool.result",
+                            model=active_model,
+                            provider_id=last_response.provider_id,
+                            iteration=iteration,
+                            retry_count=retry_count,
+                            payload={"tool_call": auto_tool_call, "tool_result": auto_result, "auto_injected": True},
+                        )
+                        # Continue loop so LLM can incorporate the formal analysis result.
+                        continue
+
                     with bind_session_context(resolved_session_id):
                         self._persist_session(resolved_session_id, active_model, messages, existing_session)
                     result = AgentLoopResult(
@@ -649,6 +691,15 @@ def _tool_call_state_key(tool_calls: list[Any]) -> tuple[tuple[str, str, str, st
         )
         for call in tool_calls
     )
+
+
+def _has_formal_analysis_call(tool_results: list[ToolCallResult]) -> bool:
+    return any(result.name == "formal_analysis" for result in tool_results)
+
+
+def _json_escape(value: str) -> str:
+    import json
+    return json.dumps(value)
 
 
 __all__ = ["AgentLoop", "AgentLoopResult", "LLMExecutor", "LLMStreamExecutor", "create_meta_harness_tool_registry"]

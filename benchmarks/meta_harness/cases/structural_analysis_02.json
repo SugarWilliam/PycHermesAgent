@@ -1,0 +1,18 @@
+{
+  "case_id": "structural_analysis_02",
+  "category": "structural_analysis",
+  "description": "Graph adjacency matrix should route to A-22",
+  "request": {
+    "problem_statement": "Compute PageRank influence in this network",
+    "data": {"adjacency": [[0, 1, 0], [0, 0, 1], [1, 0, 0]]},
+    "params": {"analysis": "pagerank"}
+  },
+  "expected": {
+    "should_select_method": "A-22",
+    "should_detect_overclaim": false,
+    "should_surface_risks": true,
+    "min_risk_count": 1,
+    "should_be_degraded": false,
+    "evidence_grade_max": "CE-C1"
+  }
+}

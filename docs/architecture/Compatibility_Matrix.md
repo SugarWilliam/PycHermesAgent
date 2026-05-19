@@ -48,15 +48,15 @@ Before a tag is created, update this table when applicable:
 
 ## 5. Current Baseline
 
-The current repository line is **`v0.2.1`** engineering preview (patch: Windows sidecar PyInstaller artifact + assessment/Phase 2 docs). Production `v1.0.0` cannot be tagged until desktop packaging, signing/updater, storage migration hardening, and installation verification meet production criteria.
+The current repository line is **`v0.3.0`** Phase 2 complete (usable local analysis workbench with desktop shell, SQLite/FTS5, 15-case benchmark, 8 builtin skills, auto-updater). Production `v1.0.0` cannot be tagged until desktop packaging signing/updater, storage migration hardening, neural embeddings, and installation verification meet production criteria.
 
 | Axis | Current value | Notes |
 |------|---------------|-------|
-| `app_version` | `0.2.1` (`pyc_hermes_agent.__version__`) | Engineering preview; **GitHub Release** may ship `pyc-hermes-sidecar.exe` (see `docs/deployment/Windows_Sidecar_Binary.md`) |
-| `sidecar_api_version` | `0.5` | Health exposes `mrag_retrieval_modes` + observability env hints; retrieval supports lexical / semantic / hybrid (`RetrievalRequest`) |
-| `contract_version` | (implicit `0.x`; document breaking `MetaAnalysisRequest` / result fields) | `target_sr_grade`, `meta_routing` on formal analysis requests are additive; bump when removing/renaming |
-| `index_format_version` | `1` (MRAG manifest) | See `docs/design/MRAG_Index_Strategy_Decision_v0.2.0.md` |
+| `app_version` | `0.3.0` (`pyc_hermes_agent.__version__`) | Phase 2 complete; desktop shell with Dify-style UI, electron-builder NSIS installer |
+| `sidecar_api_version` | `0.6` | Added: `GET/PUT/DELETE /preferences`, `POST /kb/.../ingest-pdf`, `GET /skills/audit`, health state machine with component probes, `analysis_mode` on agent requests |
+| `contract_version` | `0.3` | `AgentLoopRequest.analysis_mode` added; `MetaAnalysisRequest.meta_routing` extended with `data_shape_rules`; `AgentLoopEvent.payload.analysis_card` on formal done |
+| `index_format_version` | `2` (SQLite/FTS5) | JSON→SQLite migration via `scripts/migrate_mrag_to_sqlite.py`; v1 JSON still readable for migration |
 | `model_manifest_version` | `1` (asset manifest schema) | Unchanged |
 | `artifact_format_version` | `1` | Unchanged |
-| `skills_runtime_policy_id` | `skill-runtime-permissions-phase1-v0.2.0` | Shared dict `SKILLS_RUNTIME_POLICY` in `hermes_engine.skill_context`; sidecar skill listings + AgentLoop `start` payload; ADR defines deferrals |
-| `desktop_ipc_version` | n/a (preview) | **Preview** Electron shell ships as dev workflow (`desktop/`); no stable desktop IPC contract yet — treat as non-production |
+| `skills_runtime_policy_id` | `skill-runtime-permissions-phase2-v0.3.0` | 8 builtin skills (4 prompt + 4 analysis); `SkillAuditor` tracks activation/usage; `GET /skills/audit` |
+| `desktop_ipc_version` | `0.1` (preview) | electron-vite + React 18; contextBridge exposes sidecar, updater, and theme APIs; NSIS installer configured |

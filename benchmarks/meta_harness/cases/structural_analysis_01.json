@@ -1,0 +1,18 @@
+{
+  "case_id": "structural_analysis_01",
+  "category": "structural_analysis",
+  "description": "Time series data should route to A-12-FORECAST",
+  "request": {
+    "problem_statement": "Forecast next quarter revenue from historical data",
+    "data": {"series": [10, 20, 30, 40, 50, 60]},
+    "params": {}
+  },
+  "expected": {
+    "should_select_method": "A-12-FORECAST",
+    "should_detect_overclaim": false,
+    "should_surface_risks": true,
+    "min_risk_count": 1,
+    "should_be_degraded": false,
+    "evidence_grade_max": "CE-C1"
+  }
+}

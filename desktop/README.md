@@ -1,52 +1,25 @@
-# PycHermesAgent desktop shell (preview)
+# PycHermesAgent Desktop
 
-Engineering-preview **Electron** wrapper around the **Python sidecar** (`pyc-hermes-sidecar`). It does not bundle Python; it displays `/health` (summary + raw JSON) and key paths from **`GET /runtime-paths`**. **File → Open logs folder / Open local data folder** uses `shell.openPath` when paths are available. **View → Refresh sidecar status** (Ctrl+R / Cmd+R) re-probes the sidecar without restarting the desktop app.
+React + Electron desktop shell for PycHermesAgent, built with electron-vite.
 
-## Prerequisites
-
-- Node.js 20+
-- Python environment with `pyc-hermes-sidecar` on PATH (or use `PYC_HERMES_SIDECAR_CMD`)
-
-## Run
-
-Terminal A (repo root, virtualenv active):
+## Development
 
 ```bash
-pyc-hermes-sidecar --host 127.0.0.1 --port 8765
-```
-
-Terminal B:
-
-```bash
-cd desktop
 npm install
-npm start
+npm run dev
 ```
 
-## Environment
-
-| Variable | Meaning |
-|----------|---------|
-| `PYC_HERMES_SIDECAR_URL` | Base URL of the sidecar (default `http://127.0.0.1:8765`) |
-| `PYC_HERMES_SIDECAR_CMD` | Optional command to spawn the sidecar before opening the window (advanced). Split on whitespace: first token = executable, rest = args. **No shell** unless overridden (see below). |
-| `PYC_HERMES_SIDECAR_USE_SHELL` | Set to `1` to run **`PYC_HERMES_SIDECAR_CMD` through the system shell** (`shell: true`). Required for complex invocations (e.g. quoted paths); **increases command-injection risk** if the environment is untrusted — prefer argv-style cmd without this flag. |
-
-## Sidecar URL without environment (optional)
-
-Resolution order: **`PYC_HERMES_SIDECAR_URL`** (if set) → plain-text file **`sidecar_url.txt`** in the Electron **user data** directory (first non-empty, non-`#` line, full URL) → default `http://127.0.0.1:8765`.
-
-From the app menu use **View → Open desktop config folder**, then create or edit `sidecar_url.txt`, or use **View → Create sidecar_url.txt template…** once to drop a commented default file. **View → Copy resolved sidecar URL** (Ctrl+Shift+C / Cmd+Shift+C) copies the URL that the shell will probe (env wins over file). Restart is not required: **View → Refresh** reloads the file.
-
-On first connect failure the shell **retries up to 5 times** with increasing delay (linear: `baseMs * (1..5)`; helps if the sidecar starts slightly after the desktop window).
-
-## Packaged directory build (CI / local smoke)
-
-`electron-builder` can emit an **unpackaged** application directory (no installer, no signing):
+## Build
 
 ```bash
-cd desktop
-npm ci
-npm run dist:dir   # output under desktop/dist/<platform>-unpacked
+npm run build
+npm run dist:dir   # unpacked build for testing
+npm run dist       # full installer
 ```
 
-Full installers, code signing, and auto-update are **out of scope** for this preview; see `docs/constraints/windows-packaging.md`, `docs/deployment/Production_Release_Gates.md`, and governance documents.
+## Architecture
+
+- `electron/main.js` — Electron main process, sidecar health probe
+- `electron/preload.js` — contextBridge IPC exposure
+- `src/` — React renderer (Vite + Tailwind)
+- `electron.vite.config.js` — electron-vite build configuration

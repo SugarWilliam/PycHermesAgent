@@ -1,0 +1,18 @@
+{
+  "case_id": "risk_boundary_04",
+  "category": "risk_boundary",
+  "description": "Correlational phrasing that should NOT be treated as causal — predictive only",
+  "request": {
+    "problem_statement": "forecast next month sales from time series, this is correlational not causal",
+    "data": {"series": [5, 10, 15, 20]},
+    "params": {}
+  },
+  "expected": {
+    "should_select_method": "A-12-FORECAST",
+    "should_detect_overclaim": false,
+    "should_surface_risks": true,
+    "min_risk_count": 1,
+    "should_be_degraded": false,
+    "evidence_grade_max": "CE-C1"
+  }
+}

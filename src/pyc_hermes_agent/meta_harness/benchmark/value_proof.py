@@ -56,8 +56,11 @@ def _default_cases() -> list[tuple[str, MetaAnalysisRequest]]:
             ),
         ),
         (
-            "team_dependency_visibility",
-            MetaAnalysisRequest(problem_statement="团队冲突与生产力分析"),
+            "dependency_visibility",
+            MetaAnalysisRequest(
+                problem_statement="complex system emergence entropy analysis",
+                data={"micro_states": [1, 2, 3]},
+            ),
         ),
         (
             "degraded_manual_review",
@@ -94,8 +97,8 @@ def run_value_proof_benchmark(
             guided_overclaim_detections += 1
         if case_id == "graph_shape_routing" and guided["formal_method_id"] == "A-22":
             graph_routes_a22 += 1
-        if case_id == "team_dependency_visibility" and any(
-            "org_personal_adapters" in item for item in guided["structured_risks"]
+        if case_id == "dependency_visibility" and any(
+            "complex_systems_adapters" in item for item in guided["structured_risks"]
         ):
             dependency_risk_surfaces += 1
         if guided["formal_method_id"] not in (None, "", "manual-review"):

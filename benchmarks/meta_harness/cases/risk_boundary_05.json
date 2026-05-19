@@ -1,0 +1,18 @@
+{
+  "case_id": "risk_boundary_05",
+  "category": "risk_boundary",
+  "description": "Request mentions graph but provides no adjacency data — should degrade or fallback",
+  "request": {
+    "problem_statement": "run network analysis on the graph",
+    "data": {},
+    "params": {}
+  },
+  "expected": {
+    "should_select_method": null,
+    "should_detect_overclaim": false,
+    "should_surface_risks": true,
+    "min_risk_count": 1,
+    "should_be_degraded": true,
+    "evidence_grade_max": "CE-C4"
+  }
+}

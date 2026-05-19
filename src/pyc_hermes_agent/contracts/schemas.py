@@ -106,6 +106,18 @@ class AgentLoopRequest:
     timeout_seconds: float = 30.0
     retry_attempts: int = 1
     max_iterations: int = 8
+    analysis_mode: str = "casual"
+
+    def __post_init__(self) -> None:
+        _allowed = ("casual", "structured", "formal")
+        if self.analysis_mode not in _allowed:
+            raise ValueError(
+                f"AgentLoopRequest.analysis_mode must be one of: {', '.join(_allowed)}"
+            )
+        if self.max_iterations < 1:
+            raise ValueError("AgentLoopRequest.max_iterations must be >= 1")
+        if self.retry_budget < 0:
+            raise ValueError("AgentLoopRequest.retry_budget must be >= 0")
 
 
 @dataclass(slots=True)
@@ -195,6 +207,12 @@ class MetaAnalysisRequest:
     target_sr_grade: str = ""
     # Optional routing overlays: keyword_boosts, data_shape_bonus, data_shape_rules, pin_method, …
     meta_routing: Dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.problem_statement, str) or not self.problem_statement.strip():
+            raise ValueError(
+                "MetaAnalysisRequest.problem_statement must be a non-empty string"
+            )
 
 
 @dataclass(slots=True)

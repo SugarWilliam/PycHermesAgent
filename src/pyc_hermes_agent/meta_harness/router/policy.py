@@ -28,9 +28,8 @@ from pyc_hermes_agent.contracts import MetaAnalysisRequest
 _BUILTIN_KEYWORD_BOOSTS: dict[str, tuple[str, ...]] = {
     "A-12-SCM": ("causal", "因果", "instrument", "backdoor", "did"),
     "A-12-FORECAST": ("forecast", "predict", "预测", "time series", "时序"),
-    "A-13": ("organization", "project", "组织", "项目", "churn", "evm"),
-    "A-14": ("personal", "habit", "learning", "个人", "习惯", "成长"),
-    "A-15": ("team", "conflict", "productivity", "团队", "冲突", "协作"),
+    # A-13/A-14/A-15 removed: org_personal_adapters live only in standalone
+    # pyc-MetaFramework. Re-enable when bridge supports lazy adapter loading.
     "A-18": ("complex", "emergence", "复杂系统", "涌现", "entropy"),
     "A-22": ("network", "传播", "拓扑", "pagerank", "percolation"),
     "A-23": ("agent-based", "abm", "schelling", "opinion", "智能体"),

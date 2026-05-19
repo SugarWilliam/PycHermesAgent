@@ -95,7 +95,7 @@ def test_sidecar_client_supports_core_in_process_api_calls(tmp_path) -> None:
 
 
 def test_sidecar_client_supports_agent_loop_in_process(monkeypatch, tmp_path) -> None:
-    from pyc_hermes_agent.sidecar_api import service as sidecar_service
+    from pyc_hermes_agent.sidecar_api.services import chat_service as _chat_svc
 
     class _FakeAgentLoop:
         def __init__(self, *, root=None):
@@ -116,7 +116,7 @@ def test_sidecar_client_supports_agent_loop_in_process(monkeypatch, tmp_path) ->
                 retry_count=0,
             )
 
-    monkeypatch.setattr(sidecar_service, "AgentLoop", _FakeAgentLoop)
+    monkeypatch.setattr(_chat_svc, "AgentLoop", _FakeAgentLoop)
     client = SidecarClient(root=tmp_path)
 
     result = client.run_agent_loop(
@@ -133,7 +133,7 @@ def test_sidecar_client_supports_agent_loop_in_process(monkeypatch, tmp_path) ->
 
 
 def test_sidecar_client_passes_retry_budget_in_process(monkeypatch, tmp_path) -> None:
-    from pyc_hermes_agent.sidecar_api import service as sidecar_service
+    from pyc_hermes_agent.sidecar_api.services import chat_service as _chat_svc
 
     class _FakeAgentLoop:
         def __init__(self, *, root=None):
@@ -154,7 +154,7 @@ def test_sidecar_client_passes_retry_budget_in_process(monkeypatch, tmp_path) ->
                 retry_count=1,
             )
 
-    monkeypatch.setattr(sidecar_service, "AgentLoop", _FakeAgentLoop)
+    monkeypatch.setattr(_chat_svc, "AgentLoop", _FakeAgentLoop)
     client = SidecarClient(root=tmp_path)
 
     result = client.run_agent_loop(
@@ -172,7 +172,7 @@ def test_sidecar_client_passes_retry_budget_in_process(monkeypatch, tmp_path) ->
 
 
 def test_sidecar_client_streams_agent_loop_in_process(monkeypatch, tmp_path) -> None:
-    from pyc_hermes_agent.sidecar_api import service as sidecar_service
+    from pyc_hermes_agent.sidecar_api.services import chat_service as _chat_svc
 
     class _FakeAgentLoop:
         def __init__(self, *, root=None):
@@ -212,7 +212,7 @@ def test_sidecar_client_streams_agent_loop_in_process(monkeypatch, tmp_path) -> 
                 payload={"result": AgentLoopResult(session_id=session_id or "session-1", model=request.model, content="Hello")},
             )
 
-    monkeypatch.setattr(sidecar_service, "AgentLoop", _FakeAgentLoop)
+    monkeypatch.setattr(_chat_svc, "AgentLoop", _FakeAgentLoop)
     client = SidecarClient(root=tmp_path)
 
     events = list(

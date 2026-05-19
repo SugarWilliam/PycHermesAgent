@@ -1,0 +1,18 @@
+{
+  "case_id": "structural_analysis_05",
+  "category": "structural_analysis",
+  "description": "Agent population data should route to A-23",
+  "request": {
+    "problem_statement": "Simulate opinion dynamics with agent-based model",
+    "data": {"agents": 50, "agent_count": 50, "population": 50},
+    "params": {}
+  },
+  "expected": {
+    "should_select_method": "A-23",
+    "should_detect_overclaim": false,
+    "should_surface_risks": true,
+    "min_risk_count": 1,
+    "should_be_degraded": false,
+    "evidence_grade_max": "CE-C1"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "case_id": "fact_integration_02",
+  "category": "fact_integration",
+  "description": "User states 100% caused by factor X — overclaim on causal DAG analysis",
+  "request": {
+    "problem_statement": "Factor X 100% caused the outcome; build the causal DAG",
+    "data": {"cause": "X", "effect": "Y", "confounders": ["Z"]},
+    "params": {}
+  },
+  "expected": {
+    "should_select_method": "A-12-SCM",
+    "should_detect_overclaim": true,
+    "should_surface_risks": true,
+    "min_risk_count": 1,
+    "should_be_degraded": false,
+    "evidence_grade_max": "CE-C2"
+  }
+}

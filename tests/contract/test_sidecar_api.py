@@ -420,13 +420,13 @@ def test_sidecar_formal_analysis_invocation() -> None:
 
 
 def test_sidecar_formal_analysis_returns_standard_error_response_on_failure(monkeypatch) -> None:
-    from pyc_hermes_agent.sidecar_api import service as sidecar_service
+    from pyc_hermes_agent.sidecar_api.services import meta_service as _meta_svc
 
     class _FailingFramework:
         def execute(self, request):
             raise RuntimeError("analysis exploded")
 
-    monkeypatch.setattr(sidecar_service, "MetaFramework", lambda: _FailingFramework())
+    monkeypatch.setattr(_meta_svc, "MetaFramework", lambda: _FailingFramework())
 
     response = invoke_formal_analysis(
         MetaAnalysisRequest(
@@ -480,10 +480,10 @@ def test_sidecar_agent_loop_runs_formal_analysis_tool() -> None:
                 raw_response={"choices": []},
             )
 
-    from pyc_hermes_agent.sidecar_api import service as sidecar_service
+    from pyc_hermes_agent.sidecar_api.services import chat_service as _chat_svc
 
-    original = sidecar_service.AgentLoop
-    sidecar_service.AgentLoop = _FakeAgentLoop
+    original = _chat_svc.AgentLoop
+    _chat_svc.AgentLoop = _FakeAgentLoop
     try:
         response = run_agent_loop(
             AgentLoopRequest(
@@ -493,7 +493,7 @@ def test_sidecar_agent_loop_runs_formal_analysis_tool() -> None:
             )
         )
     finally:
-        sidecar_service.AgentLoop = original
+        _chat_svc.AgentLoop = original
 
     assert response["session_id"] == "session-1"
     assert response["provider_id"] == "openai-compatible"
@@ -521,10 +521,10 @@ def test_sidecar_passes_activated_skills_to_agent_loop() -> None:
                 iterations=1,
             )
 
-    from pyc_hermes_agent.sidecar_api import service as sidecar_service
+    from pyc_hermes_agent.sidecar_api.services import chat_service as _chat_svc
 
-    original = sidecar_service.AgentLoop
-    sidecar_service.AgentLoop = _FakeAgentLoop
+    original = _chat_svc.AgentLoop
+    _chat_svc.AgentLoop = _FakeAgentLoop
     try:
         response = run_agent_loop(
             AgentLoopRequest(
@@ -535,7 +535,7 @@ def test_sidecar_passes_activated_skills_to_agent_loop() -> None:
             )
         )
     finally:
-        sidecar_service.AgentLoop = original
+        _chat_svc.AgentLoop = original
 
     assert response["content"] == "Skill active."
 
@@ -580,10 +580,10 @@ def test_sidecar_agent_loop_streams_events() -> None:
                 payload={"result": AgentLoopResult(session_id=session_id or "session-1", model=request.model, content="Hello")},
             )
 
-    from pyc_hermes_agent.sidecar_api import service as sidecar_service
+    from pyc_hermes_agent.sidecar_api.services import chat_service as _chat_svc
 
-    original = sidecar_service.AgentLoop
-    sidecar_service.AgentLoop = _FakeAgentLoop
+    original = _chat_svc.AgentLoop
+    _chat_svc.AgentLoop = _FakeAgentLoop
     try:
         events = list(
             stream_agent_loop(
@@ -595,7 +595,7 @@ def test_sidecar_agent_loop_streams_events() -> None:
             )
         )
     finally:
-        sidecar_service.AgentLoop = original
+        _chat_svc.AgentLoop = original
 
     assert events[0]["event"] == "start"
     assert events[0]["event_id"] == "event-1"
@@ -634,10 +634,10 @@ def test_sidecar_agent_loop_stream_logs_finished_metadata(monkeypatch) -> None:
                 payload={"result": AgentLoopResult(session_id=session_id or "session-1", model=request.model, content="Hello")},
             )
 
-    from pyc_hermes_agent.sidecar_api import service as sidecar_service
+    from pyc_hermes_agent.sidecar_api.services import chat_service as _chat_svc
 
-    monkeypatch.setattr(sidecar_service, "AgentLoop", _FakeAgentLoop)
-    monkeypatch.setattr(sidecar_service, "log_event", lambda event, **fields: log_calls.append((event, fields)))
+    monkeypatch.setattr(_chat_svc, "AgentLoop", _FakeAgentLoop)
+    monkeypatch.setattr(_chat_svc, "log_event", lambda event, **fields: log_calls.append((event, fields)))
 
     events = list(
         stream_agent_loop(
@@ -670,10 +670,10 @@ def test_sidecar_agent_loop_stream_logs_failed_metadata_for_fallback_error(monke
         def stream(self, request, *, max_iterations=8, session_id=None, planning_enabled=True, retry_budget=1):
             raise RuntimeError("stream exploded")
 
-    from pyc_hermes_agent.sidecar_api import service as sidecar_service
+    from pyc_hermes_agent.sidecar_api.services import chat_service as _chat_svc
 
-    monkeypatch.setattr(sidecar_service, "AgentLoop", _FakeAgentLoop)
-    monkeypatch.setattr(sidecar_service, "log_event", lambda event, **fields: log_calls.append((event, fields)))
+    monkeypatch.setattr(_chat_svc, "AgentLoop", _FakeAgentLoop)
+    monkeypatch.setattr(_chat_svc, "log_event", lambda event, **fields: log_calls.append((event, fields)))
 
     events = list(
         stream_agent_loop(

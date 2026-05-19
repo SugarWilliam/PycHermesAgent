@@ -2,9 +2,10 @@
 
 ## Metadata
 - Date: 2026-05-26
-- Version: v0.2.1
+- Version: v0.3.0
 - Author: 彭耀成
 - Phase 1 (engineering preview): **roadmap complete** for declared scope — see `docs/architecture/Phase1_Roadmap_v0.2.0.md` §10 (not production).
+- Phase 2 (usable workbench): **complete** — see `docs/architecture/Phase2_Toward_GA_v0.2.1.md` (not production).
 
 ## Project Identity
 - Product name: `PycHermesAgent`

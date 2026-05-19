@@ -1,50 +1,79 @@
 {
   "name": "pyc-hermes-desktop",
-  "private": true,
-  "version": "0.2.1",
-  "description": "Minimal Electron shell for the PycHermesAgent Python sidecar (engineering preview)",
-  "type": "module",
-  "main": "main.mjs",
+  "version": "0.3.0",
+  "description": "PycHermesAgent Electron Desktop Shell",
+  "main": "./out/main/index.js",
   "scripts": {
-    "start": "electron .",
-    "dist:dir": "electron-builder --dir",
-    "dist": "electron-builder",
-    "dist:linux": "electron-builder --linux"
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "pack": "electron-vite build && electron-builder --dir",
+    "dist": "electron-vite build && electron-builder",
+    "dist:win": "electron-vite build && electron-builder --win"
   },
-  "engines": {
-    "node": ">=20"
+  "dependencies": {
+    "electron-updater": "^6.3.9",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-markdown": "^9.0.1",
+    "remark-gfm": "^4.0.0",
+    "remark-math": "^6.0.0",
+    "rehype-katex": "^7.0.1",
+    "katex": "^0.16.11",
+    "shiki": "^1.0.0",
+    "mermaid": "^11.0.2",
+    "echarts": "^5.5.1",
+    "echarts-for-react": "^3.0.2",
+    "zustand": "^4.5.5",
+    "tailwindcss": "^3.4.14",
+    "@radix-ui/react-dialog": "^1.0.5",
+    "@radix-ui/react-tabs": "^1.0.4",
+    "@radix-ui/react-scroll-area": "^1.0.5"
   },
   "devDependencies": {
     "electron": "^33.2.0",
-    "electron-builder": "^25.1.8"
+    "electron-vite": "^2.3.0",
+    "electron-builder": "^25.1.8",
+    "vite": "^5.4.11",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47"
   },
   "build": {
-    "appId": "com.pyc.hermes.agent",
+    "appId": "com.pyc.hermes-agent",
     "productName": "PycHermesAgent",
     "directories": {
-      "output": "dist"
+      "output": "dist-installer"
     },
-    "files": [
-      "main.mjs",
-      "package.json"
-    ],
-    "asar": true,
     "win": {
       "target": [
-        "dir"
-      ]
-    },
-    "linux": {
-      "target": [
-        "dir",
-        "zip"
+        { "target": "nsis", "arch": ["x64"] }
       ],
-      "category": "Utility"
+      "icon": "build/icon.ico"
     },
-    "mac": {
-      "target": [
-        "dir"
-      ]
-    }
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "pychermes",
+        "repo": "PycHermesAgent"
+      }
+    ],
+    "files": [
+      "out/**/*",
+      "!node_modules/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../packaging/windows/",
+        "to": "sidecar",
+        "filter": ["*.exe", "*.dll"]
+      }
+    ]
   }
 }

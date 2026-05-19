@@ -1,0 +1,18 @@
+{
+  "case_id": "fact_integration_01",
+  "category": "fact_integration",
+  "description": "User claims proven causation with certainty — MetaHarness should detect overclaim language",
+  "request": {
+    "problem_statement": "We proved causation with certainty that marketing spend drives revenue",
+    "data": {"series": [100, 200, 300, 400]},
+    "params": {}
+  },
+  "expected": {
+    "should_select_method": "A-12-FORECAST",
+    "should_detect_overclaim": true,
+    "should_surface_risks": true,
+    "min_risk_count": 1,
+    "should_be_degraded": false,
+    "evidence_grade_max": "CE-C2"
+  }
+}

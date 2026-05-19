@@ -1,0 +1,18 @@
+{
+  "case_id": "fact_integration_04",
+  "category": "fact_integration",
+  "description": "Chinese overclaim phrase in agent-based model context",
+  "request": {
+    "problem_statement": "铁证表明agent-based模型可以完美预测市场崩溃",
+    "data": {"agents": 100, "agent_count": 100},
+    "params": {}
+  },
+  "expected": {
+    "should_select_method": "A-23",
+    "should_detect_overclaim": true,
+    "should_surface_risks": true,
+    "min_risk_count": 1,
+    "should_be_degraded": false,
+    "evidence_grade_max": "CE-C2"
+  }
+}

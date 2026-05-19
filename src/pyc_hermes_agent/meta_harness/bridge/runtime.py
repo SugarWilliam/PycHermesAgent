@@ -10,7 +10,16 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any, Dict, Iterator, Optional
 
-import numpy as np
+def _get_numpy():
+    """Lazy-load numpy only when bridge fallback execution actually needs it."""
+    try:
+        import numpy as np
+        return np
+    except ImportError:
+        raise ImportError(
+            "numpy is required for legacy bridge execution. "
+            "Install with: pip install numpy>=1.26"
+        )
 
 
 # Keep the MVP bridge limited to legacy surfaces with stable local contracts or
@@ -307,6 +316,7 @@ class LegacyMetaBridge:
             }
 
     def _run_network_fallback(self, data: Dict[str, Any], params: Dict[str, Any], error: Optional[str]) -> Dict[str, Any]:
+        np = _get_numpy()
         analysis = params.get("analysis", "percolation")
         adjacency = data.get("adjacency_matrix", data.get("adjacency"))
         adjacency = np.asarray(adjacency if adjacency is not None else [], dtype=float)
@@ -333,7 +343,8 @@ class LegacyMetaBridge:
             "adapter_id": "A-22",
         }
 
-    def _network_pagerank_fallback(self, adjacency: np.ndarray, params: Dict[str, Any], error: Optional[str]) -> Dict[str, Any]:
+    def _network_pagerank_fallback(self, adjacency: "np.ndarray", params: Dict[str, Any], error: Optional[str]) -> Dict[str, Any]:
+        np = _get_numpy()
         n = adjacency.shape[0]
         damping = float(params.get("damping", 0.85))
         tol = float(params.get("tolerance", 1e-6))
@@ -368,7 +379,8 @@ class LegacyMetaBridge:
             result["warning"] = f"Legacy adapter unavailable, used numpy fallback: {error}"
         return result
 
-    def _network_percolation_fallback(self, adjacency: np.ndarray, params: Dict[str, Any], error: Optional[str]) -> Dict[str, Any]:
+    def _network_percolation_fallback(self, adjacency: "np.ndarray", params: Dict[str, Any], error: Optional[str]) -> Dict[str, Any]:
+        np = _get_numpy()
         n = adjacency.shape[0]
         n_removals = int(params.get("n_removals", min(max(n - 1, 1), 50)))
         n_trials = int(params.get("n_trials", 25))
@@ -404,7 +416,8 @@ class LegacyMetaBridge:
             result["warning"] = f"Legacy adapter unavailable, used numpy fallback: {error}"
         return result
 
-    def _network_cascade_fallback(self, adjacency: np.ndarray, params: Dict[str, Any], error: Optional[str]) -> Dict[str, Any]:
+    def _network_cascade_fallback(self, adjacency: "np.ndarray", params: Dict[str, Any], error: Optional[str]) -> Dict[str, Any]:
+        np = _get_numpy()
         n = adjacency.shape[0]
         degree = np.sum(adjacency > 0, axis=1)
         capacity_factor = float(params.get("capacity_factor", 1.5))
@@ -448,7 +461,8 @@ class LegacyMetaBridge:
             result["warning"] = f"Legacy adapter unavailable, used numpy fallback: {error}"
         return result
 
-    def _network_sir_fallback(self, adjacency: np.ndarray, params: Dict[str, Any], error: Optional[str]) -> Dict[str, Any]:
+    def _network_sir_fallback(self, adjacency: "np.ndarray", params: Dict[str, Any], error: Optional[str]) -> Dict[str, Any]:
+        np = _get_numpy()
         n = adjacency.shape[0]
         beta = float(params.get("beta", 0.3))
         gamma = float(params.get("gamma", 0.1))
@@ -500,7 +514,8 @@ class LegacyMetaBridge:
         return result
 
     @staticmethod
-    def _largest_component_size(adj: np.ndarray) -> int:
+    def _largest_component_size(adj: "np.ndarray") -> int:
+        np = _get_numpy()
         n = adj.shape[0]
         visited = np.zeros(n, dtype=bool)
         max_size = 0
@@ -521,7 +536,8 @@ class LegacyMetaBridge:
         return max_size
 
     @staticmethod
-    def _gini_coefficient(values: np.ndarray) -> float:
+    def _gini_coefficient(values: "np.ndarray") -> float:
+        np = _get_numpy()
         x = np.sort(values)
         n = len(x)
         cumsum = np.cumsum(x)

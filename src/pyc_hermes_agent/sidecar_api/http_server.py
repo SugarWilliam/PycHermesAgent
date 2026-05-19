@@ -44,6 +44,7 @@ from pyc_hermes_agent.sidecar_api.service import (
     get_meta_harness_value_proof_benchmark,
     get_runtime_paths_snapshot,
     ingest_file_document,
+    ingest_pdf_document,
     ingest_text_document,
     ingest_url_document,
     invoke_chat_completion,
@@ -62,15 +63,37 @@ from pyc_hermes_agent.sidecar_api.service import (
     stream_agent_loop,
     stream_chat_completion,
 )
+from pyc_hermes_agent.sidecar_api.services.skill_service import (
+    activate_skill,
+    deactivate_skill,
+    list_builtin_skills,
+)
 
 
 _ARTIFACTS_PATTERN = re.compile(r"^/artifacts(?:/task/(.+))?$")
+_SKILL_ACTIVATE_PATTERN = re.compile(r"^/skills/([^/]+)/activate$")
+_SKILL_DEACTIVATE_PATTERN = re.compile(r"^/skills/([^/]+)/deactivate$")
 
 _KB_DOCUMENT_TEXT_PATTERN = re.compile(r"^/knowledge-bases/([^/]+)/documents/text$")
 _KB_DOCUMENT_FILE_PATTERN = re.compile(r"^/knowledge-bases/([^/]+)/documents/file$")
+_KB_DOCUMENT_PDF_PATTERN = re.compile(r"^/knowledge-bases/([^/]+)/documents/pdf$")
 _KB_DOCUMENT_URL_PATTERN = re.compile(r"^/knowledge-bases/([^/]+)/documents/url$")
 _KB_SEARCH_PATTERN = re.compile(r"^/knowledge-bases/([^/]+)/search$")
 _KB_REBUILD_INDEX_PATTERN = re.compile(r"^/knowledge-bases/([^/]+)/rebuild-index$")
+
+
+def _get_skills_audit() -> dict[str, Any]:
+    from pyc_hermes_agent.hermes_engine.skills.audit import SkillAuditor
+    from pyc_hermes_agent.common.runtime_paths import resolve_runtime_paths
+
+    storage_path = resolve_runtime_paths().config_dir / "skill_audit.json"
+    auditor = SkillAuditor(storage_path=storage_path)
+    auditor.load()
+    from dataclasses import asdict
+    return {
+        "entries": [asdict(e) for e in auditor.get_recent_entries()],
+        "usage_counts": auditor.get_usage_counts(),
+    }
 
 
 def _get_or_bad_gateway(
@@ -130,6 +153,12 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802
         self._dispatch("POST")
 
+    def do_PUT(self) -> None:  # noqa: N802
+        self._dispatch("PUT")
+
+    def do_DELETE(self) -> None:  # noqa: N802
+        self._dispatch("DELETE")
+
     def log_message(self, format: str, *args: object) -> None:
         return None
 
@@ -143,6 +172,10 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
                 payload, status = self._handle_get(path)
             elif method == "POST":
                 payload, status = self._handle_post(path, self._read_json_body())
+            elif method == "PUT":
+                payload, status = self._handle_put(path, self._read_json_body())
+            elif method == "DELETE":
+                payload, status = self._handle_delete(path)
             else:
                 raise ValueError(f"Unsupported method: {method}")
         except json.JSONDecodeError as exc:
@@ -321,9 +354,12 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
                 )
         if path == "/health":
             try:
-                health = get_health(root)
-                self._log_health_transition(health)
-                return health, HTTPStatus.OK
+                from pyc_hermes_agent.sidecar_api.health import SidecarHealth
+
+                sidecar_health = SidecarHealth.evaluate(root=root)
+                health_payload = sidecar_health.to_dict(root=root)
+                self._log_health_transition(health_payload)
+                return health_payload, HTTPStatus.OK
             except Exception as exc:
                 return (
                     make_error_response(
@@ -373,8 +409,15 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
             )
         if path == "/skills":
             return _get_or_bad_gateway(
-                lambda: {"items": list_skills(root)},
+                lambda: {"items": list_skills(root), "builtin": list_builtin_skills()},
                 code="SKILL_LIST_FAILED",
+                domain=DOMAIN_INTERNAL,
+                details={},
+            )
+        if path == "/skills/audit":
+            return _get_or_bad_gateway(
+                lambda: _get_skills_audit(),
+                code="SKILL_AUDIT_FAILED",
                 domain=DOMAIN_INTERNAL,
                 details={},
             )
@@ -451,9 +494,23 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
                 domain=DOMAIN_MRAG,
                 details={},
             )
+        if path == "/preferences":
+            from pyc_hermes_agent.sidecar_api.services.memory_service import get_preferences
+
+            return get_preferences(root), HTTPStatus.OK
         raise KeyError(f"Unknown route: {path}")
 
     def _handle_post(self, path: str, payload: dict[str, Any]) -> tuple[dict[str, Any] | None, HTTPStatus]:
+        activate_match = _SKILL_ACTIVATE_PATTERN.fullmatch(path)
+        if activate_match:
+            skill_id = unquote(activate_match.group(1))
+            return activate_skill(skill_id), HTTPStatus.OK
+
+        deactivate_match = _SKILL_DEACTIVATE_PATTERN.fullmatch(path)
+        if deactivate_match:
+            skill_id = unquote(deactivate_match.group(1))
+            return deactivate_skill(skill_id), HTTPStatus.OK
+
         if path == "/formal-analysis":
             response = invoke_formal_analysis(MetaAnalysisRequest(**payload))
             status = HTTPStatus.OK if "error" not in response else HTTPStatus.BAD_GATEWAY
@@ -533,6 +590,23 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
                 HTTPStatus.CREATED,
             )
 
+        pdf_match = _KB_DOCUMENT_PDF_PATTERN.fullmatch(path)
+        if pdf_match:
+            knowledge_base_id = unquote(pdf_match.group(1))
+            raw_path = payload.get("path", "")
+            if not isinstance(raw_path, str) or not raw_path.strip():
+                raise ValueError("Field 'path' is required.")
+            title = payload.get("title", "")
+            return (
+                ingest_pdf_document(
+                    knowledge_base_id,
+                    raw_path.strip(),
+                    title=title if isinstance(title, str) else "",
+                    root=self._server_root(),
+                ),
+                HTTPStatus.CREATED,
+            )
+
         url_match = _KB_DOCUMENT_URL_PATTERN.fullmatch(path)
         if url_match:
             knowledge_base_id = unquote(url_match.group(1))
@@ -561,6 +635,20 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
 
         raise KeyError(f"Unknown route: {path}")
 
+    def _handle_put(self, path: str, payload: dict[str, Any]) -> tuple[dict[str, Any], HTTPStatus]:
+        if path == "/preferences":
+            from pyc_hermes_agent.sidecar_api.services.memory_service import update_preferences
+
+            return update_preferences(self._server_root(), payload), HTTPStatus.OK
+        raise KeyError(f"Unknown route: {path}")
+
+    def _handle_delete(self, path: str) -> tuple[dict[str, Any], HTTPStatus]:
+        if path == "/preferences":
+            from pyc_hermes_agent.sidecar_api.services.memory_service import reset_preferences
+
+            return reset_preferences(self._server_root()), HTTPStatus.OK
+        raise KeyError(f"Unknown route: {path}")
+
     def _normalized_path(self) -> str:
         path = urlparse(self.path).path.rstrip("/")
         return path or "/"
@@ -585,7 +673,7 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
         return cast(SidecarHTTPServer, self.server).root
 
     def _log_health_transition(self, health: dict[str, Any]) -> None:
-        status_label = health.get("status_label")
+        status_label = health.get("status_label") or health.get("state")
         if not isinstance(status_label, str) or not status_label:
             return
         previous_status_label = cast(SidecarHTTPServer, self.server).remember_health_status(status_label)

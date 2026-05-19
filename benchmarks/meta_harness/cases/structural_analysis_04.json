@@ -1,0 +1,18 @@
+{
+  "case_id": "structural_analysis_04",
+  "category": "structural_analysis",
+  "description": "Micro-state data should route to A-18 complex systems",
+  "request": {
+    "problem_statement": "Analyze emergence patterns in system state space",
+    "data": {"micro_states": [0, 1, 0, 1, 1, 0, 1]},
+    "params": {}
+  },
+  "expected": {
+    "should_select_method": "A-18",
+    "should_detect_overclaim": false,
+    "should_surface_risks": true,
+    "min_risk_count": 1,
+    "should_be_degraded": false,
+    "evidence_grade_max": "CE-C1"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "case_id": "structural_analysis_03",
+  "category": "structural_analysis",
+  "description": "Causal DAG with treatment/outcome should route to A-12-SCM",
+  "request": {
+    "problem_statement": "Estimate causal effect of treatment on outcome using backdoor adjustment",
+    "data": {"treatment": "drug_a", "outcome": "recovery", "confounders": ["age", "severity"]},
+    "params": {}
+  },
+  "expected": {
+    "should_select_method": "A-12-SCM",
+    "should_detect_overclaim": false,
+    "should_surface_risks": true,
+    "min_risk_count": 1,
+    "should_be_degraded": false,
+    "evidence_grade_max": "CE-C1"
+  }
+}

@@ -387,13 +387,13 @@ def test_sidecar_http_server_runs_meta_harness_value_proof(tmp_path) -> None:
 
 
 def test_sidecar_http_server_returns_error_status_for_failed_formal_analysis(tmp_path, monkeypatch) -> None:
-    from pyc_hermes_agent.sidecar_api import service as sidecar_service
+    from pyc_hermes_agent.sidecar_api.services import meta_service as _meta_svc
 
     class _FailingFramework:
         def execute(self, request):
             raise RuntimeError("analysis exploded")
 
-    monkeypatch.setattr(sidecar_service, "MetaFramework", lambda: _FailingFramework())
+    monkeypatch.setattr(_meta_svc, "MetaFramework", lambda: _FailingFramework())
     server, thread = _start_server(root=tmp_path)
     base_url = f"http://127.0.0.1:{server.server_address[1]}"
 
@@ -512,7 +512,7 @@ def test_sidecar_http_server_honors_incoming_request_id(tmp_path, monkeypatch) -
 
 
 def test_sidecar_http_server_sets_request_id_header_on_sse(tmp_path, monkeypatch) -> None:
-    from pyc_hermes_agent.sidecar_api import service as sidecar_service
+    from pyc_hermes_agent.sidecar_api.services import chat_service as _chat_svc
 
     class _FakeAgentLoop:
         def __init__(self, *, root=None):
@@ -532,7 +532,7 @@ def test_sidecar_http_server_sets_request_id_header_on_sse(tmp_path, monkeypatch
                 content="Hello",
             )
 
-    monkeypatch.setattr(sidecar_service, "AgentLoop", _FakeAgentLoop)
+    monkeypatch.setattr(_chat_svc, "AgentLoop", _FakeAgentLoop)
     server, thread = _start_server(root=tmp_path)
     base_url = f"http://127.0.0.1:{server.server_address[1]}"
 
@@ -556,7 +556,7 @@ def test_sidecar_http_server_sets_request_id_header_on_sse(tmp_path, monkeypatch
 
 
 def test_sidecar_http_server_adds_request_id_to_sse_events(tmp_path, monkeypatch) -> None:
-    from pyc_hermes_agent.sidecar_api import service as sidecar_service
+    from pyc_hermes_agent.sidecar_api.services import chat_service as _chat_svc
 
     class _FakeAgentLoop:
         def __init__(self, *, root=None):
@@ -583,7 +583,7 @@ def test_sidecar_http_server_adds_request_id_to_sse_events(tmp_path, monkeypatch
                 model=request.model,
             )
 
-    monkeypatch.setattr(sidecar_service, "AgentLoop", _FakeAgentLoop)
+    monkeypatch.setattr(_chat_svc, "AgentLoop", _FakeAgentLoop)
     server, thread = _start_server(root=tmp_path)
     base_url = f"http://127.0.0.1:{server.server_address[1]}"
     request_id = "req-sse-client-456"
@@ -606,7 +606,7 @@ def test_sidecar_http_server_adds_request_id_to_sse_events(tmp_path, monkeypatch
 
 
 def test_sidecar_http_server_runs_agent_loop(tmp_path, monkeypatch) -> None:
-    from pyc_hermes_agent.sidecar_api import service as sidecar_service
+    from pyc_hermes_agent.sidecar_api.services import chat_service as _chat_svc
 
     class _FakeAgentLoop:
         def __init__(self, *, root=None):
@@ -627,7 +627,7 @@ def test_sidecar_http_server_runs_agent_loop(tmp_path, monkeypatch) -> None:
                 retry_count=0,
             )
 
-    monkeypatch.setattr(sidecar_service, "AgentLoop", _FakeAgentLoop)
+    monkeypatch.setattr(_chat_svc, "AgentLoop", _FakeAgentLoop)
     server, thread = _start_server(root=tmp_path)
     base_url = f"http://127.0.0.1:{server.server_address[1]}"
 
@@ -1101,7 +1101,7 @@ def test_sidecar_client_supports_core_http_api_calls(tmp_path) -> None:
 
 
 def test_sidecar_client_supports_agent_loop_over_http(tmp_path, monkeypatch) -> None:
-    from pyc_hermes_agent.sidecar_api import service as sidecar_service
+    from pyc_hermes_agent.sidecar_api.services import chat_service as _chat_svc
 
     class _FakeAgentLoop:
         def __init__(self, *, root=None):
@@ -1122,7 +1122,7 @@ def test_sidecar_client_supports_agent_loop_over_http(tmp_path, monkeypatch) -> 
                 retry_count=0,
             )
 
-    monkeypatch.setattr(sidecar_service, "AgentLoop", _FakeAgentLoop)
+    monkeypatch.setattr(_chat_svc, "AgentLoop", _FakeAgentLoop)
     server, thread = _start_server(root=tmp_path)
     base_url = f"http://127.0.0.1:{server.server_address[1]}"
     client = SidecarClient(base_url=base_url)
@@ -1146,7 +1146,7 @@ def test_sidecar_client_supports_agent_loop_over_http(tmp_path, monkeypatch) -> 
 
 
 def test_sidecar_http_server_passes_retry_budget_to_agent_loop(tmp_path, monkeypatch) -> None:
-    from pyc_hermes_agent.sidecar_api import service as sidecar_service
+    from pyc_hermes_agent.sidecar_api.services import chat_service as _chat_svc
 
     class _FakeAgentLoop:
         def __init__(self, *, root=None):
@@ -1167,7 +1167,7 @@ def test_sidecar_http_server_passes_retry_budget_to_agent_loop(tmp_path, monkeyp
                 retry_count=1,
             )
 
-    monkeypatch.setattr(sidecar_service, "AgentLoop", _FakeAgentLoop)
+    monkeypatch.setattr(_chat_svc, "AgentLoop", _FakeAgentLoop)
     server, thread = _start_server(root=tmp_path)
     base_url = f"http://127.0.0.1:{server.server_address[1]}"
 
@@ -1192,7 +1192,7 @@ def test_sidecar_http_server_passes_retry_budget_to_agent_loop(tmp_path, monkeyp
 
 
 def test_sidecar_http_server_streams_agent_loop_events(tmp_path, monkeypatch) -> None:
-    from pyc_hermes_agent.sidecar_api import service as sidecar_service
+    from pyc_hermes_agent.sidecar_api.services import chat_service as _chat_svc
 
     class _FakeAgentLoop:
         def __init__(self, *, root=None):
@@ -1233,7 +1233,7 @@ def test_sidecar_http_server_streams_agent_loop_events(tmp_path, monkeypatch) ->
                 payload={"result": AgentLoopResult(session_id=session_id or "session-1", model=request.model, content="Hello")},
             )
 
-    monkeypatch.setattr(sidecar_service, "AgentLoop", _FakeAgentLoop)
+    monkeypatch.setattr(_chat_svc, "AgentLoop", _FakeAgentLoop)
     server, thread = _start_server(root=tmp_path)
     base_url = f"http://127.0.0.1:{server.server_address[1]}"
 
@@ -1262,7 +1262,7 @@ def test_sidecar_http_server_streams_agent_loop_events(tmp_path, monkeypatch) ->
 
 
 def test_sidecar_http_server_sets_api_version_header_on_sse(tmp_path, monkeypatch) -> None:
-    from pyc_hermes_agent.sidecar_api import service as sidecar_service
+    from pyc_hermes_agent.sidecar_api.services import chat_service as _chat_svc
 
     class _FakeAgentLoop:
         def __init__(self, *, root=None):
@@ -1282,7 +1282,7 @@ def test_sidecar_http_server_sets_api_version_header_on_sse(tmp_path, monkeypatc
                 content="Hello",
             )
 
-    monkeypatch.setattr(sidecar_service, "AgentLoop", _FakeAgentLoop)
+    monkeypatch.setattr(_chat_svc, "AgentLoop", _FakeAgentLoop)
     server, thread = _start_server(root=tmp_path)
     base_url = f"http://127.0.0.1:{server.server_address[1]}"
 
@@ -1307,7 +1307,7 @@ def test_sidecar_http_server_sets_api_version_header_on_sse(tmp_path, monkeypatc
 
 
 def test_sidecar_http_server_streams_terminal_error_event_on_agent_loop_failure(tmp_path, monkeypatch) -> None:
-    from pyc_hermes_agent.sidecar_api import service as sidecar_service
+    from pyc_hermes_agent.sidecar_api.services import chat_service as _chat_svc
 
     class _FakeAgentLoop:
         def __init__(self, *, root=None):
@@ -1316,7 +1316,7 @@ def test_sidecar_http_server_streams_terminal_error_event_on_agent_loop_failure(
         def stream(self, request, *, max_iterations=8, session_id=None, planning_enabled=True, retry_budget=1):
             raise RuntimeError("stream exploded")
 
-    monkeypatch.setattr(sidecar_service, "AgentLoop", _FakeAgentLoop)
+    monkeypatch.setattr(_chat_svc, "AgentLoop", _FakeAgentLoop)
     server, thread = _start_server(root=tmp_path)
     base_url = f"http://127.0.0.1:{server.server_address[1]}"
 

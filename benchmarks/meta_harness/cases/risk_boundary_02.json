@@ -1,0 +1,18 @@
+{
+  "case_id": "risk_boundary_02",
+  "category": "risk_boundary",
+  "description": "Empty problem statement — should degrade",
+  "request": {
+    "problem_statement": "",
+    "data": {},
+    "params": {}
+  },
+  "expected": {
+    "should_select_method": null,
+    "should_detect_overclaim": false,
+    "should_surface_risks": true,
+    "min_risk_count": 1,
+    "should_be_degraded": true,
+    "evidence_grade_max": "CE-C4"
+  }
+}
