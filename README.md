@@ -95,6 +95,8 @@ print(result["content"])
 
 ## Key Documents
 
+- `docs/Documentation_Tracking.md` — **文档索引与变更跟踪**（`docs/` 清单与 Phase 3/4 路线图族）
+- `docs/architecture/Phase3_Phase4_Productization_Roadmap_v0.3.0.md` — Phase 3 → 4 产品化总纲
 - `docs/assessment/Reassessment_v4_FactChecked_and_Upgraded.md` — architecture/评估 **事实校对** 稿
 - `docs/architecture/Phase2_Toward_GA_v0.2.1.md` — Phase 2 朝向 GA / 生产 / 商业 **工作草案**
 - `docs/deployment/Windows_Sidecar_Binary.md` — Windows 侧车 **PyInstaller** 产物说明
