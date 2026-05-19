@@ -3,17 +3,28 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any, Mapping
 
 from pyc_hermes_agent.contracts import KnowledgeDocument
 
 
-def parse_text_document(text: str, *, title: str = "", source_uri: str = "", source_type: str = "text") -> KnowledgeDocument:
+def parse_text_document(
+    text: str,
+    *,
+    title: str = "",
+    source_uri: str = "",
+    source_type: str = "text",
+    metadata: Mapping[str, Any] | None = None,
+) -> KnowledgeDocument:
+    clean_text = text.strip()
+    document_metadata = dict(metadata or {})
+    document_metadata["length"] = len(clean_text)
     return KnowledgeDocument(
         title=title or _title_from_text(text),
         source_type=source_type,
         source_uri=source_uri,
-        text=text.strip(),
-        metadata={"length": len(text.strip())},
+        text=clean_text,
+        metadata=document_metadata,
     )
 
 

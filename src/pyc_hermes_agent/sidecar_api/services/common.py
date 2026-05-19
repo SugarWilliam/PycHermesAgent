@@ -14,7 +14,12 @@ from pyc_hermes_agent.sidecar_api.error_domains import DOMAIN_INTERNAL
 from pyc_hermes_agent.sidecar_api.logging import log_event  # noqa: F401 - re-exported
 
 
-SIDECAR_API_VERSION = "0.6"
+SIDECAR_API_VERSION = "0.7"
+MRAG_RETRIEVAL_MODES = ["lexical", "semantic", "hybrid"]
+MRAG_RUNTIME_NOTE = (
+    "JSON-backed MRAGService is the active sidecar runtime; SQLite/FTS5 artifacts exist separately "
+    "and are not the active sidecar backend."
+)
 
 
 def _repo_root() -> Path:
@@ -90,6 +95,16 @@ def make_error_response(
     }
 
 
+def get_mrag_runtime_snapshot(*, include_note: bool = False) -> Dict[str, Any]:
+    snapshot: Dict[str, Any] = {
+        "backend": "json",
+        "retrieval_modes": list(MRAG_RETRIEVAL_MODES),
+    }
+    if include_note:
+        snapshot["note"] = MRAG_RUNTIME_NOTE
+    return snapshot
+
+
 def get_health(root: Path | None = None) -> dict:
     from pyc_hermes_agent.sidecar_api.services.skill_service import get_hermes_bridge_health
 
@@ -116,14 +131,15 @@ def get_health(root: Path | None = None) -> dict:
         observability["sidecar_events_log"] = str(paths.logs_dir / "sidecar-events.log")
 
     return {
-        "healthy": True,
+        "healthy": ready_state != "unavailable",
         "degraded": ready_state != "ready",
         "status_label": status_label,
         "version": __version__,
         "sidecar_api_version": SIDECAR_API_VERSION,
         "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
         "platform": sys.platform,
-        "mrag_retrieval_modes": ["lexical", "semantic", "hybrid"],
+        "mrag_retrieval_modes": list(MRAG_RETRIEVAL_MODES),
+        "mrag_runtime": get_mrag_runtime_snapshot(),
         "observability": observability,
         "hermes": {
             "ready_state": ready_state,
@@ -167,6 +183,7 @@ def get_config_snapshot(root: Path | None = None) -> Dict[str, Any]:
         "default_model": resolved.default_model,
         "small_model": resolved.small_model,
         "free_first": resolved.free_first,
+        "mrag_runtime": get_mrag_runtime_snapshot(include_note=True),
     }
 
 

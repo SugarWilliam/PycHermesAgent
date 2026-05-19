@@ -29,7 +29,7 @@ export default function CitationList() {
               >
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-gray-600 dark:text-gray-400">
-                    {cite.page ? `p.${cite.page}` : cite.source_uri}
+                    {formatCitationAnchor(cite)}
                   </span>
                   {cite.relevance != null && (
                     <RelevanceIndicator value={cite.relevance} />
@@ -47,6 +47,13 @@ export default function CitationList() {
       ))}
     </div>
   )
+}
+
+function formatCitationAnchor(cite) {
+  if (cite.page != null && cite.section) return `p.${cite.page} - ${cite.section}`
+  if (cite.page != null) return `p.${cite.page}`
+  if (cite.section) return cite.section
+  return cite.source_uri || 'Unknown source'
 }
 
 function RelevanceIndicator({ value }) {

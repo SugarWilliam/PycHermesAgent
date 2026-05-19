@@ -53,9 +53,9 @@ The current repository line is **`v0.3.0`** Phase 2 complete (usable local analy
 | Axis | Current value | Notes |
 |------|---------------|-------|
 | `app_version` | `0.3.0` (`pyc_hermes_agent.__version__`) | Phase 2 complete; desktop shell with Dify-style UI, electron-builder NSIS installer |
-| `sidecar_api_version` | `0.6` | Added: `GET/PUT/DELETE /preferences`, `POST /kb/.../ingest-pdf`, `GET /skills/audit`, health state machine with component probes, `analysis_mode` on agent requests |
-| `contract_version` | `0.3` | `AgentLoopRequest.analysis_mode` added; `MetaAnalysisRequest.meta_routing` extended with `data_shape_rules`; `AgentLoopEvent.payload.analysis_card` on formal done |
-| `index_format_version` | `2` (SQLite/FTS5) | JSON→SQLite migration via `scripts/migrate_mrag_to_sqlite.py`; v1 JSON still readable for migration |
+| `sidecar_api_version` | `0.7` | Added: richer MRAG citation payload fields (`source_type`, `page`, `section`, `relevance`) on search responses; `/health` and `/config` expose explicit `mrag_runtime`; plus `GET/PUT/DELETE /preferences`, `POST /kb/.../ingest-pdf`, `GET /skills/audit`, health state machine with component probes, `analysis_mode` on agent requests |
+| `contract_version` | `0.4` | `AgentLoopRequest.analysis_mode` added; `MetaAnalysisRequest.meta_routing` extended with `data_shape_rules`; `AgentLoopEvent.payload.analysis_card` on formal done; `Citation` adds `source_type`, `page`, `section`, and `relevance` anchors |
+| `index_format_version` | `2` (SQLite/FTS5) | SQLite/FTS5 artifacts and migration tooling exist via `scripts/migrate_mrag_to_sqlite.py`, but the active sidecar MRAG runtime remains JSON-backed; v1 JSON still readable for migration |
 | `model_manifest_version` | `1` (asset manifest schema) | Unchanged |
 | `artifact_format_version` | `1` | Unchanged |
 | `skills_runtime_policy_id` | `skill-runtime-permissions-phase2-v0.3.0` | 8 builtin skills (4 prompt + 4 analysis); `SkillAuditor` tracks activation/usage; `GET /skills/audit` |

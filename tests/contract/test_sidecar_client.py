@@ -1,5 +1,11 @@
+from pathlib import Path
+
 from pyc_hermes_agent import SidecarClient, SidecarHealthStatus
 from pyc_hermes_agent.contracts import AgentLoopRequest, MetaAnalysisRequest, RetrievalRequest
+
+
+def _read_repo_file(relative_path: str) -> str:
+    return (Path(__file__).resolve().parents[2] / relative_path).read_text(encoding="utf-8")
 
 
 def test_sidecar_client_runtime_paths_in_process(tmp_path) -> None:
@@ -233,3 +239,45 @@ def test_sidecar_client_streams_agent_loop_in_process(monkeypatch, tmp_path) -> 
     assert events[2]["event"] == "assistant.delta"
     assert events[-1]["event"] == "done"
     assert events[-1]["is_terminal"] is True
+
+
+def test_desktop_sidecar_client_uses_canonical_formal_analysis_route() -> None:
+    source = _read_repo_file("desktop/src/services/sidecarClient.js")
+
+    assert "/formal-analysis" in source
+    assert "/meta/analyze" not in source
+
+
+def test_desktop_sidecar_client_handles_canonical_stream_events() -> None:
+    source = _read_repo_file("desktop/src/services/sidecarClient.js")
+
+    assert "case 'assistant.delta'" in source
+    assert "case 'assistant.tool_call.delta'" in source
+    assert "case 'tool.result'" in source
+    assert "case 'delta'" not in source
+    assert "case 'tool_call'" not in source
+
+
+def test_desktop_main_health_probe_returns_structured_payload() -> None:
+    source = _read_repo_file("desktop/electron/main.js")
+
+    assert "payload: parsed" in source
+    assert "rawBody: parsed ? undefined : body" in source
+    assert "url: SIDECAR_URL" in source
+
+
+def test_desktop_skill_store_consumes_items_and_builtin_payload() -> None:
+    source = _read_repo_file("desktop/src/store/skillStore.js")
+
+    assert "payload.items" in source
+    assert "payload.builtin" in source
+    assert "sourceKind" in source
+    assert "activatable" in source
+
+
+def test_desktop_skill_card_handles_non_activatable_skills() -> None:
+    source = _read_repo_file("desktop/src/components/skills/SkillCard.jsx")
+
+    assert "if (!skill.activatable) return" in source
+    assert "disabled={!skill.activatable}" in source
+    assert "skill.sourceKind" in source

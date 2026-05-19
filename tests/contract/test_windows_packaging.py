@@ -117,3 +117,27 @@ def test_packaging_probe_exits_nonzero_when_install_immutability_fails(monkeypat
     err = json.loads(capsys.readouterr().out)
     assert err["install_immutability"] == "failed"
     assert "Packaging violation" in err["install_immutability_error"]
+
+
+def test_desktop_packaging_commands_align_with_release_gates() -> None:
+    root = Path(__file__).resolve().parents[2]
+    package = json.loads((root / "desktop" / "package.json").read_text(encoding="utf-8"))
+    scripts = package["scripts"]
+
+    assert "dist:dir" in scripts
+    assert scripts["dist:dir"] == "electron-vite build && electron-builder --dir"
+    assert scripts["pack"] == scripts["dist:dir"]
+
+    release_gates = (root / "scripts" / "release_gates.py").read_text(encoding="utf-8")
+    assert '"dist:linux"' not in release_gates
+    assert '"dist:dir"' in release_gates
+
+    desktop_readme = (root / "desktop" / "README.md").read_text(encoding="utf-8")
+    assert "npm run dist:dir" in desktop_readme
+    assert "dist:linux" not in desktop_readme
+
+    production_gates = (root / "docs" / "deployment" / "Production_Release_Gates.md").read_text(
+        encoding="utf-8"
+    )
+    assert "npm run dist:dir" in production_gates
+    assert "dist:linux" not in production_gates

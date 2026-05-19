@@ -9,7 +9,7 @@ Align automation with `docs/architecture/Execution_Blueprint_v0.2.0.md` and `doc
 - **Immutable install directory** — validated by `pyc-hermes-packaging-probe` and contract tests.
 - **Lockfile discipline** — `uv lock --check` in production gate.
 - **MRAG migration visibility** — `pyc-hermes-mrag-migrate STORAGE_ROOT` plans upgrades (no silent rewrites); index downgrades/rebuilds stay documented in the compatibility matrix.
-- **Desktop artifact** — `desktop/npm run dist:linux` produces Linux **directory + zip** suitable for CI smoke; Windows/mac targets remain `dir`; signing, updater, and store uploads stay manual.
+- **Desktop artifact** — `cd desktop && npm run dist:dir` produces the unpacked Electron output checked by the current production gate packaging step; installer signing, updater, and store uploads stay manual.
 
 ## Commands
 
@@ -18,7 +18,7 @@ Align automation with `docs/architecture/Execution_Blueprint_v0.2.0.md` and `doc
 | Full gate (default CI) | `uv run python scripts/release_gates.py` with `RELEASE_GATES_RUFF=1`, `RELEASE_GATES_MYPY=1` |
 | Production add-ons | `RELEASE_GATES_PRODUCTION=1 uv run python scripts/release_gates.py` (includes prior steps unless `--no-pytest`). Also exports **CycloneDX 1.5** Python SBOM to `build/sbom-python.cdx.json` (`build/` gitignored). |
 | MRAG planner + backup | `uv run pyc-hermes-mrag-migrate /path/to/mrag/root --backup-to /path/to/backup-parent --json` |
-| Desktop pack | `cd desktop && npm ci && npm audit --omit=dev --audit-level=critical && npm run dist:linux` |
+| Desktop pack | `cd desktop && npm ci && npm audit --omit=dev --audit-level=critical && npm run dist:dir` |
 
 Production gates also honour **`RELEASE_GATES_PYINSTALLER=1`** (runs **`uv sync --frozen --extra dev --extra ga`** then verifies **`PyInstaller`** imports; **`frozen`** avoids unexpected lock churn).
 

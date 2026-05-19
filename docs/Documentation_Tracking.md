@@ -62,6 +62,7 @@ Plan documents underpinning **`Phase3_Phase4_Productization_Roadmap_v0.3.0.md`**
 | **Design / ADRs** | `design/*.md` |
 | **Features** | [`features/PycHermesAgent_Feature_Details_v0.2.0.md`](./features/PycHermesAgent_Feature_Details_v0.2.0.md) |
 | **Releases** | `releases/v0.2.1.md`, `releases/v0.3.0.md`, [`releases/preview_draft.md`](./releases/preview_draft.md) |
+| **Superpowers** | `superpowers/specs/*.md`, `superpowers/plans/*.md` |
 | **Project root (docs)** | [`Project_Development_and_Release_Governance.md`](./Project_Development_and_Release_Governance.md), [`PycHermesAgent_Evaluation_Report_v1.0.md`](./PycHermesAgent_Evaluation_Report_v1.0.md), [`Development_Checkpoint_2026-05-18.md`](./Development_Checkpoint_2026-05-18.md) |
 
 ---
@@ -113,3 +114,5 @@ Canonical path set (glob: `docs/**/*.md`):
 - `releases/README.md`
 - `releases/v0.2.1.md`
 - `releases/v0.3.0.md`
+- `superpowers/plans/2026-05-20-phase3-p0-foundation-calibration.md`
+- `superpowers/specs/2026-05-20-phase3-rollout-design.md`

@@ -53,6 +53,7 @@ export function streamAgent(request, handlers = {}) {
   const controller = new AbortController()
 
   ;(async () => {
+    let sawDone = false
     try {
       const res = await fetch(`${getBaseUrl()}/agent/run/stream`, {
         method: 'POST',
@@ -63,7 +64,7 @@ export function streamAgent(request, handlers = {}) {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: res.statusText }))
-        handlers.onError?.(new Error(err.message || `Stream failed: ${res.status}`))
+        handlers.onError?.(new Error(err.error?.message || err.message || `Stream failed: ${res.status}`), err)
         return
       }
 
@@ -95,26 +96,31 @@ export function streamAgent(request, handlers = {}) {
             case 'start':
               handlers.onStart?.(event)
               break
-            case 'delta':
+            case 'assistant.delta':
               handlers.onDelta?.(event)
               break
-            case 'tool_call':
+            case 'assistant.tool_call.delta':
               handlers.onToolCall?.(event)
               break
+            case 'tool.result':
+              handlers.onToolResult?.(event)
+              break
             case 'done':
+              sawDone = true
               handlers.onDone?.(event)
               break
             case 'error':
               handlers.onError?.(new Error(event.error?.message || 'Stream error'), event)
               break
             default:
-              handlers.onDelta?.(event)
+              handlers.onEvent?.(event)
           }
         }
       }
 
-      // If stream ended without explicit done event
-      handlers.onDone?.({ event: 'done', content: '' })
+      if (!sawDone) {
+        handlers.onDone?.({ event: 'done', finish_reason: 'stream_closed' })
+      }
     } catch (err) {
       if (err.name !== 'AbortError') {
         handlers.onError?.(err)
@@ -161,14 +167,14 @@ export async function deactivateSkill(id) {
 }
 
 export async function runFormalAnalysis(request) {
-  const res = await fetch(`${getBaseUrl()}/meta/analyze`, {
+  const res = await fetch(`${getBaseUrl()}/formal-analysis`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request)
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error(err.message || `Analysis failed: ${res.status}`)
+    throw new Error(err.error?.message || err.message || `Analysis failed: ${res.status}`)
   }
   return res.json()
 }

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from threading import Lock
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Mapping
 
 from pyc_hermes_agent.common import ensure_runtime_directories, resolve_runtime_paths
 from pyc_hermes_agent.contracts import RetrievalRequest
@@ -62,6 +62,7 @@ def ingest_text_document(
     title: str = "",
     source_uri: str = "",
     source_type: str = "text",
+    metadata: Mapping[str, Any] | None = None,
     root: Path | None = None,
 ) -> Dict[str, Any]:
     document = _get_mrag_service(root).ingest_text(
@@ -70,6 +71,7 @@ def ingest_text_document(
         title=title,
         source_uri=source_uri,
         source_type=source_type,
+        metadata=metadata,
     )
     return _serialize(document)
 
@@ -91,12 +93,17 @@ def ingest_pdf_document(
     # Ingest each chunk as a text document with page metadata
     doc_ids: List[str] = []
     for chunk in chunks:
+        chunk_metadata = dict(chunk["metadata"])
+        page = chunk_metadata.get("page")
+        if page is not None and not chunk_metadata.get("section"):
+            chunk_metadata["section"] = f"page-{page}"
         doc = service.ingest_text(
             knowledge_base_id,
             chunk["text"],
             title=chunk["metadata"].get("title", ""),
             source_uri=result.source_path,
             source_type="pdf",
+            metadata=chunk_metadata,
         )
         doc_ids.append(doc.document_id)
     return {

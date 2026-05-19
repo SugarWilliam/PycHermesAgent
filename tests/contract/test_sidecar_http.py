@@ -199,6 +199,10 @@ def test_sidecar_http_server_sets_api_version_header_on_json_success(tmp_path) -
     assert status_code == 200
     assert payload["sidecar_api_version"] == SIDECAR_API_VERSION
     assert payload["mrag_retrieval_modes"] == ["lexical", "semantic", "hybrid"]
+    assert payload["mrag_runtime"] == {
+        "backend": "json",
+        "retrieval_modes": ["lexical", "semantic", "hybrid"],
+    }
     assert payload["observability"]["structured_log_events"] is True
     logs_dir_raw = payload["observability"].get("logs_dir")
     sidecar_log_raw = payload["observability"].get("sidecar_events_log")
@@ -208,6 +212,27 @@ def test_sidecar_http_server_sets_api_version_header_on_json_success(tmp_path) -
     assert str(sidecar_log_raw).endswith("sidecar-events.log")
     assert headers["X-Pyc-Sidecar-Api-Version"] == SIDECAR_API_VERSION
     assert headers["X-Pyc-Request-Id"]
+
+
+def test_sidecar_http_server_serves_config_snapshot_with_explicit_mrag_runtime(tmp_path) -> None:
+    server, thread = _start_server(root=tmp_path)
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+
+    try:
+        status_code, payload = _get_json(f"{base_url}/config")
+        client_snap = SidecarClient(base_url=base_url).get_config_snapshot()
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert status_code == 200
+    assert payload["mrag_runtime"] == {
+        "backend": "json",
+        "retrieval_modes": ["lexical", "semantic", "hybrid"],
+        "note": "JSON-backed MRAGService is the active sidecar runtime; SQLite/FTS5 artifacts exist separately and are not the active sidecar backend.",
+    }
+    assert payload["mrag_runtime"] == client_snap["mrag_runtime"]
 
 
 def test_sidecar_http_writes_sidecar_events_log_when_root_given(monkeypatch, tmp_path) -> None:
@@ -679,6 +704,11 @@ def test_sidecar_http_server_creates_and_searches_knowledge_bases(tmp_path) -> N
     assert search_status == 200
     assert result["hits"]
     assert result["citations"]
+    citation = result["citations"][0]
+    assert citation["source_type"] == "text"
+    assert citation["page"] is None
+    assert citation["section"] == ""
+    assert citation["relevance"] > 0.0
 
 
 def test_sidecar_http_server_rebuilds_mrag_chunk_index(tmp_path) -> None:

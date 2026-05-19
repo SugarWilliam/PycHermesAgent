@@ -203,6 +203,10 @@ def test_sidecar_health() -> None:
     assert "version" in health
     assert health["python_version"] == f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
     assert health["platform"] == sys.platform
+    assert health["mrag_runtime"] == {
+        "backend": "json",
+        "retrieval_modes": ["lexical", "semantic", "hybrid"],
+    }
     assert "hermes" in health
     assert health["hermes"]["ready_state"] in {"ready", "degraded", "unavailable"}
     assert health["hermes"]["status_label"] in {"ready", "ready-with-warnings", "degraded", "unavailable"}
@@ -232,7 +236,7 @@ def test_sidecar_health_includes_fake_hermes_bridge_summary(tmp_path: Path) -> N
 def test_sidecar_health_reports_unavailable_when_checkout_missing(tmp_path: Path) -> None:
     health = get_health(tmp_path)
 
-    assert health["healthy"] is True
+    assert health["healthy"] is False
     assert health["degraded"] is True
     assert health["status_label"] == "unavailable"
     assert health["hermes"]["checkout_present"] is False
@@ -240,6 +244,35 @@ def test_sidecar_health_reports_unavailable_when_checkout_missing(tmp_path: Path
     assert health["hermes"]["bridge_ready"] is False
     assert health["hermes"]["ready_state"] == "unavailable"
     assert health["hermes"]["status_label"] == "unavailable"
+
+
+def test_sidecar_health_http_matches_unavailable_in_process_snapshot(tmp_path: Path) -> None:
+    from pyc_hermes_agent.sidecar_api import create_http_server
+
+    server = create_http_server(port=0, root=tmp_path)
+    import threading
+
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    from urllib.request import urlopen
+    import json
+
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        with urlopen(f"{base_url}/health", timeout=5) as response:
+            http_payload = json.loads(response.read().decode("utf-8"))
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    direct_payload = get_health(tmp_path)
+
+    assert http_payload["status_label"] == "unavailable"
+    assert http_payload["healthy"] is False
+    assert http_payload["degraded"] is True
+    assert http_payload["healthy"] == direct_payload["healthy"]
+    assert http_payload["degraded"] == direct_payload["degraded"]
 
 
 def test_sidecar_health_refreshes_when_upstream_state_changes(tmp_path: Path) -> None:
@@ -266,6 +299,10 @@ def test_sidecar_lists_rules_and_skills() -> None:
     skills = list_skills(root)
     assert any(rule["name"] == "AGENTS.md" for rule in rules)
     skill = next(item for item in skills if item["name"] == "meta-harness-governance")
+    assert skill["id"] == "meta-harness-governance"
+    assert skill["category"] == "prompt"
+    assert skill["active"] is False
+    assert skill["source_kind"] == "project"
     assert skill["runtime"]["policy"]["activation_mode"] == "explicit_only"
     assert skill["runtime"]["policy"]["script_execution"] == "disabled"
     assert skill["runtime"]["source"]["kind"] == "SKILL.md"
@@ -303,6 +340,11 @@ def test_sidecar_config_snapshot() -> None:
     snapshot = get_config_snapshot(root)
     assert snapshot["default_model"]
     assert snapshot["free_first"] is True
+    assert snapshot["mrag_runtime"] == {
+        "backend": "json",
+        "retrieval_modes": ["lexical", "semantic", "hybrid"],
+        "note": "JSON-backed MRAGService is the active sidecar runtime; SQLite/FTS5 artifacts exist separately and are not the active sidecar backend.",
+    }
 
 
 def test_sidecar_exposes_meta_harness_dependency_snapshot() -> None:
@@ -713,6 +755,11 @@ def test_sidecar_mrag_ingest_and_search(tmp_path: Path) -> None:
     )
     assert result["hits"]
     assert result["citations"]
+    citation = result["citations"][0]
+    assert citation["source_type"] == "text"
+    assert citation["page"] is None
+    assert citation["section"] == ""
+    assert citation["relevance"] > 0.0
     all_bases = list_knowledge_bases(root=tmp_path)
     assert any(item["knowledge_base_id"] == kb["knowledge_base_id"] for item in all_bases)
 

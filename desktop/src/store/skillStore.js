@@ -8,8 +8,18 @@ const useSkillStore = create((set, get) => ({
   fetchSkills: async () => {
     set({ loading: true })
     try {
-      const skills = await fetchSkills()
-      set({ skills, loading: false })
+      const payload = await fetchSkills()
+      const discovered = (Array.isArray(payload.items) ? payload.items : []).map((skill) => ({
+        ...skill,
+        sourceKind: skill.source_kind || 'project',
+        activatable: false
+      }))
+      const builtin = (Array.isArray(payload.builtin) ? payload.builtin : []).map((skill) => ({
+        ...skill,
+        sourceKind: 'builtin',
+        activatable: true
+      }))
+      set({ skills: [...builtin, ...discovered], loading: false })
     } catch {
       set({ loading: false })
     }

@@ -74,12 +74,19 @@ def retrieve(knowledge_base: KnowledgeBase, request: RetrievalRequest) -> Retrie
     if request.include_citations:
         for hit in top_hits:
             document = knowledge_base.documents.get(hit.document_id)
+            section = hit.metadata.get("section")
+            normalized_section = section.strip() if isinstance(section, str) else ""
+            page = _normalize_page(hit.metadata.get("page"))
             citations.append(
                 Citation(
                     document_id=hit.document_id,
                     chunk_id=hit.chunk_id,
                     title=document.title if document else hit.metadata.get("title", ""),
+                    source_type=document.source_type if document else hit.metadata.get("source_type", ""),
                     source_uri=document.source_uri if document else hit.metadata.get("source_uri", ""),
+                    page=page,
+                    section=normalized_section,
+                    relevance=hit.score,
                     snippet=hit.snippet,
                 )
             )
@@ -127,3 +134,23 @@ def _snippet(text: str, query_tokens: Iterable[str], width: int = 160) -> str:
             end = min(len(text), idx + width)
             return text[start:end].strip()
     return text[:width].strip()
+
+
+def _normalize_page(value: object) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value) if value.is_integer() else None
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return None
+        try:
+            return int(stripped)
+        except ValueError:
+            return None
+    return None

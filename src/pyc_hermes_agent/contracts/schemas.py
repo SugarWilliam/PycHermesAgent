@@ -502,7 +502,11 @@ class Citation:
     document_id: str = ""
     chunk_id: str = ""
     title: str = ""
+    source_type: str = ""
     source_uri: str = ""
+    page: Optional[int] = None
+    section: str = ""
+    relevance: float = 0.0
     snippet: str = ""
 
 

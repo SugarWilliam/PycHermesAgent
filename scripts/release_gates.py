@@ -12,7 +12,7 @@ Usage (from repo root):
 
 Production extras (after ruff/mypy when enabled): ``uv lock --check``, Python CycloneDX 1.5 SBOM export (``uv export``),
 MRAG migrate CLI on a temp dir with ``--backup-to``, ``npm ci`` + ``npm audit --omit=dev --audit-level=critical``
-+ ``npm run dist:linux`` under ``desktop/`` (requires npm). Optional ``RELEASE_GATES_PYINSTALLER=1`` verifies the ``ga``
++ ``npm run dist:dir`` under ``desktop/`` (requires npm). Optional ``RELEASE_GATES_PYINSTALLER=1`` verifies the ``ga``
 extra (PyInstaller import). See ``docs/deployment/Production_Release_Gates.md``.
 
     ./.venv/bin/python scripts/release_gates.py --export-meta-benchmarks DIR
@@ -186,7 +186,7 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help=(
             "After static checks: uv lock --check, CycloneDX SBOM export, MRAG migrate+backup smoke, "
-            "npm audit (critical+) and desktop dist:linux (RELEASE_GATES_PRODUCTION=1)"
+            "npm audit (critical+) and desktop dist:dir (RELEASE_GATES_PRODUCTION=1)"
         ),
     )
     args = parser.parse_args(argv)
@@ -302,7 +302,7 @@ def main(argv: list[str] | None = None) -> int:
                 return 1
             if _run([npm_bin, "audit", "--omit=dev", "--audit-level=critical"], cwd=desktop) != 0:
                 return 1
-            if _run([npm_bin, "run", "dist:linux"], cwd=desktop) != 0:
+            if _run([npm_bin, "run", "dist:dir"], cwd=desktop) != 0:
                 return 1
         print("release_gates: production packaging checks OK", flush=True)
 

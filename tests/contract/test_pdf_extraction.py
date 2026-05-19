@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
+from pyc_hermes_agent.mrag_core.parse import parse_text_document
 from pyc_hermes_agent.mrag_core.pdf_extractor import (
     PDFExtractionResult,
     PDFPage,
@@ -85,3 +86,18 @@ def test_overlap_must_be_less_than_chunk_size():
     result = _make_result(pages)
     with pytest.raises(ValueError, match="overlap must be smaller"):
         result.to_chunks(chunk_size=100, overlap=100)
+
+
+def test_parse_text_document_preserves_caller_metadata():
+    document = parse_text_document("hello", metadata={"page": 2, "section": "summary"})
+
+    assert document.metadata["length"] == 5
+    assert document.metadata["page"] == 2
+    assert document.metadata["section"] == "summary"
+
+
+def test_parse_text_document_keeps_computed_length_over_caller_value():
+    document = parse_text_document("hello", metadata={"length": 999, "page": 2})
+
+    assert document.metadata["length"] == 5
+    assert document.metadata["page"] == 2

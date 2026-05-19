@@ -14,11 +14,23 @@ function checkSidecarHealth() {
       let body = ''
       res.on('data', (chunk) => { body += chunk })
       res.on('end', () => {
-        resolve({ ok: res.statusCode === 200, status: res.statusCode, body })
+        let parsed = null
+        try {
+          parsed = JSON.parse(body)
+        } catch {
+          parsed = null
+        }
+        resolve({
+          ok: res.statusCode === 200,
+          status: res.statusCode,
+          url: SIDECAR_URL,
+          payload: parsed,
+          rawBody: parsed ? undefined : body
+        })
       })
     })
-    req.on('error', (err) => resolve({ ok: false, error: err.message }))
-    req.setTimeout(3000, () => { req.destroy(); resolve({ ok: false, error: 'timeout' }) })
+    req.on('error', (err) => resolve({ ok: false, status: 0, url: SIDECAR_URL, error: err.message }))
+    req.setTimeout(3000, () => { req.destroy(); resolve({ ok: false, status: 0, url: SIDECAR_URL, error: 'timeout' }) })
   })
 }
 

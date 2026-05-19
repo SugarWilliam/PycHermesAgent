@@ -22,12 +22,24 @@ def chunk_document(document: KnowledgeDocument, *, chunk_size: int = 500, overla
         end = min(len(text), start + chunk_size)
         chunk_text = text[start:end].strip()
         if chunk_text:
+            metadata = dict(document.metadata)
+            metadata.update(
+                {
+                    "start": start,
+                    "end": end,
+                    "title": document.title,
+                    "source_uri": document.source_uri,
+                    "source_type": document.source_type,
+                    "page": document.metadata.get("page"),
+                    "section": document.metadata.get("section", ""),
+                }
+            )
             chunks.append(
                 DocumentChunk(
                     document_id=document.document_id,
                     index=index,
                     text=chunk_text,
-                    metadata={"start": start, "end": end, "title": document.title, "source_uri": document.source_uri},
+                    metadata=metadata,
                 )
             )
             index += 1

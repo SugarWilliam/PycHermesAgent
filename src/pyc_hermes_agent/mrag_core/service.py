@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Dict, Mapping, Optional
 from uuid import uuid4
 
 from pyc_hermes_agent.contracts import KnowledgeDocument, RetrievalRequest, RetrievalResult
@@ -52,9 +52,24 @@ class MRAGService:
             for kb in self._knowledge_bases.values()
         ]
 
-    def ingest_text(self, knowledge_base_id: str, text: str, *, title: str = "", source_uri: str = "", source_type: str = "text") -> KnowledgeDocument:
+    def ingest_text(
+        self,
+        knowledge_base_id: str,
+        text: str,
+        *,
+        title: str = "",
+        source_uri: str = "",
+        source_type: str = "text",
+        metadata: Mapping[str, Any] | None = None,
+    ) -> KnowledgeDocument:
         kb = self._require_kb(knowledge_base_id)
-        document = parse_text_document(text, title=title, source_uri=source_uri, source_type=source_type)
+        document = parse_text_document(
+            text,
+            title=title,
+            source_uri=source_uri,
+            source_type=source_type,
+            metadata=metadata,
+        )
         self._store_document(kb, document)
         return document
 

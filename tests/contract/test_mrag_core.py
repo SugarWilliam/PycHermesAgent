@@ -1,12 +1,15 @@
 import json
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
 from pyc_hermes_agent.contracts import RetrievalRequest
 from pyc_hermes_agent.mrag_core import MRAGService, MRAGManifestIncompatibleError, MRAGStorageLockedError
+from pyc_hermes_agent.mrag_core.pdf_extractor import PDFExtractionResult, PDFPage
 from pyc_hermes_agent.mrag_core.ownership import MRAG_LOCK_FILE
 from pyc_hermes_agent.mrag_core.persistence import MRAG_INDEX_FORMAT_VERSION, MRAG_MANIFEST_VERSION
+from pyc_hermes_agent.sidecar_api.services.mrag_service import ingest_pdf_document
 
 
 def test_mrag_ingest_and_search_text() -> None:
@@ -23,6 +26,59 @@ def test_mrag_ingest_and_search_text() -> None:
     assert result.hits
     assert result.citations
     assert result.coverage > 0
+    citation = result.citations[0]
+    assert citation.source_type == "markdown"
+    assert citation.relevance == pytest.approx(result.hits[0].score)
+    assert citation.page is None
+    assert citation.section == ""
+
+
+def test_mrag_citations_preserve_source_anchor_fields() -> None:
+    service = MRAGService()
+    kb = service.create_knowledge_base("anchor-fields")
+    service.ingest_text(
+        kb.knowledge_base_id,
+        "Evidence packaging should preserve source anchors.",
+        title="Evidence Note",
+        source_uri="memory://anchors/1",
+        source_type="markdown",
+        metadata={"page": "7", "section": " intro ", "label": "anchor-source"},
+    )
+    result = service.search(kb.knowledge_base_id, RetrievalRequest(query="source anchors", top_k=2))
+
+    assert result.hits
+    assert result.hits[0].metadata["label"] == "anchor-source"
+    assert result.citations
+    cite = result.citations[0]
+    assert cite.source_type == "markdown"
+    assert cite.page == 7
+    assert cite.section == "intro"
+    assert cite.relevance > 0.0
+
+
+def test_mrag_pdf_ingest_preserves_page_provenance_in_citations(tmp_path) -> None:
+    service = MRAGService()
+    kb = service.create_knowledge_base("pdf-pages")
+    extracted = PDFExtractionResult(
+        source_path=str(tmp_path / "report.pdf"),
+        title="Quarterly Report",
+        page_count=1,
+        pages=[PDFPage(page_number=3, text="Forecast evidence appears on this page.", char_count=38)],
+        total_chars=38,
+    )
+
+    with patch("pyc_hermes_agent.mrag_core.pdf_extractor.extract_pdf", return_value=extracted):
+        with patch("pyc_hermes_agent.sidecar_api.services.mrag_service._get_mrag_service", return_value=service):
+            ingest_pdf_document(kb.knowledge_base_id, extracted.source_path)
+
+    result = service.search(kb.knowledge_base_id, RetrievalRequest(query="forecast evidence", top_k=3))
+
+    assert result.citations
+    cite = result.citations[0]
+    assert cite.source_type == "pdf"
+    assert cite.source_uri == extracted.source_path
+    assert cite.page == 3
+    assert cite.section == "page-3"
 
 
 def test_mrag_lists_knowledge_bases() -> None:

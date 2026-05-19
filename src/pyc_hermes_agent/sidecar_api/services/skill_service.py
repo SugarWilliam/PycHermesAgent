@@ -62,10 +62,15 @@ def list_skills(root: Path | None = None) -> List[Dict[str, Any]]:
     items: List[Dict[str, Any]] = []
     for skill in load_skill_metadata(base):
         mtime_ns = skill.path.stat().st_mtime_ns
+        category = skill.metadata.get("category", "prompt")
         items.append(
             {
+                "id": skill.name,
                 "name": skill.name,
                 "description": skill.description,
+                "category": category,
+                "active": False,
+                "source_kind": "project",
                 "path": str(skill.path),
                 "license": skill.license,
                 "compatibility": skill.compatibility,

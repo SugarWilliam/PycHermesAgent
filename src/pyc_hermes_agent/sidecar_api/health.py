@@ -71,7 +71,11 @@ class SidecarHealth:
         from pathlib import Path
 
         from pyc_hermes_agent import __version__
-        from pyc_hermes_agent.sidecar_api.services import SIDECAR_API_VERSION
+        from pyc_hermes_agent.sidecar_api.services.common import (
+            SIDECAR_API_VERSION,
+            MRAG_RETRIEVAL_MODES,
+            get_mrag_runtime_snapshot,
+        )
 
         # Map state to legacy status_label for backward compatibility
         _status_label_map = {
@@ -104,7 +108,8 @@ class SidecarHealth:
             "sidecar_api_version": SIDECAR_API_VERSION,
             "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
             "platform": sys.platform,
-            "mrag_retrieval_modes": ["lexical", "semantic", "hybrid"],
+            "mrag_retrieval_modes": list(MRAG_RETRIEVAL_MODES),
+            "mrag_runtime": get_mrag_runtime_snapshot(),
             "observability": observability,
             # Backward-compatible fields
             "healthy": self.state != HealthState.UNAVAILABLE,
