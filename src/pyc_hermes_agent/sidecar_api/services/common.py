@@ -14,7 +14,7 @@ from pyc_hermes_agent.sidecar_api.error_domains import DOMAIN_INTERNAL
 from pyc_hermes_agent.sidecar_api.logging import log_event  # noqa: F401 - re-exported
 
 
-SIDECAR_API_VERSION = "0.5"
+SIDECAR_API_VERSION = "0.6"
 
 
 def _repo_root() -> Path:

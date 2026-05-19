@@ -177,7 +177,7 @@ def _check_hermes_bridge(root: Any = None) -> ComponentHealth:
                 name="hermes_bridge", state=HealthState.DEGRADED, message="bridge not fully ready"
             )
         return ComponentHealth(
-            name="hermes_bridge", state=HealthState.DEGRADED, message="bridge unavailable"
+            name="hermes_bridge", state=HealthState.UNAVAILABLE, message="bridge unavailable"
         )
     except Exception as exc:
         return ComponentHealth(name="hermes_bridge", state=HealthState.DEGRADED, message=str(exc))
