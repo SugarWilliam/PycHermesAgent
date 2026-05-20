@@ -116,3 +116,4 @@ Canonical path set (glob: `docs/**/*.md`):
 - `releases/v0.3.0.md`
 - `superpowers/plans/2026-05-20-phase3-p0-foundation-calibration.md`
 - `superpowers/specs/2026-05-20-phase3-rollout-design.md`
+- `superpowers/specs/2026-05-21-phase3a-a1-sidecar-startup-design.md`
