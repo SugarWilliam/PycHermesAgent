@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Generate a Markdown draft for engineering-preview releases (human polish required).
 
-Governance: ``docs/architecture/Phase1_Roadmap_v0.2.0.md`` workstream F, Phase 4 notes.
+Governance: ``docs/Project_Development_and_Release_Governance.md`` and
+``docs/releases/README.md``.
 
 Usage (from repo root):
 

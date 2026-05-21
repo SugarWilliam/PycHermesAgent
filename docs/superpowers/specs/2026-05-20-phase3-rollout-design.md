@@ -1,7 +1,7 @@
 # Phase 3 Rollout Design
 
 **Date:** 2026-05-20
-**Status:** Proposed design
+**Status:** Historical design artifact
 **Scope:** Phase 3 rollout sequencing for `PycHermesAgent`
 **Primary references:**
 - `docs/architecture/Phase3_Phase4_Productization_Roadmap_v0.3.0.md`
@@ -18,6 +18,12 @@
 Define how Phase 3 should actually be executed on top of the current repository state.
 
 This design does not replace the existing Phase 3 roadmap documents. It turns them into an execution shape that fits the current codebase, reduces rework, and makes parallel delivery realistic.
+
+Status note:
+
+- this document remains useful as a historical execution design
+- some repository-locked facts captured here were later closed or superseded by subsequent implementation and current-baseline documents
+- use it to understand rollout intent, not as the sole source of current repository truth
 
 ## 2. Current Repository Reality
 

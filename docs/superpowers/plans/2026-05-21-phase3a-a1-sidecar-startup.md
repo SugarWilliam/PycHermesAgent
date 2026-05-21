@@ -1,5 +1,7 @@
 # Phase 3A A1 Sidecar Startup Contract Implementation Plan
 
+> Historical implementation plan. The shipped A1 implementation follows this plan closely, but the finalized preload health IPC surface uses `sidecar:health` for renderer health checks while structured startup status is exposed through `getStatus()`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make the Electron main process the single authority for sidecar URL resolution, startup policy, and structured startup state so the desktop can attach first and only launch a sidecar when explicitly configured.

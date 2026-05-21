@@ -2,7 +2,12 @@
 
 Engineering-preview tags should have human-edited release notes per
 `docs/Project_Development_and_Release_Governance.md` and
-`docs/architecture/Phase1_Roadmap_v0.2.0.md` workstream F.
+`docs/Documentation_Tracking.md`.
+
+Current-document-role note:
+
+- `docs/releases/*.md` are release communication artifacts, not the authoritative source of current repository truth
+- current contract/baseline truth lives in `docs/architecture/Compatibility_Matrix.md` and `docs/deployment/Production_Release_Gates.md`
 
 **Generate a stub** (metadata + recent `git log`):
 

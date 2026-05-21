@@ -48,14 +48,19 @@ Before a tag is created, update this table when applicable:
 
 ## 5. Current Baseline
 
-The current repository line is **`v0.3.0`** Phase 2 complete (usable local analysis workbench with desktop shell, SQLite/FTS5, 15-case benchmark, 8 builtin skills, auto-updater). Production `v1.0.0` cannot be tagged until desktop packaging signing/updater, storage migration hardening, neural embeddings, and installation verification meet production criteria.
+The current repository line is **`v0.3.0`** Phase 2 complete (usable local analysis workbench with desktop shell, 15-case benchmark, 8 builtin skills, auto-updater). Production `v1.0.0` cannot be tagged until desktop packaging signing/updater, storage migration hardening, neural embeddings, and installation verification meet production criteria.
+
+Current-truth note:
+
+- current sidecar contract truth comes from this matrix plus validated code/tests
+- historical release notes may describe what a tagged line claimed or targeted, but they are not the authoritative source for the current repository baseline
 
 | Axis | Current value | Notes |
 |------|---------------|-------|
 | `app_version` | `0.3.0` (`pyc_hermes_agent.__version__`) | Phase 2 complete; desktop shell with Dify-style UI, electron-builder NSIS installer |
 | `sidecar_api_version` | `0.7` | Added: richer MRAG citation payload fields (`source_type`, `page`, `section`, `relevance`) on search responses; `/health` and `/config` expose explicit `mrag_runtime`; plus `GET/PUT/DELETE /preferences`, `POST /kb/.../ingest-pdf`, `GET /skills/audit`, health state machine with component probes, `analysis_mode` on agent requests |
 | `contract_version` | `0.4` | `AgentLoopRequest.analysis_mode` added; `MetaAnalysisRequest.meta_routing` extended with `data_shape_rules`; `AgentLoopEvent.payload.analysis_card` on formal done; `Citation` adds `source_type`, `page`, `section`, and `relevance` anchors |
-| `index_format_version` | `2` (SQLite/FTS5) | SQLite/FTS5 artifacts and migration tooling exist via `scripts/migrate_mrag_to_sqlite.py`, but the active sidecar MRAG runtime remains JSON-backed; v1 JSON still readable for migration |
+| `index_format_version` | `2` | SQLite/FTS5 artifacts and migration tooling exist via `scripts/migrate_mrag_to_sqlite.py`, but the active sidecar MRAG runtime remains JSON-backed; v1 JSON still readable for migration |
 | `model_manifest_version` | `1` (asset manifest schema) | Unchanged |
 | `artifact_format_version` | `1` | Unchanged |
 | `skills_runtime_policy_id` | `skill-runtime-permissions-phase2-v0.3.0` | 8 builtin skills (4 prompt + 4 analysis); `SkillAuditor` tracks activation/usage; `GET /skills/audit` |

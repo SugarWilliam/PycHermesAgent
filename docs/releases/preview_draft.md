@@ -1,6 +1,8 @@
 # PycHermesAgent v0.3.0-preview.1 Release Notes (draft)
 
 > Engineering preview draft. Regenerate the auto metadata only if new commits are added before tagging.
+>
+> Historical draft artifact. Do not use this file as the current repository truth source.
 
 ## Build metadata
 

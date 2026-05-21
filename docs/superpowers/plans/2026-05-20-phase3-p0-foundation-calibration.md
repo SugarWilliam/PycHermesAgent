@@ -1,5 +1,7 @@
 # Phase 3 P0 Foundation Calibration Implementation Plan
 
+> Historical implementation plan. Keep this document as the P0 execution record; use current contract and release-gate documents for the present repository baseline.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Stabilize the shared Phase 3 foundation by eliminating desktop-sidecar contract drift, freezing the first practical evidence schema, preserving PDF provenance, making the active JSON-backed MRAG runtime explicit, and fixing packaging gate drift.

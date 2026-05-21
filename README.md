@@ -2,23 +2,23 @@
 
 > Status: internal engineering preview. Not production-ready.
 
-PycHermesAgent is a local-first agent platform baseline built around:
+PycHermesAgent is a Windows-first, local-first agent platform built around:
 
 1. `hermes_engine`
 2. `meta_harness`
 3. `llm_gateway`
 4. `mrag_core`
-5. a Python sidecar contract surface
+5. `sidecar_api`
+6. an Electron desktop shell under `desktop/`
 
-Current repository status:
+Current repository baseline:
 
-1. Governance and architecture baseline are in place.
-2. Contract-tested Python sidecar functions are implemented.
-3. Hermes read-only bridge snapshots are implemented.
-4. A minimal local HTTP sidecar transport is implemented.
-5. A minimal OpenAI-compatible synchronous LLM execution path is implemented.
-6. Minimal local model-asset promotion and artifact export helpers are implemented.
-7. CI (GitHub Actions) runs contract tests and `scripts/release_gates.py`; a minimal Electron preview shell lives under `desktop/` (does not bundle Python).
+1. Governance, architecture, compatibility, and packaging constraints are in place under `AGENTS.md` and `docs/`.
+2. Contract-tested Python sidecar routes are implemented, including JSON and SSE agent-loop surfaces.
+3. Product-owned `hermes_engine.AgentLoop` is implemented with tool dispatch, session persistence, retry budgeting, and analysis-mode support.
+4. `meta_harness.MetaFramework.execute()` remains the formal-analysis entry point.
+5. The Electron desktop is a usable preview workbench with streaming chat, sessions, settings, citations, and a main-process-owned sidecar startup contract.
+6. `scripts/release_gates.py` is the local verification baseline for the repository.
 
 ## Continuous integration
 
@@ -93,25 +93,45 @@ result = client.invoke_chat_completion(
 print(result["content"])
 ```
 
+## Document Roles
+
+Use docs by authority level:
+
+- Governance and architecture authority:
+  - `AGENTS.md`
+  - `docs/Project_Development_and_Release_Governance.md`
+  - `docs/architecture/*.md`
+  - `docs/constraints/*.md`
+- Current contract and baseline truth:
+  - `docs/architecture/Compatibility_Matrix.md`
+  - `docs/deployment/Production_Release_Gates.md`
+  - `docs/Documentation_Tracking.md`
+- Status, release, and execution notes:
+  - `docs/releases/*.md`
+  - `docs/superpowers/specs/*.md`
+  - `docs/superpowers/plans/*.md`
+
 ## Key Documents
 
-- `docs/Documentation_Tracking.md` — **文档索引与变更跟踪**（`docs/` 清单与 Phase 3/4 路线图族）
-- `docs/architecture/Phase3_Phase4_Productization_Roadmap_v0.3.0.md` — Phase 3 → 4 产品化总纲
-- `docs/assessment/Reassessment_v4_FactChecked_and_Upgraded.md` — architecture/评估 **事实校对** 稿
-- `docs/architecture/Phase2_Toward_GA_v0.2.1.md` — Phase 2 朝向 GA / 生产 / 商业 **工作草案**
-- `docs/deployment/Windows_Sidecar_Binary.md` — Windows 侧车 **PyInstaller** 产物说明
+- `docs/Documentation_Tracking.md` — `docs/` inventory and tracking index
+- `docs/Project_Development_and_Release_Governance.md` — top-level development and release authority
+- `docs/architecture/Compatibility_Matrix.md` — current contract and version baseline
+- `docs/architecture/Phase3_Phase4_Productization_Roadmap_v0.3.0.md` — Phase 3 → 4 productization roadmap
+- `docs/deployment/Production_Release_Gates.md` — current release-gate operations baseline
+- `docs/deployment/Windows_Sidecar_Binary.md` — Windows sidecar PyInstaller artifact notes
 - `docs/architecture/PycHermesAgent_Architecture_v0.2.0.md`
 - `docs/architecture/PycHermesAgent_Solution_Architecture_v0.2.0.md`
 - `docs/architecture/Execution_Blueprint_v0.2.0.md`
 - `docs/architecture/Hermes_Mixed_Integration_Mapping_v0.2.0.md`
-- `docs/architecture/Phase1_Roadmap_v0.2.0.md`
 - `docs/design/PycHermesAgent_Detailed_Design_v0.2.0.md`
 - `docs/features/PycHermesAgent_Feature_Details_v0.2.0.md`
 - `docs/deployment/PycHermesAgent_Usage_Deployment_Guide_v0.2.0.md`
 
 ## Release Status
 
-Tagged releases (**`v*.*.*`**) trigger **`.github/workflows/release.yml`**, which builds **`pyc-hermes-sidecar.exe`** (Windows) and publishes a **GitHub Release** with checksums. Current baseline notes live in **`docs/releases/v0.3.0.md`** (see also `docs/releases/v0.2.1.md` for older context).
+Tagged releases (**`v*.*.*`**) trigger **`.github/workflows/release.yml`**, which builds **`pyc-hermes-sidecar.exe`** (Windows) and publishes a **GitHub Release** with checksums. Current release-note workflow lives in `docs/releases/README.md`.
+
+`docs/releases/v0.3.0.md` and `docs/releases/v0.2.1.md` are historical tag notes. For current repository truth, prefer `docs/architecture/Compatibility_Matrix.md` and `docs/deployment/Production_Release_Gates.md`.
 
 The repository is suitable for architecture validation, contract validation, and internal engineering preview work.
 It is not yet a production release.

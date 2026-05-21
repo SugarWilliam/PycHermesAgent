@@ -1,7 +1,7 @@
 # Phase 3A A1 Sidecar Startup Contract Design
 
 **Date:** 2026-05-21
-**Status:** Proposed design
+**Status:** Historical approved design
 **Scope:** Phase 3A / A1 sidecar startup contract for the Electron desktop shell
 **Primary references:**
 - `docs/architecture/Phase3_Phase4_Productization_Roadmap_v0.3.0.md`
@@ -14,6 +14,11 @@
 Define one authoritative desktop-sidecar startup contract so the Electron desktop can reliably attach to an already-running sidecar or, when explicitly configured, launch one and report structured startup state.
 
 This design is intentionally narrower than Phase 3A as a whole. It only covers `A1. Sidecar Startup Contract` and leaves health UX, SSE/runtime UX, and packaging validation to later Phase 3A work.
+
+Status note:
+
+- this design remains the intent record for the delivered A1 work
+- for the current shipped baseline and verification truth, prefer `docs/architecture/Compatibility_Matrix.md`, `desktop/README.md`, and the validated tests
 
 ## 2. Current Baseline
 

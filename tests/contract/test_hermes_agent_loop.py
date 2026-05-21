@@ -203,6 +203,40 @@ def test_agent_loop_persists_partial_history_on_failure(tmp_path: Path) -> None:
     assert [message.content for message in saved.messages] == ["Hello"]
 
 
+def test_agent_loop_defaults_session_storage_to_root_sandbox(tmp_path: Path) -> None:
+    loop = AgentLoop(
+        root=tmp_path,
+        llm_executor=lambda request, root: LLMChatResponse(
+            model="openai-compatible/demo-model",
+            provider_id="openai-compatible",
+            content="Sandboxed.",
+            finish_reason="stop",
+        ),
+    )
+
+    result = loop.run(
+        ChatCompletionRequest(
+            model="openai-compatible/demo-model",
+            messages=[ChatMessage(role="user", content="Persist locally")],
+        ),
+        session_id="sandbox-default",
+    )
+
+    expected_path = (
+        tmp_path
+        / ".pyc_hermes_agent_runtime"
+        / "LOCALAPPDATA"
+        / "PycHermesAgent"
+        / "hermes_engine"
+        / "sessions"
+    )
+    saved = AgentSessionStore(root=tmp_path).load(result.session_id)
+
+    assert saved is not None
+    assert saved.messages[-1].content == "Sandboxed."
+    assert loop._session_store.resolve_path(result.session_id).is_relative_to(expected_path)
+
+
 def test_agent_loop_injects_session_memory_into_prompt(tmp_path: Path) -> None:
     store = AgentSessionStore(root=tmp_path)
     store.save(

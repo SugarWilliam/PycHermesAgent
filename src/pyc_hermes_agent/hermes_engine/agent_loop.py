@@ -59,7 +59,8 @@ class AgentLoop:
         self._llm_executor = llm_executor
         self._llm_stream_executor = llm_stream_executor
         self._tool_registry = tool_registry or create_meta_harness_tool_registry()
-        self._session_store = session_store or AgentSessionStore(root=storage_root)
+        resolved_storage_root = storage_root if storage_root is not None else root
+        self._session_store = session_store or AgentSessionStore(root=resolved_storage_root)
 
     def run(
         self,

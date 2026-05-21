@@ -114,7 +114,9 @@ Canonical path set (glob: `docs/**/*.md`):
 - `releases/README.md`
 - `releases/v0.2.1.md`
 - `releases/v0.3.0.md`
+- `superpowers/plans/2026-05-22-governance-first-runtime-and-docs-closure.md`
 - `superpowers/plans/2026-05-20-phase3-p0-foundation-calibration.md`
 - `superpowers/plans/2026-05-21-phase3a-a1-sidecar-startup.md`
+- `superpowers/specs/2026-05-22-governance-first-runtime-and-docs-closure-design.md`
 - `superpowers/specs/2026-05-20-phase3-rollout-design.md`
 - `superpowers/specs/2026-05-21-phase3a-a1-sidecar-startup-design.md`
