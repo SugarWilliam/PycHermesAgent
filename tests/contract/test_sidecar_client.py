@@ -258,6 +258,63 @@ def test_desktop_sidecar_client_handles_canonical_stream_events() -> None:
     assert "case 'tool_call'" not in source
 
 
+def test_desktop_sidecar_client_reads_runtime_config_from_main_process() -> None:
+    source = _read_repo_file("desktop/src/services/sidecarClient.js")
+
+    assert "window.sidecar.getRuntimeConfig()" in source
+    assert "resolved_url" in source
+    assert "settingsStore.getState().sidecarUrl" not in source
+
+
+def test_desktop_preload_exposes_runtime_config_ipc() -> None:
+    source = _read_repo_file("desktop/electron/preload.js")
+
+    assert "getRuntimeConfig" in source
+    assert "setRuntimeConfig" in source
+    assert "getStatus" in source
+
+
+def test_desktop_settings_store_no_longer_persists_sidecar_url() -> None:
+    source = _read_repo_file("desktop/src/store/settingsStore.js")
+
+    assert "sidecarUrl" not in source
+
+
+def test_settings_panel_saves_sidecar_config_through_ipc() -> None:
+    source = _read_repo_file("desktop/src/components/settings/SettingsPanel.jsx")
+
+    assert "window.sidecar?.setRuntimeConfig" in source
+    assert "resolved_url_source" in source
+
+
+def test_desktop_preload_exposes_startup_status_ipc() -> None:
+    source = _read_repo_file("desktop/electron/preload.js")
+
+    assert "checkHealth" in source
+    assert "getStatus" in source
+    assert "sidecar:health" in source
+
+
+def test_desktop_main_status_contract_uses_snake_case_fields() -> None:
+    runtime_source = _read_repo_file("desktop/electron/sidecarRuntime.js")
+    settings_source = _read_repo_file("desktop/src/components/settings/SettingsPanel.jsx")
+
+    assert "resolved_url:" in runtime_source
+    assert "resolved_url_source:" in runtime_source
+    assert "launch_configured:" in runtime_source
+    assert "launch_command_source:" in runtime_source
+    assert "resolved_url_source" in settings_source
+    assert "launch_command_source" in settings_source
+
+
+def test_desktop_main_reconciles_managed_sidecar_lifecycle() -> None:
+    source = _read_repo_file("desktop/electron/main.js")
+
+    assert "runtimeTargetsDiffer" in source
+    assert "buildManagedExitStatus" in source
+    assert "stopManagedSidecar()" in source
+
+
 def test_desktop_main_health_probe_returns_structured_payload() -> None:
     source = _read_repo_file("desktop/electron/main.js")
 

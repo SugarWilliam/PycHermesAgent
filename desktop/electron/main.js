@@ -1,37 +1,49 @@
 const { app, BrowserWindow, ipcMain } = require('electron')
 const { join } = require('path')
-const http = require('http')
 
 let autoUpdater = null
-try { autoUpdater = require('electron-updater').autoUpdater } catch (e) { /* dev mode */ }
+try {
+  autoUpdater = require('electron-updater').autoUpdater
+} catch (e) {
+  // dev mode
+}
 
-const SIDECAR_URL = process.env.PYC_HERMES_SIDECAR_URL || 'http://127.0.0.1:8765'
+const {
+  buildSidecarStatus,
+  buildManagedExitStatus,
+  loadPersistedSidecarConfig,
+  savePersistedSidecarConfig,
+  resolveSidecarRuntimeConfig,
+  runtimeTargetsDiffer,
+  probeSidecarHealth,
+  attachFirstStartup,
+} = require('./sidecarRuntime')
 
-function checkSidecarHealth() {
-  return new Promise((resolve) => {
-    const url = new URL('/health', SIDECAR_URL)
-    const req = http.get(url, (res) => {
-      let body = ''
-      res.on('data', (chunk) => { body += chunk })
-      res.on('end', () => {
-        let parsed = null
-        try {
-          parsed = JSON.parse(body)
-        } catch {
-          parsed = null
-        }
-        resolve({
-          ok: res.statusCode === 200,
-          status: res.statusCode,
-          url: SIDECAR_URL,
-          payload: parsed,
-          rawBody: parsed ? undefined : body
-        })
-      })
-    })
-    req.on('error', (err) => resolve({ ok: false, status: 0, url: SIDECAR_URL, error: err.message }))
-    req.setTimeout(3000, () => { req.destroy(); resolve({ ok: false, status: 0, url: SIDECAR_URL, error: 'timeout' }) })
-  })
+let runtimeConfig = {
+  resolved_url: 'http://127.0.0.1:8765',
+  resolved_url_source: 'default',
+  launch_configured: false,
+  launch_command: '',
+  launch_args: [],
+  launch_command_source: 'none',
+  persisted_config: { sidecar_url: '', sidecar_command: '', sidecar_args: [] },
+}
+let runtimeStatus = buildSidecarStatus(runtimeConfig)
+let managedSidecar = null
+
+async function checkSidecarHealth() {
+  const SIDECAR_URL = runtimeConfig.resolved_url
+  const probe = await probeSidecarHealth(SIDECAR_URL)
+  const parsed = probe.payload || null
+  const body = probe.rawBody
+  return {
+    ok: probe.ok,
+    status: probe.status,
+    url: SIDECAR_URL,
+    payload: parsed,
+    rawBody: parsed ? undefined : body,
+    error: probe.error,
+  }
 }
 
 function createWindow() {
@@ -43,8 +55,8 @@ function createWindow() {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
-    }
+      sandbox: false,
+    },
   })
 
   if (process.env.ELECTRON_RENDERER_URL) {
@@ -56,8 +68,76 @@ function createWindow() {
   return mainWindow
 }
 
-ipcMain.handle('sidecar:health', () => checkSidecarHealth())
-ipcMain.handle('sidecar:url', () => SIDECAR_URL)
+function stopManagedSidecar() {
+  if (managedSidecar && !managedSidecar.killed) {
+    managedSidecar.kill()
+  }
+  managedSidecar = null
+}
+
+function bindManagedSidecar(child, runtime) {
+  if (!child || typeof child.once !== 'function') {
+    return child
+  }
+
+  child.once('exit', (code, signal) => {
+    if (managedSidecar !== child) {
+      return
+    }
+    runtimeStatus = buildManagedExitStatus(runtime, runtimeStatus, { code, signal })
+    managedSidecar = null
+  })
+  return child
+}
+
+async function refreshSidecarRuntime({ allowLaunch }) {
+  const nextRuntimeConfig = resolveSidecarRuntimeConfig({ env: process.env, userDataDir: app.getPath('userData') })
+
+  if (managedSidecar && runtimeTargetsDiffer(runtimeConfig, nextRuntimeConfig)) {
+    stopManagedSidecar()
+  }
+
+  runtimeConfig = nextRuntimeConfig
+
+  if (allowLaunch) {
+    const result = await attachFirstStartup(runtimeConfig)
+    runtimeStatus = result.status
+    managedSidecar = result.status.managed_process ? bindManagedSidecar(result.child, runtimeConfig) : null
+    return runtimeStatus
+  }
+
+  const probe = await probeSidecarHealth(runtimeConfig.resolved_url)
+  runtimeStatus = {
+    ...buildSidecarStatus(runtimeConfig),
+    startup_state: probe.ok ? 'attached' : 'unavailable',
+    last_probe: probe,
+    last_error: probe.ok
+      ? null
+      : {
+          code: probe.status === 0 ? 'attach_unreachable' : 'attach_http_error',
+          message: probe.error || `HTTP ${probe.status}`,
+          stage: 'attach',
+          details: probe,
+        },
+  }
+  return runtimeStatus
+}
+
+ipcMain.handle('sidecar:get-runtime-config', async () => runtimeConfig)
+ipcMain.handle('sidecar:get-status', async () => runtimeStatus)
+ipcMain.handle('sidecar:check-health', async () => refreshSidecarRuntime({ allowLaunch: false }))
+ipcMain.handle('sidecar:health', async () => checkSidecarHealth())
+ipcMain.handle('sidecar:url', async () => runtimeConfig.resolved_url)
+ipcMain.handle('sidecar:set-runtime-config', async (_event, partial) => {
+  const current = loadPersistedSidecarConfig(app.getPath('userData'))
+  const next = savePersistedSidecarConfig(app.getPath('userData'), {
+    sidecar_url: typeof partial.sidecar_url === 'string' ? partial.sidecar_url : current.sidecar_url,
+    sidecar_command: typeof partial.sidecar_command === 'string' ? partial.sidecar_command : current.sidecar_command,
+    sidecar_args: Array.isArray(partial.sidecar_args) ? partial.sidecar_args : current.sidecar_args,
+  })
+  await refreshSidecarRuntime({ allowLaunch: false })
+  return { ...runtimeConfig, persisted_config: next }
+})
 
 function initAutoUpdater() {
   if (!autoUpdater) return
@@ -66,7 +146,9 @@ function initAutoUpdater() {
 
   function sendStatus(data) {
     const win = BrowserWindow.getAllWindows()[0]
-    if (win && !win.isDestroyed()) win.webContents.send('updater:status', data)
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('updater:status', data)
+    }
   }
 
   autoUpdater.on('checking-for-update', () => sendStatus({ state: 'checking' }))
@@ -82,16 +164,14 @@ function initAutoUpdater() {
 }
 
 app.whenReady().then(async () => {
-  const healthy = await checkSidecarHealth()
-  if (!healthy.ok) {
-    console.warn('[desktop] Sidecar not reachable at', SIDECAR_URL)
-  }
-
+  await refreshSidecarRuntime({ allowLaunch: true })
   initAutoUpdater()
   const win = createWindow()
 
   win.once('show', () => {
-    if (autoUpdater) setTimeout(() => autoUpdater.checkForUpdates().catch(() => {}), 5000)
+    if (autoUpdater) {
+      setTimeout(() => autoUpdater.checkForUpdates().catch(() => {}), 5000)
+    }
   })
   win.show()
 
@@ -99,6 +179,8 @@ app.whenReady().then(async () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
+
+app.on('before-quit', stopManagedSidecar)
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()

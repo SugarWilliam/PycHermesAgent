@@ -3,10 +3,19 @@ import { create } from 'zustand'
 const STORAGE_KEY = 'pyc-hermes-settings'
 
 const DEFAULTS = {
-  sidecarUrl: 'http://127.0.0.1:8765',
   defaultModel: '',
   defaultAnalysisMode: 'casual',
   theme: 'dark'
+}
+
+function sanitizeSettings(input = {}) {
+  return {
+    defaultModel: typeof input.defaultModel === 'string' ? input.defaultModel : DEFAULTS.defaultModel,
+    defaultAnalysisMode: ['casual', 'structured', 'formal'].includes(input.defaultAnalysisMode)
+      ? input.defaultAnalysisMode
+      : DEFAULTS.defaultAnalysisMode,
+    theme: ['light', 'dark', 'system'].includes(input.theme) ? input.theme : DEFAULTS.theme
+  }
 }
 
 const useSettingsStore = create((set, get) => ({
@@ -15,20 +24,17 @@ const useSettingsStore = create((set, get) => ({
   loadSettings: () => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY)
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        set({ ...DEFAULTS, ...parsed })
-      }
+      if (!raw) return
+      set(sanitizeSettings(JSON.parse(raw)))
     } catch {
       // ignore corrupt storage
     }
   },
 
   saveSettings: (partial) => {
-    const next = { ...get(), ...partial }
-    const { loadSettings, saveSettings, ...data } = next
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-    set(partial)
+    const next = sanitizeSettings({ ...get(), ...partial })
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+    set(next)
   }
 }))
 

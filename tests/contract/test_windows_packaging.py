@@ -141,3 +141,14 @@ def test_desktop_packaging_commands_align_with_release_gates() -> None:
     )
     assert "npm run dist:dir" in production_gates
     assert "dist:linux" not in production_gates
+
+
+def test_desktop_readme_documents_sidecar_startup_contract() -> None:
+    root = Path(__file__).resolve().parents[2]
+    desktop_readme = (root / "desktop" / "README.md").read_text(encoding="utf-8")
+
+    assert "PYC_HERMES_SIDECAR_URL" in desktop_readme
+    assert "sidecar_url.txt" in desktop_readme
+    assert "sidecar-config.json" in desktop_readme
+    assert "PYC_HERMES_SIDECAR_CMD" in desktop_readme
+    assert "attach first" in desktop_readme.lower()

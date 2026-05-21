@@ -1,17 +1,16 @@
 /**
  * Sidecar HTTP + SSE client.
  *
- * Connects to the Python sidecar at a configurable base URL and provides
+ * Connects to the Python sidecar at a main-process-authoritative base URL and provides
  * methods for health checks, non-streaming calls, and SSE streaming.
  */
 
-import useSettingsStore from '../store/settingsStore'
-
 const DEFAULT_BASE_URL = 'http://127.0.0.1:8765'
 
-function getBaseUrl() {
-  const stored = useSettingsStore.getState().sidecarUrl
-  return window.__SIDECAR_URL__ || stored || DEFAULT_BASE_URL
+async function getBaseUrl() {
+  if (!window.sidecar?.getRuntimeConfig) return DEFAULT_BASE_URL
+  const runtime = await window.sidecar.getRuntimeConfig()
+  return runtime.resolved_url || DEFAULT_BASE_URL
 }
 
 /**
@@ -19,7 +18,11 @@ function getBaseUrl() {
  * @returns {Promise<object>} health payload
  */
 export async function checkHealth() {
-  const res = await fetch(`${getBaseUrl()}/health`)
+  if (window.sidecar?.checkHealth) {
+    return window.sidecar.checkHealth()
+  }
+
+  const res = await fetch(`${await getBaseUrl()}/health`)
   if (!res.ok) throw new Error(`Health check failed: ${res.status}`)
   return res.json()
 }
@@ -30,7 +33,7 @@ export async function checkHealth() {
  * @returns {Promise<object>} result payload
  */
 export async function runAgent(request) {
-  const res = await fetch(`${getBaseUrl()}/agent/run`, {
+  const res = await fetch(`${await getBaseUrl()}/agent/run`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request)
@@ -55,7 +58,8 @@ export function streamAgent(request, handlers = {}) {
   ;(async () => {
     let sawDone = false
     try {
-      const res = await fetch(`${getBaseUrl()}/agent/run/stream`, {
+      const baseUrl = await getBaseUrl()
+      const res = await fetch(`${baseUrl}/agent/run/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(request),
@@ -132,16 +136,11 @@ export function streamAgent(request, handlers = {}) {
 }
 
 /**
- * Send a formal analysis request.
- * @param {object} request - MetaAnalysisRequest fields
- * @returns {Promise<object>} MetaAnalysisResult
- */
-/**
  * Fetch all skills.
  * @returns {Promise<object[]>} skills list
  */
 export async function fetchSkills() {
-  const res = await fetch(`${getBaseUrl()}/skills`)
+  const res = await fetch(`${await getBaseUrl()}/skills`)
   if (!res.ok) throw new Error(`Fetch skills failed: ${res.status}`)
   return res.json()
 }
@@ -151,7 +150,7 @@ export async function fetchSkills() {
  * @param {string} id - skill ID
  */
 export async function activateSkill(id) {
-  const res = await fetch(`${getBaseUrl()}/skills/${id}/activate`, { method: 'POST' })
+  const res = await fetch(`${await getBaseUrl()}/skills/${id}/activate`, { method: 'POST' })
   if (!res.ok) throw new Error(`Activate skill failed: ${res.status}`)
   return res.json()
 }
@@ -161,13 +160,13 @@ export async function activateSkill(id) {
  * @param {string} id - skill ID
  */
 export async function deactivateSkill(id) {
-  const res = await fetch(`${getBaseUrl()}/skills/${id}/deactivate`, { method: 'POST' })
+  const res = await fetch(`${await getBaseUrl()}/skills/${id}/deactivate`, { method: 'POST' })
   if (!res.ok) throw new Error(`Deactivate skill failed: ${res.status}`)
   return res.json()
 }
 
 export async function runFormalAnalysis(request) {
-  const res = await fetch(`${getBaseUrl()}/formal-analysis`, {
+  const res = await fetch(`${await getBaseUrl()}/formal-analysis`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request)
