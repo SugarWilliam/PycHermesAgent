@@ -127,6 +127,7 @@ def test_desktop_packaging_commands_align_with_release_gates() -> None:
     assert "dist:dir" in scripts
     assert scripts["dist:dir"] == "electron-vite build && electron-builder --dir"
     assert scripts["pack"] == scripts["dist:dir"]
+    assert scripts.get("dist:win-unpacked", "").startswith("electron-vite build && electron-builder --win dir")
 
     release_gates = (root / "scripts" / "release_gates.py").read_text(encoding="utf-8")
     assert '"dist:linux"' not in release_gates

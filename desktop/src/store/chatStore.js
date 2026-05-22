@@ -2,6 +2,22 @@ import { create } from 'zustand'
 import { streamAgent, extractCitationsFromToolContent } from '../services/sidecarClient'
 import useCitationStore from './citationStore'
 import useSkillStore from './skillStore'
+import useUiStore from './uiStore'
+
+/** Map server `analysis_card` (snake_case) to ContextPanel `contextData` shape. */
+function analysisCardToContextData(card) {
+  if (!card || typeof card !== 'object') return null
+  return {
+    method: card.method,
+    evidenceGrade: card.evidence_grade ?? card.evidenceGrade,
+    srGrade: card.sr_grade ?? card.srGrade,
+    rationale: card.rationale,
+    citations: Array.isArray(card.citations) ? card.citations : [],
+    risks: Array.isArray(card.risks) ? card.risks : [],
+    assumptions: Array.isArray(card.assumptions) ? card.assumptions : [],
+    degraded: Boolean(card.degraded)
+  }
+}
 
 const useChatStore = create((set, get) => ({
   conversations: [],
@@ -82,6 +98,7 @@ const useChatStore = create((set, get) => ({
     }
 
     useCitationStore.getState().clearCitations()
+    useUiStore.getState().setFormalContextSnapshot(null)
 
     // Add user message
     get().addMessage(convId, { role: 'user', content: text, analysisMode })
@@ -172,7 +189,9 @@ const useChatStore = create((set, get) => ({
       onDone: (event) => {
         const meta = { finishReason: event.finish_reason || 'stop' }
         if (event.payload?.analysis_card || event.analysis_card) {
-          meta.analysisCard = event.payload?.analysis_card || event.analysis_card
+          const raw = event.payload?.analysis_card || event.analysis_card
+          meta.analysisCard = raw
+          useUiStore.getState().setFormalContextSnapshot(analysisCardToContextData(raw))
         }
         get().updateLastAssistantMeta(convId, meta)
         set({ isStreaming: false, streamController: null })

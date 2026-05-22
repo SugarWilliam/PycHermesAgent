@@ -13,8 +13,9 @@ npm run dev
 
 ```bash
 npm run build
-npm run dist:dir   # unpacked build for testing
-npm run dist       # full installer
+npm run dist:dir             # unpacked for current OS (Ubuntu CI → linux-unpacked)
+npm run dist:win-unpacked    # Windows unpacked — run on Windows; needs desktop/build/icon.ico
+npm run dist                 # installer / platform defaults from electron-builder
 ```
 
 ## Sidecar Startup Contract
@@ -59,7 +60,7 @@ Environment variables and `sidecar_url.txt` **override** values shown in Setting
 
 ## Chat streaming (SSE)
 
-The renderer consumes `/agent/run/stream` (`sidecarClient.streamAgent`). Event types from the Hermes `AgentLoop` include at least: `start`, `plan`, `assistant.delta`, `assistant.tool_call.delta`, `assistant.completed`, `tool.result`, `retry`, `done`, `error`. **Stop** cancels via `AbortController`; the client invokes **`onAbort`** so **`isStreaming` clears** without a stuck spinner. Formal-mode **`analysis_card`** is attached on the terminal `done` event when present.
+The renderer consumes `/agent/run/stream` (`sidecarClient.streamAgent`). Event types from the Hermes `AgentLoop` include at least: `start`, `plan`, `assistant.delta`, `assistant.tool_call.delta`, `assistant.completed`, `tool.result`, `retry`, `done`, `error`. **Stop** cancels via `AbortController`; the client invokes **`onAbort`** so **`isStreaming` clears** without a stuck spinner. Formal-mode **`analysis_card`** is attached on the terminal `done` event when present and is mirrored into the **Context panel** snapshot for Method / Evidence / SR / Risks / Assumptions (without forcing the panel open).
 
 The request body includes **`activated_skills`** (names of toggled-on **builtin** skills from the sidebar), matching the sidecar `AgentLoopRequest` contract. Project-scoped skills listed from `/skills` remain **metadata-only** in the UI (not activatable via POST) per server policy.
 

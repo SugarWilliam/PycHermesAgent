@@ -311,7 +311,8 @@ Rationale:
 
 - Track G:
   - CI package build
-  - installer smoke
+  - **Linux unpacked** validated by `RELEASE_GATES_PRODUCTION` (`npm run dist:dir`)
+  - **Windows unpacked/installer**: use `desktop/npm run dist:win-unpacked` or `dist:win` on a Windows runner after `desktop/build/icon.ico` exists
   - update path smoke
   - release gate automation
 

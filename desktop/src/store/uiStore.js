@@ -9,9 +9,12 @@ const useUiStore = create((set) => ({
   toggleContextPanel: () => set((s) => ({ contextPanelCollapsed: !s.contextPanelCollapsed })),
   setTheme: (theme) => set({ theme }),
 
-  // Context panel content
+  // Context panel content (Formal/Meta snapshot; chat may refresh via setFormalContextSnapshot)
   contextData: null,
-  setContextData: (data) => set({ contextData: data, contextPanelCollapsed: false })
+  /** Opens the context panel (user-driven navigation). */
+  setContextData: (data) => set({ contextData: data, contextPanelCollapsed: false }),
+  /** Replace right-rail snapshot without forcing the panel open (streaming formal path). */
+  setFormalContextSnapshot: (data) => set({ contextData: data })
 }))
 
 export default useUiStore

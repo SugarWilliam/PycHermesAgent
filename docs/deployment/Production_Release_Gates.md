@@ -20,6 +20,8 @@ Align automation with `docs/architecture/Execution_Blueprint_v0.2.0.md` and `doc
 | MRAG planner + backup | `uv run pyc-hermes-mrag-migrate /path/to/mrag/root --backup-to /path/to/backup-parent --json` |
 | Desktop pack | `cd desktop && npm ci && npm audit --omit=dev --audit-level=critical && npm run dist:dir` |
 
+**Linux vs Windows unpacked:** CI production gates exercise `dist:dir` on Ubuntu (electron-builder emits `dist-installer/linux-unpacked`). For **Windows unpacked** artifacts (Phase 3 Track G installer smoke precursor), run on **`windows-latest`** or a developer machine: `npm run dist:win-unpacked` after adding `desktop/build/icon.ico` (referenced by `package.json` `build.win.icon`).
+
 Production gates also honour **`RELEASE_GATES_PYINSTALLER=1`** (runs **`uv sync --frozen --extra dev --extra ga`** then verifies **`PyInstaller`** imports; **`frozen`** avoids unexpected lock churn).
 
 ## Observability

@@ -1,4 +1,5 @@
 node_modules/
 dist/
+dist-installer/
 out/
 .electron-vite/
