@@ -1,6 +1,7 @@
 import Sidebar from './Sidebar'
 import ContextPanel from './ContextPanel'
 import ChatPanel from '../chat/ChatPanel'
+import SidecarStatusBanner from './SidecarStatusBanner'
 import useUiStore from '../../store/uiStore'
 
 export default function AppLayout() {
@@ -20,6 +21,7 @@ export default function AppLayout() {
 
       {/* Center chat panel */}
       <div className="flex-1 flex flex-col min-w-0">
+        <SidecarStatusBanner />
         <ChatPanel />
       </div>
 

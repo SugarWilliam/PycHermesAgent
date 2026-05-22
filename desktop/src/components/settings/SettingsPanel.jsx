@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import useSettingsStore from '../../store/settingsStore'
+import { useSidecarStatusStore } from '../../store/sidecarStatusStore'
 
 export default function SettingsPanel({ open, onClose }) {
   const settings = useSettingsStore()
@@ -51,6 +52,8 @@ export default function SettingsPanel({ open, onClose }) {
       sidecar_command: form.sidecar_command,
       sidecar_args: String(form.sidecar_args_text || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
     })
+
+    useSidecarStatusStore.getState().refresh()
 
     onClose()
   }

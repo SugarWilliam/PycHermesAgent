@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('sidecar', {
   setRuntimeConfig: (partial) => ipcRenderer.invoke('sidecar:set-runtime-config', partial),
   getStatus: () => ipcRenderer.invoke('sidecar:get-status'),
   checkHealth: () => ipcRenderer.invoke('sidecar:health'),
+  restart: () => ipcRenderer.invoke('sidecar:restart'),
 })
 
 contextBridge.exposeInMainWorld('app', {

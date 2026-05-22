@@ -83,6 +83,8 @@ Acceptance:
 - Desktop can surface a clear startup error when sidecar launch fails.
 - No hidden mismatch between `main.js`, `sidecarClient.js`, and settings defaults.
 
+**Canonical policy reference:** precedence order, IPC surface, and UI field mapping are documented in `desktop/README.md` (Sidecar Startup Contract — single authoritative policy for dev and packaged runs).
+
 ### A2. Health and Degraded-State UX
 
 **Goal:** make the desktop operationally understandable when the sidecar is unavailable or degraded.

@@ -135,8 +135,15 @@ ipcMain.handle('sidecar:set-runtime-config', async (_event, partial) => {
     sidecar_command: typeof partial.sidecar_command === 'string' ? partial.sidecar_command : current.sidecar_command,
     sidecar_args: Array.isArray(partial.sidecar_args) ? partial.sidecar_args : current.sidecar_args,
   })
-  await refreshSidecarRuntime({ allowLaunch: false })
+  // Saving desktop sidecar settings should re-run attach-first startup so a
+  // configured launch command can spawn the managed sidecar without a separate
+  // "Restart sidecar" action (Phase 3A product path).
+  await refreshSidecarRuntime({ allowLaunch: true })
   return { ...runtimeConfig, persisted_config: next }
+})
+ipcMain.handle('sidecar:restart', async () => {
+  await refreshSidecarRuntime({ allowLaunch: true })
+  return runtimeStatus
 })
 
 function initAutoUpdater() {
