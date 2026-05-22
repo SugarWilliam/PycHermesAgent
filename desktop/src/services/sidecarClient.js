@@ -49,7 +49,7 @@ export async function runAgent(request) {
  * Stream agent loop events via SSE.
  *
  * @param {object} request - AgentLoopRequest fields
- * @param {object} handlers - { onStart, onDelta, onToolCall, onDone, onError }
+ * @param {object} handlers - { onStart, onDelta, onToolCall, onToolResult, onDone, onError, onAbort }
  * @returns {AbortController} - call .abort() to cancel the stream
  */
 export function streamAgent(request, handlers = {}) {
@@ -100,6 +100,11 @@ export function streamAgent(request, handlers = {}) {
             case 'start':
               handlers.onStart?.(event)
               break
+            case 'plan':
+            case 'assistant.completed':
+            case 'retry':
+              handlers.onEvent?.(event)
+              break
             case 'assistant.delta':
               handlers.onDelta?.(event)
               break
@@ -126,7 +131,9 @@ export function streamAgent(request, handlers = {}) {
         handlers.onDone?.({ event: 'done', finish_reason: 'stream_closed' })
       }
     } catch (err) {
-      if (err.name !== 'AbortError') {
+      if (err.name === 'AbortError') {
+        handlers.onAbort?.()
+      } else {
         handlers.onError?.(err)
       }
     }
@@ -143,6 +150,37 @@ export async function fetchSkills() {
   const res = await fetch(`${await getBaseUrl()}/skills`)
   if (!res.ok) throw new Error(`Fetch skills failed: ${res.status}`)
   return res.json()
+}
+
+/**
+ * Load sidecar-backed user preferences (Hermes memory / analysis defaults).
+ * @returns {Promise<object>}
+ */
+export async function fetchPreferences() {
+  const res = await fetch(`${await getBaseUrl()}/preferences`)
+  if (!res.ok) throw new Error(`Fetch preferences failed: ${res.status}`)
+  return res.json()
+}
+
+/**
+ * Try to collect MRAG-style citation objects from a tool result JSON body.
+ * @param {unknown} content - tool_result.content (often a stringified JSON)
+ * @returns {object[]}
+ */
+export function extractCitationsFromToolContent(content) {
+  if (typeof content !== 'string' || !content.trim()) return []
+  let data
+  try {
+    data = JSON.parse(content)
+  } catch {
+    return []
+  }
+  if (!data || typeof data !== 'object') return []
+  const fromRoot = data.citations
+  const fromRetrieval = data.retrieval && data.retrieval.citations
+  const fromNested = data.result && data.result.citations
+  const raw = Array.isArray(fromRoot) ? fromRoot : Array.isArray(fromRetrieval) ? fromRetrieval : Array.isArray(fromNested) ? fromNested : []
+  return raw.filter((c) => c && typeof c === 'object')
 }
 
 /**

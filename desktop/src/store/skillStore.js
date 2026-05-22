@@ -1,14 +1,19 @@
 import { create } from 'zustand'
-import { fetchSkills, activateSkill, deactivateSkill } from '../services/sidecarClient'
+import {
+  fetchSkills as loadSkillsPayload,
+  activateSkill,
+  deactivateSkill
+} from '../services/sidecarClient'
 
 const useSkillStore = create((set, get) => ({
   skills: [],
   loading: false,
+  lastFetchError: null,
 
   fetchSkills: async () => {
-    set({ loading: true })
+    set({ loading: true, lastFetchError: null })
     try {
-      const payload = await fetchSkills()
+      const payload = await loadSkillsPayload()
       const discovered = (Array.isArray(payload.items) ? payload.items : []).map((skill) => ({
         ...skill,
         sourceKind: skill.source_kind || 'project',
@@ -19,9 +24,12 @@ const useSkillStore = create((set, get) => ({
         sourceKind: 'builtin',
         activatable: true
       }))
-      set({ skills: [...builtin, ...discovered], loading: false })
-    } catch {
-      set({ loading: false })
+      set({ skills: [...builtin, ...discovered], loading: false, lastFetchError: null })
+    } catch (e) {
+      set({
+        loading: false,
+        lastFetchError: e?.message || String(e)
+      })
     }
   },
 
@@ -45,7 +53,10 @@ const useSkillStore = create((set, get) => ({
     }
   },
 
-  getActiveFragments: () => get().skills.filter((s) => s.active).map((s) => s.name)
+  getActiveFragments: () => get().skills.filter((s) => s.active).map((s) => s.name),
+
+  /** Skill names passed to `/agent/run/stream` as `activated_skills` (sidecar contract). */
+  getActiveSkillNames: () => get().skills.filter((s) => s.active).map((s) => s.name)
 }))
 
 export default useSkillStore

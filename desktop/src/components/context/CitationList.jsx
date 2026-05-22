@@ -3,7 +3,13 @@ import useCitationStore from '../../store/citationStore'
 export default function CitationList() {
   const citations = useCitationStore((s) => s.citations)
 
-  if (!citations || citations.length === 0) return null
+  if (!citations || citations.length === 0) {
+    return (
+      <p className="text-xs text-gray-500 dark:text-gray-400 py-1">
+        No retrieval citations yet (populated when tools return JSON with a <code className="text-[10px]">citations</code> array).
+      </p>
+    )
+  }
 
   // Group by source document
   const grouped = citations.reduce((acc, c) => {

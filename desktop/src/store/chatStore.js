@@ -1,5 +1,7 @@
 import { create } from 'zustand'
-import { streamAgent } from '../services/sidecarClient'
+import { streamAgent, extractCitationsFromToolContent } from '../services/sidecarClient'
+import useCitationStore from './citationStore'
+import useSkillStore from './skillStore'
 
 const useChatStore = create((set, get) => ({
   conversations: [],
@@ -79,6 +81,8 @@ const useChatStore = create((set, get) => ({
       convId = get().createConversation()
     }
 
+    useCitationStore.getState().clearCitations()
+
     // Add user message
     get().addMessage(convId, { role: 'user', content: text, analysisMode })
 
@@ -87,6 +91,7 @@ const useChatStore = create((set, get) => ({
       role: 'assistant',
       content: '',
       toolCalls: [],
+      toolResults: [],
       traceId: null,
       model: null
     })
@@ -99,11 +104,14 @@ const useChatStore = create((set, get) => ({
       ?.messages.filter((m) => m.role === 'user' || m.role === 'assistant')
       .map((m) => ({ role: m.role, content: m.content })) || []
 
+    const activated_skills = useSkillStore.getState().getActiveSkillNames()
+
     const request = {
       messages,
       analysis_mode: analysisMode,
       planning_enabled: analysisMode !== 'casual',
-      max_iterations: analysisMode === 'formal' ? 12 : 8
+      max_iterations: analysisMode === 'formal' ? 12 : 8,
+      activated_skills
     }
 
     const controller = streamAgent(request, {
@@ -129,6 +137,38 @@ const useChatStore = create((set, get) => ({
           }))
         })
       },
+      onToolResult: (event) => {
+        const payload = event.payload && typeof event.payload === 'object' ? event.payload : {}
+        const entry = {
+          name: payload.tool_call?.name || payload.tool_call?.function?.name,
+          tool_call_id: payload.tool_call?.id || payload.tool_result?.tool_call_id,
+          content:
+            typeof payload.tool_result?.content === 'string'
+              ? payload.tool_result.content
+              : payload.tool_result?.content != null
+                ? JSON.stringify(payload.tool_result.content)
+                : '',
+          auto_injected: Boolean(payload.auto_injected)
+        }
+        set((s) => ({
+          conversations: s.conversations.map((c) => {
+            if (c.id !== convId) return c
+            const msgs = [...c.messages]
+            const last = msgs[msgs.length - 1]
+            if (!last || last.role !== 'assistant') return c
+            const prev = Array.isArray(last.toolResults) ? last.toolResults : []
+            msgs[msgs.length - 1] = {
+              ...last,
+              toolResults: [...prev, entry]
+            }
+            return { ...c, messages: msgs }
+          })
+        }))
+        const cites = extractCitationsFromToolContent(entry.content)
+        if (cites.length > 0) {
+          useCitationStore.getState().appendCitations(cites)
+        }
+      },
       onDone: (event) => {
         const meta = { finishReason: event.finish_reason || 'stop' }
         if (event.payload?.analysis_card || event.analysis_card) {
@@ -139,6 +179,10 @@ const useChatStore = create((set, get) => ({
       },
       onError: (err) => {
         get().appendDelta(convId, `\n\n**Error:** ${err.message}`)
+        set({ isStreaming: false, streamController: null })
+      },
+      onAbort: () => {
+        get().updateLastAssistantMeta(convId, { finishReason: 'aborted' })
         set({ isStreaming: false, streamController: null })
       }
     })

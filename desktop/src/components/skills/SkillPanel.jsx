@@ -8,12 +8,15 @@ export default function SkillPanel({ expanded, onToggle }) {
   const fetchSkills = useSkillStore((s) => s.fetchSkills)
 
   useEffect(() => {
-    if (expanded && skills.length === 0) fetchSkills()
-  }, [expanded])
+    if (!expanded) return
+    fetchSkills()
+  }, [expanded, fetchSkills])
 
   const activeCount = skills.filter((s) => s.active).length
+  const lastFetchError = useSkillStore((s) => s.lastFetchError)
   const prompt = skills.filter((s) => s.category === 'prompt')
   const analysis = skills.filter((s) => s.category === 'analysis')
+  const other = skills.filter((s) => s.category !== 'prompt' && s.category !== 'analysis')
 
   return (
     <div className="border-t border-gray-200 dark:border-gray-800 pt-2 mt-2">
@@ -29,6 +32,11 @@ export default function SkillPanel({ expanded, onToggle }) {
 
       {expanded && (
         <div className="mt-1 max-h-60 overflow-y-auto">
+          {lastFetchError && (
+            <p className="text-xs text-red-500 dark:text-red-400 px-3 py-2" title={lastFetchError}>
+              Skills unavailable ({lastFetchError.slice(0, 80)})
+            </p>
+          )}
           {loading ? (
             <p className="text-xs text-gray-400 px-3 py-2">Loading skills…</p>
           ) : (
@@ -45,8 +53,16 @@ export default function SkillPanel({ expanded, onToggle }) {
                   {analysis.map((s) => <SkillCard key={s.id} skill={s} />)}
                 </div>
               )}
-              {!prompt.length && !analysis.length && (
-                <p className="text-xs text-gray-400 px-3 py-2">No skills available</p>
+              {other.length > 0 && (
+                <div className="mb-1">
+                  <span className="px-3 text-[10px] font-medium text-gray-400 uppercase">Other</span>
+                  {other.map((s) => <SkillCard key={s.id} skill={s} />)}
+                </div>
+              )}
+              {!prompt.length && !analysis.length && !other.length && (
+                <p className="text-xs text-gray-400 px-3 py-2">
+                  {lastFetchError ? 'Open sidecar and retry expanding Skills.' : 'No skills available'}
+                </p>
               )}
             </>
           )}
