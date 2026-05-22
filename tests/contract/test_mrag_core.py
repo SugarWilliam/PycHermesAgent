@@ -1,4 +1,5 @@
 import json
+import zipfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -6,6 +7,8 @@ import pytest
 
 from pyc_hermes_agent.contracts import RetrievalRequest
 from pyc_hermes_agent.mrag_core import MRAGService, MRAGManifestIncompatibleError, MRAGStorageLockedError
+from pyc_hermes_agent.mrag_core.docx_extractor import extract_docx_plain_text
+from pyc_hermes_agent.mrag_core.xlsx_extractor import extract_xlsx_plain_text
 from pyc_hermes_agent.mrag_core.pdf_extractor import PDFExtractionResult, PDFPage
 from pyc_hermes_agent.mrag_core.ownership import MRAG_LOCK_FILE
 from pyc_hermes_agent.mrag_core.persistence import MRAG_INDEX_FORMAT_VERSION, MRAG_MANIFEST_VERSION
@@ -81,6 +84,108 @@ def test_mrag_pdf_ingest_preserves_page_provenance_in_citations(tmp_path) -> Non
     assert cite.section == "page-3"
 
 
+def test_mrag_docx_ingest_and_search_paragraph_text(tmp_path: Path) -> None:
+    xml = """<?xml version="1.0" encoding="UTF-8"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>MRAG DOCX ingestion overview.</w:t></w:r></w:p>
+    <w:p><w:r><w:t>Second paragraph for retrieval alpha.</w:t></w:r></w:p>
+  </w:body>
+</w:document>"""
+    docx_path = tmp_path / "note.docx"
+    with zipfile.ZipFile(docx_path, "w") as zf:
+        zf.writestr("word/document.xml", xml)
+
+    assert "DOCX ingestion" in extract_docx_plain_text(docx_path)
+
+    service = MRAGService()
+    kb = service.create_knowledge_base("docx-test")
+    service.ingest_file(kb.knowledge_base_id, docx_path)
+
+    stored = service.get_knowledge_base(kb.knowledge_base_id)
+    assert stored is not None
+    doc = next(iter(stored.documents.values()))
+    assert doc.source_type == "docx"
+    assert "alpha" in doc.text.lower()
+
+    result = service.search(kb.knowledge_base_id, RetrievalRequest(query="DOCX retrieval", top_k=3))
+    assert result.hits
+    assert result.citations
+    assert result.citations[0].source_type == "docx"
+
+
+def test_mrag_xlsx_ingest_and_search_shared_string(tmp_path: Path) -> None:
+    workbook_xml = """<?xml version="1.0" encoding="UTF-8"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>
+    <sheet name="DemoSheet" sheetId="1" r:id="rId1"/>
+  </sheets>
+</workbook>"""
+
+    rels_xml = """<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+</Relationships>"""
+
+    shared_xml = """<?xml version="1.0" encoding="UTF-8"?>
+<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="1" uniqueCount="1">
+  <si><t>MRAG XLSX retrieval alpha token</t></si>
+</sst>"""
+
+    sheet_xml = """<?xml version="1.0" encoding="UTF-8"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetData>
+    <row r="1"><c r="A1" t="s"><v>0</v></c></row>
+  </sheetData>
+</worksheet>"""
+
+    xlsx_path = tmp_path / "grid.xlsx"
+
+    with zipfile.ZipFile(xlsx_path, "w") as zf:
+        zf.writestr("xl/workbook.xml", workbook_xml)
+        zf.writestr("xl/_rels/workbook.xml.rels", rels_xml)
+
+        zf.writestr("xl/sharedStrings.xml", shared_xml)
+        zf.writestr("xl/worksheets/sheet1.xml", sheet_xml)
+
+    assert "XLSX retrieval" in extract_xlsx_plain_text(xlsx_path)
+
+    service = MRAGService()
+
+    kb = service.create_knowledge_base("xlsx-test")
+    service.ingest_file(kb.knowledge_base_id, xlsx_path)
+
+    stored = service.get_knowledge_base(kb.knowledge_base_id)
+
+    assert stored is not None
+
+    doc = next(iter(stored.documents.values()))
+
+    assert doc.source_type == "xlsx"
+    assert "alpha" in doc.text.lower()
+
+    result = service.search(kb.knowledge_base_id, RetrievalRequest(query="XLSX retrieval token", top_k=3))
+    assert result.hits
+    assert result.citations
+    assert result.citations[0].source_type == "xlsx"
+
+
+def test_extract_xlsx_rejects_bad_archive(tmp_path: Path) -> None:
+    bad = tmp_path / "fake.xlsx"
+
+    bad.write_text("not zip", encoding="utf-8")
+    with pytest.raises(ValueError, match="ZIP archive"):
+        extract_xlsx_plain_text(bad)
+
+
+def test_extract_docx_rejects_bad_archive(tmp_path: Path) -> None:
+    bad = tmp_path / "fake.docx"
+    bad.write_text("not zip", encoding="utf-8")
+    with pytest.raises(ValueError, match="ZIP archive"):
+        extract_docx_plain_text(bad)
+
+
 def test_mrag_lists_knowledge_bases() -> None:
     service = MRAGService()
     service.create_knowledge_base("kb-a")
@@ -131,9 +236,7 @@ def test_mrag_persistence_writes_manifest_and_index_versions(tmp_path) -> None:
         source_uri="memory://versioned/1",
     )
 
-    manifest = json.loads(
-        (storage_root / "knowledge_bases" / kb.knowledge_base_id / "manifest.json").read_text(encoding="utf-8")
-    )
+    manifest = json.loads((storage_root / "knowledge_bases" / kb.knowledge_base_id / "manifest.json").read_text(encoding="utf-8"))
     chunks_payload = json.loads((storage_root / "indexes" / kb.knowledge_base_id / "chunks.json").read_text(encoding="utf-8"))
 
     assert manifest["manifest_version"] == MRAG_MANIFEST_VERSION

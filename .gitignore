@@ -12,6 +12,9 @@ htmlcov/
 venv/
 dist/
 build/
+# Windows electron-builder expects tracked assets under desktop/build/
+!desktop/build/
+!desktop/build/**
 *.egg-info/
 
 .env

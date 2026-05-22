@@ -108,9 +108,9 @@ def test_agent_loop_uses_builtin_formal_analysis_tool(tmp_path: Path) -> None:
 def test_meta_harness_tool_registry_exposes_formal_analysis() -> None:
     registry = create_meta_harness_tool_registry()
 
+    names = {d.name for d in registry.list_descriptors()}
+    assert "formal_analysis" in names
     assert registry.has_tool("formal_analysis") is True
-    descriptor = registry.list_descriptors()[0]
-    assert descriptor.name == "formal_analysis"
 
 
 def test_agent_loop_rejects_unknown_requested_tool(tmp_path: Path) -> None:
@@ -222,14 +222,7 @@ def test_agent_loop_defaults_session_storage_to_root_sandbox(tmp_path: Path) -> 
         session_id="sandbox-default",
     )
 
-    expected_path = (
-        tmp_path
-        / ".pyc_hermes_agent_runtime"
-        / "LOCALAPPDATA"
-        / "PycHermesAgent"
-        / "hermes_engine"
-        / "sessions"
-    )
+    expected_path = tmp_path / ".pyc_hermes_agent_runtime" / "LOCALAPPDATA" / "PycHermesAgent" / "hermes_engine" / "sessions"
     saved = AgentSessionStore(root=tmp_path).load(result.session_id)
 
     assert saved is not None

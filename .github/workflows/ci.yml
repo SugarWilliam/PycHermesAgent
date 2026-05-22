@@ -54,6 +54,31 @@ jobs:
           RELEASE_GATES_MYPY: "1"
         run: uv run python scripts/release_gates.py
 
+  desktop-windows-unpacked:
+    name: Desktop Windows unpacked (electron-builder)
+    needs: contract-tests
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: desktop
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: npm ci + electron-vite build + win dir
+        run: |
+          npm ci
+          npm run dist:win-unpacked
+
   production-gates:
     name: Production packaging gates (lockfile, MRAG migrate, desktop dir pack)
     needs: contract-tests

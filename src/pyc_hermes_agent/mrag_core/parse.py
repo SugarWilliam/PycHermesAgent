@@ -30,6 +30,30 @@ def parse_text_document(
 
 def parse_file_document(path: Path) -> KnowledgeDocument:
     suffix = path.suffix.lower()
+    if suffix == ".docx":
+        from pyc_hermes_agent.mrag_core.docx_extractor import extract_docx_plain_text
+
+        text = extract_docx_plain_text(path)
+        return parse_text_document(
+            text,
+            title=path.stem,
+            source_uri=str(path.resolve()),
+            source_type="docx",
+            metadata={"format": "docx"},
+        )
+
+    if suffix == ".xlsx":
+        from pyc_hermes_agent.mrag_core.xlsx_extractor import extract_xlsx_plain_text
+
+        text = extract_xlsx_plain_text(path)
+        return parse_text_document(
+            text,
+            title=path.stem,
+            source_uri=str(path.resolve()),
+            source_type="xlsx",
+            metadata={"format": "xlsx"},
+        )
+
     text = path.read_text(encoding="utf-8")
     source_type = {
         ".md": "markdown",

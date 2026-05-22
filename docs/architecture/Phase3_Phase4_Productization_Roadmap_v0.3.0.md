@@ -78,7 +78,7 @@ Phase 4 is complete when:
 | GitHub Copilot | Supported in gateway | Real end-user configuration and desktop settings validation |
 | Hermes inheritance | Read-only bridge + product runtime | Better continuity with Hermes memory/session behaviors without collapsing boundaries |
 | MRAG | SQLite/FTS5 + PDF + file/url text | Multi-format ingestion, stronger citation fidelity, better semantic retrieval, and stronger multi-source evidence convergence |
-| Network grounding | Not implemented | Real-time web search tool and evidence path |
+| Network grounding | Not implemented | **`web_search` tool** (urllib + DuckDuckGo instant JSON) + citations; richer providers remain future work |
 | Skills | Builtins + `.opencode/skills` metadata and controlled context binding | User-loadable runtime activation, UI, audit, priority model, and agent-authored skills from user request or long-term usage patterns |
 | Rules | Discovery only | Runtime prompt assembly and precedence enforcement |
 | Authoring | Artifact engine foundation only | PPT/XLSX creation workflows |
@@ -107,8 +107,8 @@ Phase 4 is complete when:
 
 | ID | Task | Detail | Acceptance |
 |----|------|--------|------------|
-| B1 | Search provider abstraction | Introduce provider-neutral web search interface under product runtime/tooling | Search backend swappable without UI changes |
-| B2 | Web search tool | Add a runtime tool for network search usable by AgentLoop | Tool callable in chat and formal modes |
+| B1 | Search provider abstraction | Introduce provider-neutral web search interface under product runtime/tooling | **MVP:** `hermes_engine/web_search.py` normalizes payloads; DuckDuckGo instant JSON backend + injectable opener for contracts |
+| B2 | Web search tool | Add a runtime tool for network search usable by AgentLoop | **MVP shipped:** builtin `create_meta_harness_tool_registry()` registers **`web_search`** |
 | B3 | Evidence normalization | Search results normalized to title / URL / snippet / timestamp / source metadata | Desktop renders them uniformly |
 | B4 | Citation integration | Search results appear in evidence/citation panel | User can inspect network-grounded evidence |
 | B5 | Formal mode grounding | Formal analysis can consume network evidence without bypassing `MetaFramework.execute()` | Formal mode preserves evidence boundary |
@@ -121,8 +121,8 @@ Phase 4 is complete when:
 | ID | Task | Format / scope | Acceptance |
 |----|------|----------------|------------|
 | C1 | HTML ingest | Raw HTML and cleaned content extraction | Title, source URI, body text preserved |
-| C2 | DOCX ingest | Paragraphs, headings, table text | Citations preserve section/document provenance |
-| C3 | XLSX ingest | Workbook/sheet/table/cell text extraction | Citations identify workbook + sheet |
+| C2 | DOCX ingest | Paragraphs, headings, table text | **Baseline shipped:** ZIP/XML paragraph text via `mrag_core/docx_extractor.py` (`source_type="docx"`); heading/table fidelity + provenance refinement remain |
+| C3 | XLSX ingest | Workbook/sheet/table/cell text extraction | **Baseline shipped:** OOXML ZIP workbook + worksheets + shared strings via `mrag_core/xlsx_extractor.py` (`source_type="xlsx"`); per-cell citations & rich provenance refinement remain |
 | C4 | PPTX ingest | Slide title/body/notes extraction | Citations identify slide number |
 | C5 | Image ingest | OCR-first extraction and source metadata | Searchable text from supported image files |
 | C6 | Unified parser registry | Format dispatch under `mrag_core` | Ingestion path stays centralized |
@@ -178,7 +178,7 @@ Phase 4 is complete when:
 
 | ID | Task | Detail | Acceptance |
 |----|------|--------|------------|
-| G1 | Desktop CI build | Build desktop artifacts in CI | Reproducible desktop build job exists |
+| G1 | Desktop CI build | Build desktop artifacts in CI | **`desktop-windows-unpacked`** (Windows runner) plus Linux **`RELEASE_GATES_PRODUCTION`** desktop `dist:dir` |
 | G2 | Clean-machine smoke | Validate install/startup on clean Windows environment | Installer tested beyond dev machine |
 | G3 | Updater release path | Connect packaged updater flow to real release process | Update check/download/install path validated |
 | G4 | Signing preparation | Prepare config and documented process for Authenticode signing | Signing slot is ready even if certificate comes later |
@@ -224,7 +224,8 @@ Rationale:
 
 ### Track B
 
-- `src/pyc_hermes_agent/hermes_engine/tools/*`
+- `src/pyc_hermes_agent/hermes_engine/web_search.py` (urllib provider surface)
+- `src/pyc_hermes_agent/hermes_engine/tools/*` (reserved for richer toolkits)
 - `src/pyc_hermes_agent/hermes_engine/tool_registry.py`
 - `src/pyc_hermes_agent/hermes_engine/agent_loop.py`
 - `src/pyc_hermes_agent/sidecar_api/services/*`
@@ -264,6 +265,8 @@ Rationale:
 ### Track G
 
 - `desktop/package.json`
+- `desktop/build/icon.ico`
+- `scripts/write_min_icon_ico.py`
 - `.github/workflows/*`
 - `scripts/release_gates.py`
 - `docs/deployment/*`

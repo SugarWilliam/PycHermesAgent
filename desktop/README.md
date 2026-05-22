@@ -14,7 +14,7 @@ npm run dev
 ```bash
 npm run build
 npm run dist:dir             # unpacked for current OS (Ubuntu CI → linux-unpacked)
-npm run dist:win-unpacked    # Windows unpacked — run on Windows; needs desktop/build/icon.ico
+npm run dist:win-unpacked    # Windows unpacked (`desktop/build/icon.ico` is tracked; regenerate → `python ../scripts/write_min_icon_ico.py`)
 npm run dist                 # installer / platform defaults from electron-builder
 ```
 

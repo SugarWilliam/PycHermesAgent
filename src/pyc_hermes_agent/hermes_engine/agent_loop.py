@@ -24,6 +24,7 @@ from pyc_hermes_agent.hermes_engine.session_context import bind_session_context
 from pyc_hermes_agent.hermes_engine.session_store import AgentSessionStore
 from pyc_hermes_agent.hermes_engine.skill_context import SKILLS_RUNTIME_POLICY, build_skill_context_messages
 from pyc_hermes_agent.hermes_engine.tool_registry import ToolRegistry
+from pyc_hermes_agent.hermes_engine.web_search import run_web_search_tool
 from pyc_hermes_agent.llm_gateway import LLMChatChunk, LLMChatRequest, LLMChatResponse, LLMMessage, execute_chat
 from pyc_hermes_agent.meta_harness import MetaFramework
 
@@ -302,7 +303,7 @@ class AgentLoop:
                     if analysis_mode == "formal" and not _has_formal_analysis_call(tool_results):
                         auto_tool_call = ToolCall(
                             name="formal_analysis",
-                            arguments='{"problem_statement": ' + _json_escape(last_response.content or "Analyze the conversation context.") + '}',
+                            arguments='{"problem_statement": ' + _json_escape(last_response.content or "Analyze the conversation context.") + "}",
                         )
                         with bind_session_context(resolved_session_id):
                             auto_result = registry.dispatch(auto_tool_call)
@@ -548,6 +549,19 @@ def create_meta_harness_tool_registry() -> ToolRegistry:
             "required": ["problem_statement"],
         },
     )
+    registry.register_function(
+        "web_search",
+        run_web_search_tool,
+        description="Network-grounded shallow search (instant-answer JSON). Returns results[] and citations[] for the desktop evidence pane.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "query": {"type": "string"},
+                "max_results": {"type": "integer", "minimum": 1, "maximum": 20},
+            },
+            "required": ["query"],
+        },
+    )
     return registry
 
 
@@ -700,6 +714,7 @@ def _has_formal_analysis_call(tool_results: list[ToolCallResult]) -> bool:
 
 def _json_escape(value: str) -> str:
     import json
+
     return json.dumps(value)
 
 
