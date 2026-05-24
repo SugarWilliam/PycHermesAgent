@@ -22,9 +22,7 @@ Current repository baseline:
 
 ## Continuous integration
 
-Push and pull requests to `main` run **`.github/workflows/ci.yml`** with **three jobs**: **Python 3.11 + 3.12** MRAG proofs + **`pyc-hermes-packaging-probe`** (simulated Windows-style dirs) + **`scripts/release_gates.py`** (pytest + whitespace + heuristic secret scan + optional ruff/mypy as configured); **`production-gates`** (Ubuntu: `RELEASE_GATES_PRODUCTION=1` SBOM/migrate/Linux desktop **`dist:dir`** + **`electron_dist_layout_smoke`**); and **`desktop-windows-unpacked`** (Windows **`win-unpacked`** + same smoke harness with **`--prefer-unpacked win`**, relying on **`desktop/build/icon.ico`**).
-
-Use **`uv`** locally as in `scripts/release_gates.py` docs — CI installs via **`uv sync --extra dev`**. Signing/store-ready releases are **`release.yml`** + governance docs, not implied by CI alone (`docs/deployment/Production_Release_Gates.md`).
+Push and pull requests to `main` run **`.github/workflows/ci.yml`**: **Python 3.11 + 3.12** MRAG proofs + **`pyc-hermes-packaging-probe`** + **`scripts/release_gates.py`** (pytest + whitespace + secret heuristics + ruff/mypy as configured); **`production-gates`** (Ubuntu ``RELEASE_GATES_PRODUCTION=1`` + Linux **`dist:dir`** + electron smoke); **`desktop-windows-unpacked`** (``win-unpacked`` + smoke); and **`desktop-windows-nsis-silent`** (``npm run dist:win`` NSIS Setup + **silent install / reinstall / uninstall** via `scripts/windows_nsis_silent_upgrade_smoke.ps1`). Use **`uv`** locally as in `scripts/release_gates.py`; CI uses **`uv sync --extra dev`**. Signing, **electron-updater feed** proof, and store-ready releases remain release governance (`release.yml`, `docs/deployment/Production_Release_Gates.md`).
 
 ## Quick Start
 

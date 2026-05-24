@@ -95,6 +95,40 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: python scripts/electron_dist_layout_smoke.py desktop --require-unpacked-resources --prefer-unpacked win
 
+  desktop-windows-nsis-silent:
+    name: Windows NSIS silent install + reinstall smoke
+    needs: contract-tests
+    timeout-minutes: 45
+    # When you introduce a self-hosted Windows runner pool, duplicate this job replacing `runs-on` with labels
+    # like `[self-hosted, windows-nsis]` and keep tooling versions aligned (`actions/setup-node` node-version).
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: desktop
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: npm ci + audit + electron-builder Win (NSIS)
+        run: |
+          npm ci
+          npm audit --omit=dev --audit-level=critical
+          npm run dist:win
+
+      - name: NSIS silent install / reinstall / uninstall smoke
+        working-directory: ${{ github.workspace }}
+        shell: pwsh
+        run: ./scripts/windows_nsis_silent_upgrade_smoke.ps1 -DistDir desktop/dist-installer
+
   production-gates:
     name: Production packaging gates (lockfile, MRAG migrate, desktop dir pack)
     needs: contract-tests

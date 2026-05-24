@@ -20,13 +20,16 @@ Align automation with `docs/architecture/Execution_Blueprint_v0.2.0.md` and `doc
 | MRAG planner + backup | `uv run pyc-hermes-mrag-migrate /path/to/mrag/root --backup-to /path/to/backup-parent --json` |
 | Expanded MRAG benchmark | `uv run python benchmarks/mrag/run_expanded_hybrid_benchmark.py` (also runs in `RELEASE_GATES_PRODUCTION=1` path) |
 | Desktop pack | `cd desktop && npm ci && npm audit --omit=dev --audit-level=critical && npm run dist:dir` |
-| Electron unpacked layout smoke | `python scripts/electron_dist_layout_smoke.py desktop --require-unpacked-resources` (after dist; verifies `desktop/out/` and unpacked `dist-installer/*unpacked/resources/`) |
+| Electron unpacked layout smoke | `python scripts/electron_dist_layout_smoke.py desktop --require-unpacked-resources` (after dist; pass `--prefer-unpacked win` or `linux`; verifies `desktop/out/` and unpacked `dist-installer/*unpacked/resources/`) |
+| Windows NSIS headless reinstall smoke | `pwsh scripts/windows_nsis_silent_upgrade_smoke.ps1 -DistDir desktop/dist-installer` (after ``npm run dist:win``; CI job **`desktop-windows-nsis-silent**`; second `/S /D=` pass covers maintenance/update-style reinstall without a separate semver feed) |
 
 **Linux vs Windows unpacked:** CI **contract-tests** exercises Linux `dist-installer/*-unpacked` via `production-gates`.
 The dedicated **`desktop-windows-unpacked`** workflow job (``windows-latest``) runs ``npm run dist:win-unpacked`` **and**
-**`scripts/electron_dist_layout_smoke.py ... --require-unpacked-resources --prefer-unpacked win`** so Windows
-artifacts get the same structural checks as Linux. **Installer signing, auto-updater channel validation, and true
-clean-machine human smoke** remain out-of-band (next layer).
+**`scripts/electron_dist_layout_smoke.py ... --require-unpacked win`** so Windows
+artifacts get the same structural checks as Linux. **`desktop-windows-nsis-silent`** builds the Setup EXE (`npm run dist:win`)
+and runs **`windows_nsis_silent_upgrade_smoke.ps1`** (silent install → silent reinstall prefix → uninstaller `/S`).
+**electron-updater** requires a staged feed with two binaries to prove binary delta upgrades — gate that separately once a release bucket exists.
+Installer signing and store uploads remain manual.
 
 Production gates also honour **`RELEASE_GATES_PYINSTALLER=1`** (runs **`uv sync --frozen --extra dev --extra ga`** then verifies **`PyInstaller`** imports; **`frozen`** avoids unexpected lock churn).
 
