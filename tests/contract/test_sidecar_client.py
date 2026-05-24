@@ -100,6 +100,44 @@ def test_sidecar_client_supports_core_in_process_api_calls(tmp_path) -> None:
     assert result["hits"]
 
 
+def test_sidecar_client_materialize_and_patch_drafts_in_process(tmp_path: Path) -> None:
+    from pyc_hermes_agent.contracts import ChatMessage
+    from pyc_hermes_agent.hermes_engine.session_store import AgentSessionStore
+
+    client = SidecarClient(root=tmp_path)
+    kb = client.create_knowledge_base("client-patch-kb")
+    doc = client.materialize_text_document(
+        kb["knowledge_base_id"],
+        "## Final\nHold citations.",
+        title="Client mat",
+    )
+    assert doc.get("metadata", {}).get("materialization") is True
+
+    drafts_state = client.list_skill_patch_drafts()
+    assert "items" in drafts_state
+
+    drafted = client.create_skill_patch_draft(title="Draft", body="body text")
+    assert drafted.get("draft_id")
+
+    AgentSessionStore(root=tmp_path).save(
+        session_id="client-suggest",
+        model="demo",
+        messages=[
+            ChatMessage(role="user", content="Hi"),
+            ChatMessage(role="assistant", content="Teach the model to cite sources."),
+        ],
+    )
+
+    sug = client.suggest_skill_patch_draft_from_session("client-suggest")
+    assert sug.get("source") == "session_suggest"
+
+    removed = client.delete_skill_patch_draft(str(drafted["draft_id"]))
+    assert removed.get("status") == "deleted"
+
+    missing = client.delete_skill_patch_draft(str(drafted["draft_id"]))
+    assert missing.get("status") == "error"
+
+
 def test_sidecar_client_supports_agent_loop_in_process(monkeypatch, tmp_path) -> None:
     from pyc_hermes_agent.sidecar_api.services import chat_service as _chat_svc
 
@@ -246,6 +284,20 @@ def test_desktop_sidecar_client_uses_canonical_formal_analysis_route() -> None:
 
     assert "/formal-analysis" in source
     assert "/meta/analyze" not in source
+
+
+def test_desktop_sidecar_client_defines_roi_path_constants_and_clients() -> None:
+    """Evolution backlog parity: SIDECAR_PATHS + materialize + patch-draft wrappers."""
+    source = _read_repo_file("desktop/src/services/sidecarClient.js")
+
+    assert "export const SIDECAR_PATHS" in source
+    assert "materializeKnowledgeBaseText" in source
+    assert "sidecarKnowledgeBasePath" in source
+    assert "SKILL_PATCH_DRAFTS" in source
+    assert "listSkillPatchDrafts" in source
+    assert "createSkillPatchDraft" in source
+    assert "suggestSkillPatchDraftFromSession" in source
+    assert "deleteSkillPatchDraft" in source
 
 
 def test_desktop_sidecar_client_handles_canonical_stream_events() -> None:

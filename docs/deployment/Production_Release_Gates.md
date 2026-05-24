@@ -2,6 +2,8 @@
 
 **Status:** Operational checklist (not a guarantee of store-ready binaries without signing/updater)
 
+**Governance linkage:** Routine **tranche-one** tagging follows `docs/Project_Development_and_Release_Governance.md` Gates 1–8. **`Gate 9`** (Phase 5 / major architecture fork) applies only **after Phase 4 tranche-one closure** and when a release is explicitly Phase 5–scoped — see **§ Gate 9 — Phase 5 / architecture fork** below.
+
 ## Goals
 
 Align automation with `docs/architecture/Execution_Blueprint_v0.2.0.md` and `docs/constraints/windows-packaging.md`:
@@ -40,6 +42,21 @@ Production gates also honour **`RELEASE_GATES_PYINSTALLER=1`** (runs **`uv sync 
 Set **`PYC_HERMES_LOG_FORMAT=json`** before starting the sidecar so `log_event` lines are plain JSON objects (no log prefix noise). **`PYC_HERMES_LOG_LEVEL`** controls verbosity (`INFO` default).
 
 `/health` includes **`observability.logs_dir`** and **`observability.sidecar_events_log`** when the sidecar is started with `--root`; disable the rotating file sink with **`PYC_HERMES_DISABLE_FILE_LOG=1`**.
+
+## Gate 9 — Phase 5 / architecture fork (manual until scripted)
+
+Use this subsection **only** when tagging a release that executes **`docs/architecture/Phase5_Evolution_Blueprint_v0.5.0.md`** work (gateway/runtime fork, cross-cutting teammate surfaces, coordinated contract bumps). It **does not** replace Gates 1–8; **it adds** prerequisites on top.
+
+| # | Checkpoint | Receipt / artefact |
+|---|------------|---------------------|
+| 9a | Phase 4 tranche-one closure is still the baseline for ordinary releases; Gate 9 applies only after **explicit Phase 5 program open** | Record in release notes (`Phase 5 program open`) or steering doc link |
+| 9b | **ADR published** summarising fork choice (`llm_gateway` deepen vs upstream gateway integration vs hybrid); linked from release notes | ADR filename + anchor in changelog |
+| 9c | **`docs/architecture/Compatibility_Matrix.md` §6** satisfied: every touched axis (`sidecar_api_version`, `contract_version`, `desktop_ipc_version`, `index_format_version`, …) bumped **together** with a single migration narrative | Updated matrix §5 table + subsection §6 wording still true |
+| 9d | **`AGENTS.md` / governance §4** non‑negotiables unchanged unless the ADR explicitly revises boundaries (then `AGENTS.md` + governance must be patched in the **same** release merge) | Diff shows intentional boundary edits only via ADR |
+| 9e | Contract suite and any **new** migration / desktop IPC tests required by the fork pass in CI | Log excerpt or CI run URL in release checklist |
+| 9f | If route B / vendor gateway: **exit / self-host rollback** posture documented (per blueprint §7 vendor lock‑in guard) | Paragraph in ADR attachment or ops runbook |
+
+**Authoritative charters:** `docs/architecture/Phase5_Evolution_Blueprint_v0.5.0.md`, `docs/Project_Development_and_Release_Governance.md` §9, `docs/architecture/Compatibility_Matrix.md` §§5–6.
 
 ## Honest scope
 

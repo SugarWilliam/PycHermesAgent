@@ -26,7 +26,7 @@ from pyc_hermes_agent.hermes_engine.memory_injection import build_prompt_message
 from pyc_hermes_agent.hermes_engine.planner import build_agent_plan
 from pyc_hermes_agent.hermes_engine.rule_context import build_rule_context_messages
 from pyc_hermes_agent.hermes_engine.session_context import bind_session_context
-from pyc_hermes_agent.hermes_engine.session_store import AgentSessionStore
+from pyc_hermes_agent.hermes_engine.session_store import AgentSessionStore, normalize_working_memory_lines
 from pyc_hermes_agent.hermes_engine.skill_context import SKILLS_RUNTIME_POLICY, build_skill_context_messages
 from pyc_hermes_agent.llm_gateway.skill_runtime_audit import collect_skill_audit_hints, sort_skill_names_for_context
 from pyc_hermes_agent.hermes_engine.tool_registry import ToolRegistry
@@ -49,6 +49,20 @@ _STRUCTURED_MODE_SYSTEM_MESSAGE = (
     "## Recommendations\nActionable next steps.\n"
     "Do not omit any section."
 )
+
+_SESSION_WM_OPEN = "<session-working-memory>"
+_SESSION_WM_CLOSE = "</session-working-memory>"
+
+
+def _build_session_working_memory_message(lines: list[str]) -> ChatMessage | None:
+    if not lines:
+        return None
+    bullets = "\n".join(f"- {line}" for line in lines)
+    body = (
+        "Session working memory (bounded carry-over for this session; not indexed into MRAG).\n"
+        f"{_SESSION_WM_OPEN}\n{bullets}\n{_SESSION_WM_CLOSE}"
+    )
+    return ChatMessage(role="system", content=body)
 
 
 class AgentLoop:
@@ -80,6 +94,8 @@ class AgentLoop:
         retry_budget: int = _DEFAULT_RETRY_BUDGET,
         activated_skills: list[str] | None = None,
         analysis_mode: str = "casual",
+        working_memory: list[str] | None = None,
+        update_working_memory: bool = False,
     ) -> AgentLoopResult:
         generator = self._run_generator(
             request,
@@ -91,6 +107,8 @@ class AgentLoop:
             stream_llm_tokens=False,
             activated_skills=activated_skills,
             analysis_mode=analysis_mode,
+            working_memory=working_memory,
+            update_working_memory=update_working_memory,
         )
         while True:
             try:
@@ -112,6 +130,8 @@ class AgentLoop:
         retry_budget: int = _DEFAULT_RETRY_BUDGET,
         activated_skills: list[str] | None = None,
         analysis_mode: str = "casual",
+        working_memory: list[str] | None = None,
+        update_working_memory: bool = False,
     ) -> Iterator[AgentLoopEvent]:
         yield from self._run_generator(
             request,
@@ -123,6 +143,8 @@ class AgentLoop:
             stream_llm_tokens=True,
             activated_skills=activated_skills,
             analysis_mode=analysis_mode,
+            working_memory=working_memory,
+            update_working_memory=update_working_memory,
         )
 
     def _run_generator(
@@ -137,6 +159,8 @@ class AgentLoop:
         stream_llm_tokens: bool,
         activated_skills: list[str] | None,
         analysis_mode: str = "casual",
+        working_memory: list[str] | None = None,
+        update_working_memory: bool = False,
     ) -> Generator[AgentLoopEvent, None, AgentLoopResult]:
         if max_iterations < 1:
             raise ValueError("Agent loop max_iterations must be at least 1.")
@@ -153,6 +177,13 @@ class AgentLoop:
         if not new_messages:
             raise ValueError("Agent loop requires at least one new message.")
         messages = [*existing_messages, *new_messages]
+
+        stored_wm = normalize_working_memory_lines(list(existing_session.working_memory)) if existing_session else []
+        if update_working_memory:
+            effective_wm = normalize_working_memory_lines(list(working_memory or []))
+        else:
+            effective_wm = stored_wm
+        wm_system_message = _build_session_working_memory_message(effective_wm)
 
         registry = tool_registry or self._tool_registry
         tools = _resolve_loop_tools(request, registry)
@@ -230,6 +261,8 @@ class AgentLoop:
                 "skills_runtime_policy": dict(SKILLS_RUNTIME_POLICY),
                 "analysis_mode": analysis_mode,
                 "rule_sources": [str(p) for p in rule_paths],
+                "working_memory_lines": len(effective_wm),
+                "working_memory_updated": update_working_memory,
             },
         )
         if plan is not None:
@@ -239,7 +272,10 @@ class AgentLoop:
             for iteration in range(1, max_iterations + 1):
                 current_iteration = iteration
                 with bind_session_context(resolved_session_id):
-                    extra_system_messages = [*rule_messages, *skill_messages]
+                    extra_system_messages = [*rule_messages]
+                    if wm_system_message is not None:
+                        extra_system_messages.append(wm_system_message)
+                    extra_system_messages.extend(skill_messages)
                     if analysis_mode == "structured":
                         extra_system_messages.append(ChatMessage(role="system", content=_STRUCTURED_MODE_SYSTEM_MESSAGE))
                     if recovery_message is not None:
@@ -343,7 +379,13 @@ class AgentLoop:
                         continue
 
                     with bind_session_context(resolved_session_id):
-                        self._persist_session(resolved_session_id, active_model, messages, existing_session)
+                        self._persist_session(
+                            resolved_session_id,
+                            active_model,
+                            messages,
+                            existing_session,
+                            working_memory=list(effective_wm),
+                        )
                     result = AgentLoopResult(
                         session_id=resolved_session_id,
                         model=active_model,
@@ -357,6 +399,7 @@ class AgentLoop:
                         tool_results=tool_results,
                         raw_response=last_response.raw_response,
                         audit=dict(audit_base),
+                        working_memory=list(effective_wm),
                     )
                     yield emit(
                         "done",
@@ -417,7 +460,13 @@ class AgentLoop:
                         )
         except Exception as exc:
             with bind_session_context(resolved_session_id):
-                self._persist_session(resolved_session_id, active_model, messages, existing_session)
+                self._persist_session(
+                    resolved_session_id,
+                    active_model,
+                    messages,
+                    existing_session,
+                    working_memory=list(effective_wm),
+                )
             yield emit(
                 "error",
                 model=active_model,
@@ -540,12 +589,15 @@ class AgentLoop:
         model: str,
         messages: list[ChatMessage],
         existing_session,
+        *,
+        working_memory: list[str],
     ) -> None:
         self._session_store.save(
             session_id=session_id,
             model=model,
             messages=messages,
             created_at=existing_session.created_at if existing_session is not None else None,
+            working_memory=working_memory,
         )
 
 

@@ -107,6 +107,10 @@ class AgentLoopRequest:
     retry_attempts: int = 1
     max_iterations: int = 8
     analysis_mode: str = "casual"
+    # Session-scoped working memory (bounded; not MRAG-indexed). When ``update_working_memory`` is
+    # true, request ``working_memory`` replaces the stored lines for this session on persist.
+    working_memory: List[str] = field(default_factory=list)
+    update_working_memory: bool = False
 
     def __post_init__(self) -> None:
         _allowed = ("casual", "structured", "formal")
@@ -146,6 +150,7 @@ class AgentLoopResult:
     plan: Optional[AgentPlan] = None
     messages: List[ChatMessage] = field(default_factory=list)
     tool_results: List[ToolCallResult] = field(default_factory=list)
+    working_memory: List[str] = field(default_factory=list)
 
     raw_response: Dict[str, Any] = field(default_factory=dict)
 

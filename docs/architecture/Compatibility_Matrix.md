@@ -1,6 +1,7 @@
 # PycHermesAgent Compatibility Matrix
 
-**Status:** Required for release and tag decisions
+**Status:** Required for release and tag decisions  
+**Program boundary:** **Tranche one** (首期工程) delivery closes at **Phase 4** exit criteria — `docs/architecture/Phase3_Phase4_Productization_Roadmap_v0.3.0.md` §11 + `Phase3_Phase4_Exit_Checklist_v0.3.0.md`. Strategic evolution after that (**Phase 5**: digital teammate, gateway fork evaluation) is **`docs/architecture/Phase5_Evolution_Blueprint_v0.5.0.md`** and must **not** be treated as Phase 4 tag debt.
 
 ## 1. Version Axes
 
@@ -31,6 +32,7 @@
 - MRAG index format changes require migration or explicit rebuild behavior.
 - Asset manifest changes require checksum and promotion compatibility tests.
 - Artifact format changes require consumer-facing release notes.
+- **Phase 5-class changes** (see §6): expect **coordinated bumps** across one or more axes (`contract_version`, `sidecar_api_version`, `desktop_ipc_version`, optionally `index_format_version`) plus an ADR recorded in governance; do not increment axes piecemeal without a written migration story.
 
 ## 4. Release Matrix Checklist
 
@@ -45,10 +47,11 @@ Before a tag is created, update this table when applicable:
 | Artifact metadata | `artifact_format_version` | artifact engine tests |
 | Skill runtime policy (Phase 1 dict / `start` payload) | `skills_runtime_policy_id` in §5 | agent loop + `list_skills` contract tests |
 | Desktop IPC | `desktop_ipc_version` | desktop integration tests |
+| **Phase 5 / gateway fork / ADR** (post–Phase 4 only) | All affected axes in §5 + **`Phase5_Evolution_Blueprint_v0.5.0.md`** linkage + governance ADR | contract tests + migration notes + desktop/sidecar consumer updates |
 
 ## 5. Current Baseline
 
-The current repository line is **`v0.3.0`** Phase 2 complete (usable local analysis workbench with desktop shell, 15-case benchmark, 8 builtin skills, auto-updater). Production `v1.0.0` cannot be tagged until desktop packaging signing/updater, storage migration hardening, neural embeddings, and installation verification meet production criteria.
+The current repository line is **`v0.4.0`** cumulative engineering-preview workbench (**tag** aligns with package `app_version`; still **not** production / store-ready — see Gates). Production `v1.0.0` cannot be tagged until desktop packaging signing/updater, storage migration hardening, neural embeddings, and installation verification meet production criteria.
 
 Current-truth note:
 
@@ -57,9 +60,9 @@ Current-truth note:
 
 | Axis | Current value | Notes |
 |------|---------------|-------|
-| `app_version` | `0.3.0` (`pyc_hermes_agent.__version__`) | Phase 2 complete; desktop shell with Dify-style UI, electron-builder NSIS installer |
-| `sidecar_api_version` | `0.9` | `GET /rules/manifest` **`manifest_version: 2`** adds **`runtime_profile`** (discovery engine, bundle kind, sidecar lineage). Prior: **`GET /capabilities/a2a`** (`A2A_SubAgent_Platform_Seam_v0.4.0.md`); MRAG citation anchors; **`mrag_runtime`** on `/health` + `/config`; preferences, PDF ingest, `/skills/audit`, `analysis_mode` |
-| `contract_version` | `0.4` | `AgentLoopRequest.analysis_mode` added; `MetaAnalysisRequest.meta_routing` extended with `data_shape_rules`; `AgentLoopEvent.payload.analysis_card` on formal done; `Citation` adds `source_type`, `page`, `section`, and `relevance` anchors |
+| `app_version` | `0.4.0` (`pyc_hermes_agent.__version__`) | **v0.4.0** tag line: governance + Phase 5 charter docs, IPC MRAG benchmarks, MetaHarness IPC consistency signals, desktop formal snapshot UX, Evolution ROI receipts, sidecar/skills/evolution surfaces per `releases/v0.4.0.md` |
+| `sidecar_api_version` | `0.10` | Adds session **working memory** (`AgentLoopRequest.working_memory`, `update_working_memory`; reflected in **`AgentLoopResult.working_memory`**); **`POST /knowledge-bases/{id}/materialize`** thin-ingest tagging; **`GET|POST /skills/patch-drafts`** + **`POST .../suggest-from-session`** + **`DELETE .../{uuid}`** (weak automation drafts, human-gated); append-only **`LOCALAPPDATA/.../audit/preferences.jsonl`** when preferences mutate. **`0.9` baseline retained:** `/rules/manifest` **`manifest_version: 2`** + **`runtime_profile`**; **`GET /capabilities/a2a`** + MRAG health/config surfaces |
+| `contract_version` | `0.5` | `AgentLoopRequest.working_memory`, `AgentLoopRequest.update_working_memory`, `AgentLoopResult.working_memory` |
 | `index_format_version` | `2` | SQLite/FTS5 artifacts and migration tooling exist via `scripts/migrate_mrag_to_sqlite.py`, but the active sidecar MRAG runtime remains JSON-backed; v1 JSON still readable for migration |
 | `model_manifest_version` | `1` (asset manifest schema) | Unchanged |
 | `artifact_format_version` | `1` | Unchanged |
@@ -69,3 +72,15 @@ Current-truth note:
 **GitHub Actions (Phase 4 engineering tier):** `contract-tests` (Python matrix + MRAG proofs + simulated packaging probe + `scripts/release_gates.py` with ruff+mypy); **`desktop-generic-https-feed-proof`** (Ubuntu · `desktop/tools/ci_generic_https_feed_proof.cjs` — `electron-updater` **`GenericProvider`** GET **`latest-linux.yml`** over loopback HTTPS with ephemeral self-signed cert; proves YAML/layout + resolver only, **no full app install/download**); `production-gates` (`RELEASE_GATES_PRODUCTION=1` SBOM MRAG migrate + Linux `npm run dist:dir` + `electron_dist_layout_smoke --prefer-unpacked linux`); `desktop-windows-unpacked` (Windows **`win-unpacked`** + smoke); **`desktop-windows-nsis-silent`** (dual semver NSIS + **`windows_nsis_silent_upgrade_smoke.ps1`**). Interactive **electron-updater** UI (`checking → downloading → ready`) and signed delta installs remain manual / Windows-scope — see **`docs/deployment/Windows_Install_Upgrade_Rollback_Matrix_and_Updater_Proof_v0.4.0.md`**. CI still does **not** replace Windows code signing or store-ready attestation (`Production_Release_Gates.md` honest scope).
 
 Hermes **`create_meta_harness_tool_registry()`** default builtin tools (**non-exhaustive**, contract-tested): `formal_analysis`, **`web_search`**, **`knowledge_retrieve`** (JSON-backed `MRAGService` retrieval via `sidecar_api.services.mrag_service`; supports tests monkeypatching the module). Update this paragraph when ToolRegistry defaults change (`tests/contract/test_web_search.py`, `tests/contract/test_hermes_agent_loop.py`).
+
+---
+
+## 6. Tranche one vs Phase 5 (major-version posture)
+
+| Scope | Compatibility expectation |
+|-------|---------------------------|
+| **Through Phase 4 (tranche one)** | Increment axes **per observable contract or disk-format change**, using §§1–4. Patch/minor semantics follow semver policy in §3. |
+| **Phase 5 opens (post–tranche-one)** | Breaking or cross-cutting/runtime changes (e.g. upstream gateway adoption, memory/team-model surfaces, desktop IPC redesign) likely require **one coordinated major release story** (`app_version` major) **and** explicit bumps of every touched axis — not silent partial upgrades. |
+
+**Authoritative charter:** `docs/architecture/Phase5_Evolution_Blueprint_v0.5.0.md`. Until Phase 5 is formally opened, **do not** add Phase-only exit criteria to Phase 4 tags based on Phase 5 items.
+

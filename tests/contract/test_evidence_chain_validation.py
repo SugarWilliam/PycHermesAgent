@@ -98,3 +98,25 @@ def test_degraded_meta_surfaces_policy_signal() -> None:
     )
     joined = " ".join(pack["policy_hints"]).lower()
     assert "degraded" in joined
+
+
+def test_logic_signals_ipc_consistency_hints_in_validation_pack() -> None:
+    pack = build_evidence_validation_pack(
+        problem_statement=(
+            "ONVIF interoperability note on profile T while SKU is proprietary only; "
+            "preview is 720p but export block lists 1080p; bench 52 ms versus field 620 ms tails"
+        ),
+        web_citations=[],
+        kb_citations=[
+            {"document_id": "d", "chunk_id": "c", "snippet": "Short marketing line only."},
+        ],
+        web_stats={"citation_entry_count": 0},
+        kb_stats={"citation_entry_count": 1, "distinct_documents": 1, "citations_missing_ref": 0},
+        overlapping_http_across_kb_and_web=[],
+        meta_result=None,
+        http_refs_summary=(),
+    )
+    logic = " ".join(pack["logic_signals"])
+    assert "onvif_vs_proprietary_mutex_language_ipc_review" in logic
+    assert "mutex_video_resolution_tokens_single_snippet_ipc_review" in logic
+    assert "competing_latency_ms_narratives_in_short_snippet" in logic

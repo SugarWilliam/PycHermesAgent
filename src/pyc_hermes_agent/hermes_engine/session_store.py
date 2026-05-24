@@ -12,6 +12,37 @@ from pyc_hermes_agent.common import ensure_runtime_directories, resolve_runtime_
 from pyc_hermes_agent.contracts import ChatMessage, ToolCall
 from pyc_hermes_agent.contracts.schemas import utc_now_iso
 
+_MAX_WORKING_MEMORY_LINES = 32
+_MAX_WORKING_MEMORY_LINE_CHARS = 400
+_MAX_WORKING_MEMORY_TOTAL_CHARS = 8000
+
+
+def normalize_working_memory_lines(lines: list[str] | None) -> list[str]:
+    """Bound working-memory carry-over lines (session-local; never MRAG-indexed)."""
+
+    if not lines:
+        return []
+
+    bounded: list[str] = []
+    total_chars = 0
+    for raw in lines:
+        if len(bounded) >= _MAX_WORKING_MEMORY_LINES:
+            break
+        line = raw.replace("\r\n", "\n").strip()
+        if not line:
+            continue
+        if len(line) > _MAX_WORKING_MEMORY_LINE_CHARS:
+            line = line[:_MAX_WORKING_MEMORY_LINE_CHARS]
+        delimiter = 1 if bounded else 0
+        remaining = _MAX_WORKING_MEMORY_TOTAL_CHARS - total_chars - delimiter
+        if remaining <= 0:
+            break
+        if len(line) > remaining:
+            line = line[:remaining]
+        bounded.append(line)
+        total_chars += delimiter + len(line)
+    return bounded
+
 
 @dataclass(slots=True)
 class AgentSessionRecord:
@@ -20,6 +51,7 @@ class AgentSessionRecord:
     created_at: str = ""
     updated_at: str = ""
     messages: list[ChatMessage] = field(default_factory=list)
+    working_memory: list[str] = field(default_factory=list)
 
 
 class AgentSessionStore:
@@ -47,18 +79,32 @@ class AgentSessionStore:
         records.sort(key=lambda record: (record.updated_at, record.created_at, record.session_id), reverse=True)
         return records
 
-    def save(self, *, session_id: str, model: str, messages: list[ChatMessage], created_at: str | None = None) -> AgentSessionRecord:
+    def save(
+        self,
+        *,
+        session_id: str,
+        model: str,
+        messages: list[ChatMessage],
+        created_at: str | None = None,
+        working_memory: list[str] | None = None,
+    ) -> AgentSessionRecord:
         normalized_session_id = session_id.strip()
         if not normalized_session_id:
             raise ValueError("Session id is required.")
 
         existing = self.load(normalized_session_id)
+        if working_memory is not None:
+            wm_lines = normalize_working_memory_lines(working_memory)
+        else:
+            wm_lines = list(existing.working_memory) if existing is not None else []
+
         record = AgentSessionRecord(
             session_id=normalized_session_id,
             model=model or (existing.model if existing is not None else ""),
             created_at=created_at or (existing.created_at if existing is not None else utc_now_iso()),
             updated_at=utc_now_iso(),
             messages=[_copy_message(message) for message in messages],
+            working_memory=wm_lines,
         )
         _write_json_atomic(
             self._session_path(normalized_session_id),
@@ -67,6 +113,7 @@ class AgentSessionStore:
                 "model": record.model,
                 "created_at": record.created_at,
                 "updated_at": record.updated_at,
+                "working_memory": list(record.working_memory),
                 "messages": [asdict(message) for message in record.messages],
             },
         )
@@ -106,12 +153,23 @@ def _message_from_payload(payload: dict[str, Any]) -> ChatMessage:
     )
 
 
+def _working_memory_from_payload(payload: dict[str, Any]) -> list[str]:
+    raw = payload.get("working_memory")
+    if not isinstance(raw, list):
+        return []
+    decoded: list[str] = []
+    for item in raw:
+        decoded.append(str(item))
+    return normalize_working_memory_lines(decoded)
+
+
 def _record_from_payload(payload: dict[str, Any], *, fallback_session_id: str) -> AgentSessionRecord:
     return AgentSessionRecord(
         session_id=str(payload.get("session_id", fallback_session_id)),
         model=str(payload.get("model", "")),
         created_at=str(payload.get("created_at", "")),
         updated_at=str(payload.get("updated_at", "")),
+        working_memory=_working_memory_from_payload(payload),
         messages=[_message_from_payload(item) for item in payload.get("messages", []) if isinstance(item, dict)],
     )
 
@@ -127,4 +185,4 @@ def _write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
     temp_path.replace(path)
 
 
-__all__ = ["AgentSessionRecord", "AgentSessionStore"]
+__all__ = ["AgentSessionRecord", "AgentSessionStore", "normalize_working_memory_lines"]

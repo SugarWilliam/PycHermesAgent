@@ -76,6 +76,27 @@ def ingest_text_document(
     return _serialize(document)
 
 
+def materialize_text_document(
+    knowledge_base_id: str,
+    text: str,
+    *,
+    title: str = "",
+    source_uri: str = "",
+    root: Path | None = None,
+) -> Dict[str, Any]:
+    """Ingest finalized prose via the MRAG text path with materialization bookkeeping metadata."""
+
+    return ingest_text_document(
+        knowledge_base_id,
+        text,
+        title=title or "Materialized note",
+        source_uri=source_uri or "memory://materialize",
+        source_type="markdown",
+        metadata={"pipeline": "materialize", "materialization": True},
+        root=root,
+    )
+
+
 def ingest_pdf_document(
     knowledge_base_id: str,
     path: Path | str,

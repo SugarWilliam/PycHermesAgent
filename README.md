@@ -118,14 +118,15 @@ Use docs by authority level:
 ## Key Documents
 
 - `docs/Documentation_Tracking.md` — `docs/` inventory and tracking index
-- `docs/Project_Development_and_Release_Governance.md` — top-level development and release authority
-- `docs/architecture/Compatibility_Matrix.md` — current contract and version baseline
+- `docs/Project_Development_and_Release_Governance.md` — top-level development and release authority (§9 **Gate 9** when Phase 5 / architecture-fork releases are tagged)
+- `docs/architecture/Compatibility_Matrix.md` — current contract and version baseline; **§6** tranche one vs Phase 5 coordinated versioning
 - `docs/architecture/Evolution_Backlog_Priorities_v0.4.0.md` — cross-track backlog (intel, MRAG, desktop, A2A)
 - `docs/architecture/A2A_SubAgent_Platform_Seam_v0.4.0.md` — reserved sub-agent / A2A contract surface (`GET /capabilities/a2a`)
 - `docs/architecture/Longevity_Stability_and_Team_Process_v0.4.0.md` — long-running team cadence defaults
 - `docs/deployment/Windows_Install_Upgrade_Rollback_Matrix_and_Updater_Proof_v0.4.0.md` — install / upgrade / rollback matrix and updater proof checklist
-- `docs/architecture/Phase3_Phase4_Productization_Roadmap_v0.3.0.md` — Phase 3 → 4 productization roadmap
-- `docs/deployment/Production_Release_Gates.md` — current release-gate operations baseline
+- `docs/architecture/Phase3_Phase4_Productization_Roadmap_v0.3.0.md` — Phase 3 → 4 productization roadmap (tranche one closes at Phase 4 exit; §11)
+- `docs/architecture/Phase5_Evolution_Blueprint_v0.5.0.md` — Phase 5 strategic evolution (digital teammate; gateway fork); post–tranche-one
+- `docs/deployment/Production_Release_Gates.md` — current release-gate operations baseline (includes **Gate 9** checklist for Phase 5 / fork releases)
 - `docs/deployment/Windows_Sidecar_Binary.md` — Windows sidecar PyInstaller artifact notes
 - `docs/architecture/PycHermesAgent_Architecture_v0.2.0.md`
 - `docs/architecture/PycHermesAgent_Solution_Architecture_v0.2.0.md`
@@ -139,7 +140,7 @@ Use docs by authority level:
 
 Tagged releases (**`v*.*.*`**) trigger **`.github/workflows/release.yml`**, which builds **`pyc-hermes-sidecar.exe`** (Windows) and publishes a **GitHub Release** with checksums. Current release-note workflow lives in `docs/releases/README.md`.
 
-`docs/releases/v0.3.0.md` and `docs/releases/v0.2.1.md` are historical tag notes. For current repository truth, prefer `docs/architecture/Compatibility_Matrix.md` and `docs/deployment/Production_Release_Gates.md`.
+`docs/releases/v0.4.0.md`, `docs/releases/v0.3.0.md` and `docs/releases/v0.2.1.md` are historical tag notes. For current repository truth, prefer `docs/architecture/Compatibility_Matrix.md` and `docs/deployment/Production_Release_Gates.md`.
 
 The repository is suitable for architecture validation, contract validation, and internal engineering preview work.
 It is not yet a production release.

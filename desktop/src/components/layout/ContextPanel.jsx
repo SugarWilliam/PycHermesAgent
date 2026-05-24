@@ -88,6 +88,14 @@ export default function ContextPanel() {
           </Section>
         )}
 
+        {/* Formal analysis — degraded / risks / validation surfaced first */}
+        {(contextData?.method ||
+          contextData?.evidenceGrade ||
+          contextData?.degraded ||
+          (contextData?.evidenceChain && typeof contextData.evidenceChain === 'object')) && (
+          <FormalReviewStripe contextData={contextData} />
+        )}
+
         {/* Formal analysis context (from contextData) */}
         {contextData?.method && (
           <Section title="Method">
@@ -115,17 +123,6 @@ export default function ContextPanel() {
               {contextData.citations.map((c, i) => (
                 <li key={i} className="text-xs text-blue-600 dark:text-blue-400 truncate" title={c}>
                   {c}
-                </li>
-              ))}
-            </ul>
-          </Section>
-        )}
-        {contextData?.risks?.length > 0 && (
-          <Section title="Risks">
-            <ul className="space-y-1">
-              {contextData.risks.map((r, i) => (
-                <li key={i} className="text-xs text-amber-600 dark:text-amber-400">
-                  • {r}
                 </li>
               ))}
             </ul>
@@ -556,6 +553,133 @@ function ArtifactSidecarRecords() {
           <p className="text-[10px] text-gray-500">Showing 16 newest of {rows.length}.</p>
         ) : null}
       </div>
+    </Section>
+  )
+}
+
+/** Highlights degraded mode, harness risks, and `analysis_card.evidence_chain.validation` for formal runs. */
+function FormalReviewStripe({ contextData }) {
+  const degraded = Boolean(contextData?.degraded)
+  const risks = Array.isArray(contextData?.risks) ? contextData.risks : []
+  const v = contextData?.evidenceChain?.validation
+  const conflicts = Array.isArray(v?.conflicts) ? v.conflicts : []
+  const logicSignals = Array.isArray(v?.logic_signals) ? v.logic_signals : []
+  const temporalSignals = Array.isArray(v?.temporal_signals) ? v.temporal_signals : []
+  const policyHints = Array.isArray(v?.policy_hints) ? v.policy_hints : []
+  const verification = Array.isArray(v?.delivery?.verification_next_steps) ? v.delivery.verification_next_steps : []
+
+  const preview = (xs, max) => xs.filter((x) => typeof x === 'string' && x.trim()).slice(0, max)
+
+  const hasEscalation = conflicts.length > 0 || preview(logicSignals, 8).length > 0 || preview(temporalSignals, 8).length > 0
+
+  return (
+    <Section title="Formal review snapshot">
+      {degraded ? (
+        <div
+          className="mb-3 rounded-md border border-amber-600/90 bg-amber-50 px-3 py-2 dark:border-amber-500 dark:bg-amber-950/40"
+          role="status"
+          aria-live="polite"
+        >
+          <p className="text-xs font-semibold uppercase tracking-wide text-amber-900 dark:text-amber-200">
+            Formal degraded mode
+          </p>
+          <p className="text-[11px] text-amber-900 dark:text-amber-100 mt-0.5 leading-relaxed">
+            Harness reports degraded routing — treat outputs as exploratory; verify claims against evidence lanes.
+          </p>
+        </div>
+      ) : null}
+
+      {risks.length > 0 ? (
+        <div className="mb-3 rounded-md border border-rose-300 bg-rose-50 px-3 py-2 dark:border-rose-600/70 dark:bg-rose-950/35">
+          <p className="text-xs font-semibold text-rose-900 dark:text-rose-100">Formal risk notes</p>
+          <ul className="mt-1 space-y-1">
+            {risks.map((r, i) => (
+              <li key={i} className="text-[11px] text-rose-800 dark:text-rose-200 leading-relaxed">
+                • {r}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {v && typeof v === 'object' ? (
+        <div className="rounded-md border border-teal-200 bg-teal-50/70 px-3 py-2 dark:border-teal-800 dark:bg-teal-950/30">
+          <p className="text-xs font-semibold text-teal-900 dark:text-teal-100">Evidence chain validation (heuristic)</p>
+          <p className="text-[10px] text-teal-800/90 dark:text-teal-300/90 mt-0.5">
+            Conflicts {conflicts.length} · Logic signals {logicSignals.length} · Temporal {temporalSignals.length}
+          </p>
+          {hasEscalation ? (
+            <p className="text-[10px] font-medium text-amber-700 dark:text-amber-400 mt-1">Review recommended before acting on causal claims.</p>
+          ) : null}
+          {conflicts.length > 0 ? (
+            <details className="mt-2" open={conflicts.length <= 4}>
+              <summary className="cursor-pointer text-[10px] text-teal-800 dark:text-teal-300 underline">
+                Conflict previews ({Math.min(conflicts.length, 3)} shown)
+              </summary>
+              <ul className="mt-1 space-y-1 max-h-28 overflow-y-auto">
+                {conflicts.slice(0, 3).map((c, i) => (
+                  <li key={i} className="text-[10px] font-mono text-gray-700 dark:text-gray-300 break-words">
+                    {String(c.kind || 'conflict')}: {(c.anchor_a || '').slice(0, 80)}{(c.anchor_a || '').length > 80 ? '…' : ''}{' — '}
+                    {(c.anchor_b || '').slice(0, 80)}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
+          {preview(logicSignals, 8).length > 0 ? (
+            <div className="mt-2">
+              <p className="text-[10px] font-medium text-teal-900 dark:text-teal-200">Logic / IPC scan signals</p>
+              <ul className="space-y-0.5">
+                {preview(logicSignals, 6).map((s, i) => (
+                  <li key={i} className="text-[10px] font-mono text-gray-800 dark:text-gray-300 break-words">
+                    {s}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {preview(temporalSignals, 8).length > 0 ? (
+            <div className="mt-2">
+              <p className="text-[10px] font-medium text-teal-900 dark:text-teal-200">Temporal/version signals</p>
+              <ul className="space-y-0.5">
+                {preview(temporalSignals, 4).map((s, i) => (
+                  <li key={i} className="text-[10px] font-mono text-gray-700 dark:text-gray-300 break-words">
+                    {s}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {preview(policyHints, 12).length > 0 ? (
+            <details className="mt-2">
+              <summary className="cursor-pointer text-[10px] text-teal-800 dark:text-teal-300 underline">
+                Policy hints ({policyHints.length})
+              </summary>
+              <ul className="mt-1 space-y-0.5 max-h-32 overflow-y-auto">
+                {preview(policyHints, 8).map((h, i) => (
+                  <li key={i} className="text-[10px] text-teal-900 dark:text-teal-100 leading-snug">
+                    • {h}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
+          {verification.length > 0 ? (
+            <div className="mt-2 border-t border-teal-200/80 pt-2 dark:border-teal-700/70">
+              <p className="text-[10px] font-medium text-teal-900 dark:text-teal-100">Suggested verification steps</p>
+              <ul className="space-y-0.5 mt-1">
+                {verification.slice(0, 5).map((step, i) => (
+                  <li key={i} className="text-[10px] text-teal-800 dark:text-teal-200 leading-snug">
+                    {i + 1}. {step}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <p className="text-[10px] text-gray-500 dark:text-gray-400">Validation payload absent for this snapshot.</p>
+      )}
     </Section>
   )
 }

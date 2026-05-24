@@ -1,7 +1,7 @@
 # Phase 3 / Phase 4 退出条件 — 三态对照（相对代码库）
 
 **Status:** Living checklist（随实现更新）  
-**Authority:** `docs/architecture/Phase3_Phase4_Productization_Roadmap_v0.3.0.md` §2  
+**Authority:** `docs/architecture/Phase3_Phase4_Productization_Roadmap_v0.3.0.md` §2；**首期工程交付边界**止于 Phase 4（同文件 §11）。Phase 5 战略项见 `Phase5_Evolution_Blueprint_v0.5.0.md`，**不得**写入本清单作为 Phase 4 退场依赖。  
 **Last reviewed:** 2026-05-24（Track B web_search 缓存/配额；IPC 业务 MRAG 基准；Track D skill 优先级；可选 dense 嵌入）  
 
 **三态定义**

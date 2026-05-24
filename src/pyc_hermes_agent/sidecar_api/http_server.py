@@ -59,6 +59,7 @@ from pyc_hermes_agent.sidecar_api.service import (
     list_sidecar_artifacts,
     list_skills,
     make_error_response,
+    materialize_text_document,
     rebuild_mrag_chunk_index,
     run_agent_loop,
     search_knowledge_base,
@@ -82,6 +83,8 @@ _KB_DOCUMENT_PDF_PATTERN = re.compile(r"^/knowledge-bases/([^/]+)/documents/pdf$
 _KB_DOCUMENT_URL_PATTERN = re.compile(r"^/knowledge-bases/([^/]+)/documents/url$")
 _KB_SEARCH_PATTERN = re.compile(r"^/knowledge-bases/([^/]+)/search$")
 _KB_REBUILD_INDEX_PATTERN = re.compile(r"^/knowledge-bases/([^/]+)/rebuild-index$")
+_KB_MATERIALIZE_PATTERN = re.compile(r"^/knowledge-bases/([^/]+)/materialize$")
+_PATCH_DRAFT_DELETE_PATTERN = re.compile(r"^/skills/patch-drafts/([^/]+)$")
 
 
 def _get_skills_audit() -> dict[str, Any]:
@@ -343,8 +346,11 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
                         "/knowledge-bases/{id}/documents/text",
                         "/knowledge-bases/{id}/documents/file",
                         "/knowledge-bases/{id}/documents/url",
+                        "/knowledge-bases/{id}/materialize",
                         "/knowledge-bases/{id}/search",
                         "/knowledge-bases/{id}/rebuild-index",
+                        "/skills/patch-drafts",
+                        "/skills/patch-drafts/suggest-from-session",
                     ],
                 }, HTTPStatus.OK
             except Exception as exc:
@@ -535,6 +541,10 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
             from pyc_hermes_agent.sidecar_api.services.memory_service import get_preferences
 
             return get_preferences(root), HTTPStatus.OK
+        if path == "/skills/patch-drafts":
+            from pyc_hermes_agent.sidecar_api.services.skill_patch_drafts import list_skill_patch_drafts
+
+            return list_skill_patch_drafts(root), HTTPStatus.OK
         raise KeyError(f"Unknown route: {path}")
 
     def _handle_post(self, path: str, payload: dict[str, Any]) -> tuple[dict[str, Any] | None, HTTPStatus]:
@@ -561,6 +571,41 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
                 skill_id_raw=sid.strip(), markdown_body=markdown_raw, root=self._server_root()
             )
             return bundle, HTTPStatus.CREATED
+
+        if path == "/skills/patch-drafts":
+            from pyc_hermes_agent.sidecar_api.services.skill_patch_drafts import create_skill_patch_draft
+
+            title = payload.get("title", "")
+            body = payload.get("body", "")
+            session_hint = payload.get("session_id", "")
+            source = payload.get("source", "manual")
+            if not isinstance(title, str) or not isinstance(body, str):
+                raise ValueError("Fields 'title' and 'body' must be strings.")
+            if not body.strip():
+                raise ValueError("Field 'body' is required.")
+            merged_session = session_hint if isinstance(session_hint, str) else ""
+            merged_source = source if isinstance(source, str) else "manual"
+            return (
+                create_skill_patch_draft(
+                    self._server_root(),
+                    title=title,
+                    body=body,
+                    session_id=merged_session,
+                    source=merged_source,
+                ),
+                HTTPStatus.CREATED,
+            )
+
+        if path == "/skills/patch-drafts/suggest-from-session":
+            from pyc_hermes_agent.sidecar_api.services.skill_patch_drafts import suggest_skill_patch_draft_from_session
+
+            session_id = payload.get("session_id", "")
+            if not isinstance(session_id, str) or not session_id.strip():
+                raise ValueError("Field 'session_id' is required.")
+            return (
+                suggest_skill_patch_draft_from_session(self._server_root(), session_id.strip()),
+                HTTPStatus.CREATED,
+            )
 
         if path == "/formal-analysis":
             response = invoke_formal_analysis(MetaAnalysisRequest(**payload))
@@ -604,6 +649,25 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
         if rebuild_match:
             knowledge_base_id = unquote(rebuild_match.group(1))
             return rebuild_mrag_chunk_index(knowledge_base_id, root=self._server_root()), HTTPStatus.OK
+
+        materialize_match = _KB_MATERIALIZE_PATTERN.fullmatch(path)
+        if materialize_match:
+            knowledge_base_id = unquote(materialize_match.group(1))
+            text = payload.get("text", "")
+            if not isinstance(text, str) or not text:
+                raise ValueError("Field 'text' is required.")
+            title = payload.get("title", "")
+            source_uri = payload.get("source_uri", "")
+            return (
+                materialize_text_document(
+                    knowledge_base_id,
+                    text,
+                    title=title if isinstance(title, str) else "",
+                    source_uri=source_uri if isinstance(source_uri, str) else "",
+                    root=self._server_root(),
+                ),
+                HTTPStatus.CREATED,
+            )
 
         document_match = _KB_DOCUMENT_TEXT_PATTERN.fullmatch(path)
         if document_match:
@@ -698,6 +762,24 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
         raise KeyError(f"Unknown route: {path}")
 
     def _handle_delete(self, path: str) -> tuple[dict[str, Any], HTTPStatus]:
+        draft_match = _PATCH_DRAFT_DELETE_PATTERN.fullmatch(path)
+        if draft_match:
+            from pyc_hermes_agent.sidecar_api.services.skill_patch_drafts import delete_skill_patch_draft
+
+            draft_id = unquote(draft_match.group(1))
+            if delete_skill_patch_draft(self._server_root(), draft_id):
+                return {"draft_id": draft_id, "status": "deleted"}, HTTPStatus.OK
+            return (
+                make_error_response(
+                    "SKILL_PATCH_DRAFT_MISSING",
+                    "client",
+                    f"Draft not found: {draft_id}",
+                    domain=DOMAIN_INTERNAL,
+                    retryable=False,
+                    degraded=False,
+                ),
+                HTTPStatus.NOT_FOUND,
+            )
         if path == "/preferences":
             from pyc_hermes_agent.sidecar_api.services.memory_service import reset_preferences
 

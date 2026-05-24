@@ -35,7 +35,8 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          body_path: docs/releases/v0.3.0.md
+          # Tag-name note file: e.g. `v0.4.0` → `docs/releases/v0.4.0.md`
+          body_path: docs/releases/${{ github.ref_name }}.md
           files: |
             dist/pyc-hermes-sidecar.exe
             dist/pyc-hermes-sidecar.exe.sha256

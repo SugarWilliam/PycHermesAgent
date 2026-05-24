@@ -363,7 +363,12 @@ def build_evidence_validation_pack(
     temporal.extend(consistency.scan_version_literal_density(text_blocks))
     temporal.extend(consistency.scan_wide_percentage_conflict_within_blocks(text_blocks))
 
-    logic_signals = [*consistency.scan_problem_overclaim_signals(problem_statement)]
+    logic_signals = [
+        *consistency.scan_problem_overclaim_signals(problem_statement),
+        *consistency.scan_mutex_video_resolution_tokens(text_blocks),
+        *consistency.scan_competing_latency_ms_claims(text_blocks),
+        *consistency.scan_onvif_proprietary_mutex_language(text_blocks),
+    ]
 
     kb_entries = int(kb_stats.get("citation_entry_count") or len(kb_list))
     web_entries = int(web_stats.get("citation_entry_count") or len(web_list))

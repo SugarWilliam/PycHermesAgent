@@ -50,6 +50,8 @@ class _AgentLoopRunKwargs(TypedDict, total=False):
     planning_enabled: bool
     retry_budget: int
     analysis_mode: str
+    working_memory: list[str]
+    update_working_memory: bool
 
 
 def _to_llm_messages(request: ChatCompletionRequest) -> list:
@@ -483,6 +485,9 @@ def _build_run_kwargs(nr: AgentLoopRequest) -> _AgentLoopRunKwargs:
         run_kwargs["retry_budget"] = nr.retry_budget
     if nr.analysis_mode != "casual":
         run_kwargs["analysis_mode"] = nr.analysis_mode
+    if nr.update_working_memory:
+        run_kwargs["update_working_memory"] = True
+        run_kwargs["working_memory"] = list(nr.working_memory)
     return run_kwargs
 
 

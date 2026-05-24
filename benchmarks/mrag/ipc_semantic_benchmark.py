@@ -41,6 +41,40 @@ IPC_BUSINESS_SCENARIOS: tuple[ScenarioSpec, ...] = (
             "shipping dock camera placement generic guidance",
         ],
     ),
+    ScenarioSpec(
+        key="sip_pts_door_station_token_split",
+        doc_lex_hits=[
+            "SIP SDP RTP TCP UDP QoS jitter buffer syslog generic release notes VLAN trunk matrix baseline "
+            "compliance filler paragraph interoperability checklist appendix tail boilerplate surveillance"
+        ],
+        doc_sem_aligned=[
+            "zzz rarePtsVillaDoorRareToken zzz harmonic PTS doorstation audio routing zzz rarePtsVillaDoorRareToken "
+            "villa intercom two-wire lift zzz rarePtsVillaDoorRareToken harmonic duplicate tail"
+        ],
+        query="SIP SDP rarePtsVillaDoorRareToken",
+        hybrid_sem_weight=0.72,
+        topical_k_overview=[
+            "retail storefront generic WIFI planning doc",
+            "parking barrier gate signage maintenance notice",
+        ],
+    ),
+    ScenarioSpec(
+        key="aac_echo_cancel_lex_vs_ipc_sem",
+        doc_lex_hits=[
+            "AAC PCM G711 G726 sample rate opus encoder firmware audio pipeline generic datasheet paragraph "
+            "compliance filler matrix baseline RTSP onboarding boilerplate appendix tail surveillance"
+        ],
+        doc_sem_aligned=[
+            "zzz rareIntercomAecLeakToken zzz harmonic full-duplex AEC leakage guard zzz rareIntercomAecLeakToken "
+            "duplex tails near-end zzz rareIntercomAecLeakToken harmonic block duplicate"
+        ],
+        query="AAC G711 rareIntercomAecLeakToken",
+        hybrid_sem_weight=0.67,
+        topical_k_overview=[
+            "factory floor paging generic safety briefing",
+            "warehouse forklift traffic camera placement notes",
+        ],
+    ),
 )
 
 

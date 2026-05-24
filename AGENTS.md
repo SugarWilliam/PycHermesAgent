@@ -2,18 +2,20 @@
 
 ## Metadata
 - Date: 2026-05-26
-- Version: v0.3.0
+- Version: v0.4.0
 - Author: 彭耀成
 - Phase 1 (engineering preview): **roadmap complete** for declared scope — see `docs/architecture/Phase1_Roadmap_v0.2.0.md` §10 (not production).
 - Phase 2 (usable workbench): **complete** — see `docs/architecture/Phase2_Toward_GA_v0.2.1.md` (not production).
 - Phase 3 → 4 **exit criteria vs code** (living checklist): see `docs/architecture/Phase3_Phase4_Exit_Checklist_v0.3.0.md` (maps Roadmap §2 to 已实现 / 部分 / 未见).
 - Phase 4 **automation tier (engineering)**: `.github/workflows/ci.yml` jobs `production-gates` + `desktop-windows-unpacked` (Windows `win-unpacked` + `electron_dist_layout_smoke.py --prefer-unpacked win`); not store-ready signing/GA without separate release governance.
 - **v0.4 evolution backlog + A2A seam + updater matrix (docs)**: see `docs/architecture/Evolution_Backlog_Priorities_v0.4.0.md`, `docs/architecture/A2A_SubAgent_Platform_Seam_v0.4.0.md`, `docs/deployment/Windows_Install_Upgrade_Rollback_Matrix_and_Updater_Proof_v0.4.0.md`, `docs/architecture/Longevity_Stability_and_Team_Process_v0.4.0.md`.
+- **Phase 5 (post–tranche-one strategy, major-version column):** strategic north star — *all-day personal/team digital employee, knows you better over time*; includes **roadmap fork** (continue `llm_gateway` vs adopt/integrate upstream gateway) — **`docs/architecture/Phase5_Evolution_Blueprint_v0.5.0.md`**. **Program tranche one closes at Phase 4 exit** (see `Phase3_Phase4_Productization_Roadmap_v0.3.0.md` §11); Phase 5 is not part of tranche-one exit.
 
 ## Project Identity
 - Product name: `PycHermesAgent`
-- Repo root: `PycHermersAgent/`
+- Repo root: `PycHermesAgent/`
 - Product direction: `Hermes Engine + MetaHarness + opencode-style LLM + local-first MRAG + Electron Desktop`
+- Strategic horizon (Phase 5+, not tranche-one commitment): *all-day personal/team digital employee; learns your context over time with explicit governance* — see Phase 5 blueprint above.
 
 ## Non-Negotiable Boundaries
 - Formal analysis must go through `MetaFramework.execute()`.

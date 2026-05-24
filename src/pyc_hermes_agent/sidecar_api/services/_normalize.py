@@ -78,6 +78,19 @@ def normalize_chat_request(request: ChatCompletionRequest) -> ChatCompletionRequ
     )
 
 
+def _normalize_working_memory_field(raw: object) -> list[str]:
+    """Coerce arbitrary JSON payloads into working-memory strings (trim-only; trimming happens server-side)."""
+
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        return []
+    coerced: list[str] = []
+    for item in raw:
+        coerced.append(str(item) if not isinstance(item, str) else item)
+    return coerced
+
+
 def normalize_agent_loop_request(request: AgentLoopRequest) -> AgentLoopRequest:
     normalized_chat = normalize_chat_request(
         ChatCompletionRequest(
@@ -104,4 +117,6 @@ def normalize_agent_loop_request(request: AgentLoopRequest) -> AgentLoopRequest:
         retry_attempts=normalized_chat.retry_attempts,
         max_iterations=request.max_iterations,
         analysis_mode=request.analysis_mode,
+        working_memory=_normalize_working_memory_field(request.working_memory),
+        update_working_memory=bool(request.update_working_memory),
     )

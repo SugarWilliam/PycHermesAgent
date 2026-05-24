@@ -64,6 +64,8 @@ def test_agent_loop_request_defaults() -> None:
     assert request.retry_budget == 1
     assert request.max_iterations == 8
     assert request.tools == []
+    assert request.working_memory == []
+    assert request.update_working_memory is False
 
 
 def test_agent_loop_result_defaults() -> None:
@@ -74,6 +76,7 @@ def test_agent_loop_result_defaults() -> None:
     assert result.retry_count == 0
     assert result.plan is None
     assert result.tool_results == []
+    assert result.working_memory == []
 
 
 def test_chat_completion_chunk_defaults() -> None:

@@ -388,3 +388,12 @@ It must still preserve the core project constraints:
 - `MetaFramework.execute()` as the formal analysis entry point
 
 ---
+
+## 11. Program tranche one scope boundary (首期工程止于 Phase 4)
+
+**Program tranche one** (首期工程) is defined as delivery through **Phase 4 exit** as stated in §2 and verified against `docs/architecture/Phase3_Phase4_Exit_Checklist_v0.3.0.md`.
+
+- **In scope for tranche one:** All workstreams in §4 through release-hardening tracks required to satisfy Phase 3 and Phase 4 exit criteria.
+- **Out of scope for tranche one:** Strategic upgrades chartered as **Phase 5** — all-day digital teammate, deep personalization / “knows you better over time,” and the **architecture fork** between continuing `PycHermesAgent`’s `llm_gateway` vs adopting or deeply integrating an upstream unified gateway. Those items live only in `docs/architecture/Phase5_Evolution_Blueprint_v0.5.0.md` and must not become hidden Phase 4 exit dependencies.
+
+---

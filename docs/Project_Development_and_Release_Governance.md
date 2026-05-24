@@ -10,6 +10,8 @@ PycHermesAgent is being developed into a Windows-first, local-first agent platfo
 
 Future agents must use this document as the first reference before changing architecture, implementing features, creating release commits, pushing to remotes, or creating tags. Lower-level design documents may add detail, but they must not weaken the boundaries or release gates defined here.
 
+**Roadmap overlays:** Phase 3→4 execution and Phase 4 exit checklist map to **`docs/architecture/Phase3_Phase4_Productization_Roadmap_v0.3.0.md`** (§11 bounds tranche one). Post–Phase 5 strategy is chartered only in **`docs/architecture/Phase5_Evolution_Blueprint_v0.5.0.md`**.
+
 ## 2. Current State Baseline
 
 The current repository has these validated capabilities:
@@ -167,6 +169,12 @@ Required outcomes:
 - Security and secret scans pass.
 - Release notes generated from verified changes.
 
+### Program tranche one closure and Phase 5 (strategic line)
+
+- **Program tranche one** (首期工程) is bounded by **Phase 4 exit**: see `docs/architecture/Phase3_Phase4_Productization_Roadmap_v0.3.0.md` §2 and §11, verified against `docs/architecture/Phase3_Phase4_Exit_Checklist_v0.3.0.md`. Governance gates (§§8–11) apply to tagging through that closure.
+- **Phase 5** is a **post–tranche-one** strategic program: north star *all-day personal/team digital employee; learns context over time*; includes the **architecture fork** between deepening `llm_gateway` vs adopting or deeply integrating an **upstream unified gateway**. Full charter: `docs/architecture/Phase5_Evolution_Blueprint_v0.5.0.md`.
+- **Compatibility:** Phase 5-class releases must treat version axes as potentially **coordinated** (`docs/architecture/Compatibility_Matrix.md` §6); require recorded ADR before weakening §4 non‑negotiable boundaries.
+
 ## 7. Cursor Conditional Automation Authority
 
 Cursor is conditionally authorized to perform development, verification, git push, tag creation, and release preparation only when all of the following are true:
@@ -218,12 +226,15 @@ A release candidate cannot be tagged until these gates pass:
 - Gate 7: No secrets or generated runtime assets are staged.
 - Gate 8: Tag name and branch policy are valid.
 
+**Phase 5 / major-architecture-fork releases** (only after Phase 4 tranche-one closure and explicit Phase 5 program open): Gate 9 must additionally pass — documented ADR linked from release notes covering runtime/gateway choices; **`docs/architecture/Compatibility_Matrix.md` §6** satisfied (coordinated axis bumps + migration narrative); **`AGENTS.md` / governance §4** boundaries unchanged unless the ADR explicitly revises them.
+
 ## 10. Failure Rules
 
 Development must stop when:
 
 - A test failure cannot be explained with evidence.
 - A planned phase requires architectural boundary changes not approved in this document.
+- Phase 5-class fork work would proceed **without** a recorded ADR and **Compatibility Matrix** §6-compliant version story.
 - A provider SDK object would cross the `llm_gateway` boundary.
 - MRAG storage would mix unrelated runtime assets.
 - A release would require force push, skipped hooks, or unverified credentials.
@@ -238,3 +249,4 @@ Every material feature must update the relevant document before release:
 - Storage changes update MRAG constraints and compatibility matrix.
 - Release process changes update this document and the deployment guide.
 - Evaluation findings update the adoption decision section of the evaluation report.
+- Phase 5-chartered releases update `Phase5_Evolution_Blueprint_v0.5.0.md`, the gateway/runtime ADR, and **Compatibility Matrix** §§5–6 in one pass where axes move together.

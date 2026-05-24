@@ -14,6 +14,58 @@ async function getBaseUrl() {
 }
 
 /**
+ * Canonical relative REST paths under the Python sidecar.
+ * Align with repo `Compatibility_Matrix.md` and `GET /` route enumeration.
+ * @readonly
+ */
+export const SIDECAR_PATHS = Object.freeze({
+  HEALTH: '/health',
+  RUNTIME_PATHS: '/runtime-paths',
+  CONFIG: '/config',
+  AGENT_RUN: '/agent/run',
+  AGENT_RUN_STREAM: '/agent/run/stream',
+  SKILLS: '/skills',
+  SKILLS_USER: '/skills/user',
+  RULES: '/rules',
+  RULES_MANIFEST: '/rules/manifest',
+  PREFERENCES: '/preferences',
+  KNOWLEDGE_BASES: '/knowledge-bases',
+  FORMAL_ANALYSIS: '/formal-analysis',
+  ARTIFACTS: '/artifacts',
+  ARTIFACTS_OFFICE: '/artifacts/office',
+  SKILL_PATCH_DRAFTS: '/skills/patch-drafts',
+  SKILL_PATCH_DRAFT_SUGGEST_FROM_SESSION: '/skills/patch-drafts/suggest-from-session'
+})
+
+/**
+ * @param {string} knowledgeBaseId
+ * @param {'' | 'search' | 'materialize' | string} [segment] - e.g. `search`, `materialize`; empty → `/knowledge-bases/{id}` only (rare — usually use list via {@link SIDECAR_PATHS}.KNOWLEDGE_BASES)
+ */
+export function sidecarKnowledgeBasePath(knowledgeBaseId, segment = '') {
+  const enc = encodeURIComponent(knowledgeBaseId)
+  const extra = segment ? `/${segment}` : ''
+  return `${SIDECAR_PATHS.KNOWLEDGE_BASES}/${enc}${extra}`
+}
+
+/** @param {string} draftId */
+export function sidecarSkillPatchDraftPath(draftId) {
+  return `${SIDECAR_PATHS.SKILL_PATCH_DRAFTS}/${encodeURIComponent(String(draftId).trim())}`
+}
+
+/** @param {string} skillId @param {'activate'|'deactivate'} action */
+export function sidecarSkillTogglePath(skillId, action) {
+  return `${SIDECAR_PATHS.SKILLS}/${encodeURIComponent(skillId)}/${action}`
+}
+
+/** @param {string|undefined|null} taskId */
+export function sidecarArtifactsPath(taskId) {
+  if (taskId != null && String(taskId).trim()) {
+    return `${SIDECAR_PATHS.ARTIFACTS}/task/${encodeURIComponent(String(taskId).trim())}`
+  }
+  return SIDECAR_PATHS.ARTIFACTS
+}
+
+/**
  * Check sidecar health.
  * @returns {Promise<object>} health payload
  */
@@ -22,7 +74,7 @@ export async function checkHealth() {
     return window.sidecar.checkHealth()
   }
 
-  const res = await fetch(`${await getBaseUrl()}/health`)
+  const res = await fetch(`${await getBaseUrl()}${SIDECAR_PATHS.HEALTH}`)
   if (!res.ok) throw new Error(`Health check failed: ${res.status}`)
   return res.json()
 }
@@ -33,7 +85,7 @@ export async function checkHealth() {
  * @returns {Promise<object>} result payload
  */
 export async function runAgent(request) {
-  const res = await fetch(`${await getBaseUrl()}/agent/run`, {
+  const res = await fetch(`${await getBaseUrl()}${SIDECAR_PATHS.AGENT_RUN}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request)
@@ -59,7 +111,7 @@ export function streamAgent(request, handlers = {}) {
     let sawDone = false
     try {
       const baseUrl = await getBaseUrl()
-      const res = await fetch(`${baseUrl}/agent/run/stream`, {
+      const res = await fetch(`${baseUrl}${SIDECAR_PATHS.AGENT_RUN_STREAM}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(request),
@@ -143,11 +195,11 @@ export function streamAgent(request, handlers = {}) {
 }
 
 /**
- * Fetch all skills.
- * @returns {Promise<object[]>} skills list
+ * Fetch skills bundle from `GET /skills`: project `items` plus optional builtin activatables.
+ * @returns {Promise<object>}
  */
 export async function fetchSkills() {
-  const res = await fetch(`${await getBaseUrl()}/skills`)
+  const res = await fetch(`${await getBaseUrl()}${SIDECAR_PATHS.SKILLS}`)
   if (!res.ok) throw new Error(`Fetch skills failed: ${res.status}`)
   return res.json()
 }
@@ -157,7 +209,7 @@ export async function fetchSkills() {
  * @returns {Promise<object>} `{ items: ... }`
  */
 export async function fetchRules() {
-  const res = await fetch(`${await getBaseUrl()}/rules`)
+  const res = await fetch(`${await getBaseUrl()}${SIDECAR_PATHS.RULES}`)
   if (!res.ok) throw new Error(`Fetch rules failed: ${res.status}`)
   return res.json()
 }
@@ -167,7 +219,7 @@ export async function fetchRules() {
  * @returns {Promise<object>}
  */
 export async function fetchRulesManifest() {
-  const res = await fetch(`${await getBaseUrl()}/rules/manifest`)
+  const res = await fetch(`${await getBaseUrl()}${SIDECAR_PATHS.RULES_MANIFEST}`)
   if (!res.ok) throw new Error(`Fetch rules manifest failed: ${res.status}`)
   return res.json()
 }
@@ -178,7 +230,7 @@ export async function fetchRulesManifest() {
  * @param {string} markdown - Full SKILL.md body (YAML frontmatter supported)
  */
 export async function saveUserSkill(skillId, markdown) {
-  const res = await fetch(`${await getBaseUrl()}/skills/user`, {
+  const res = await fetch(`${await getBaseUrl()}${SIDECAR_PATHS.SKILLS_USER}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ skill_id: skillId, markdown })
@@ -195,7 +247,7 @@ export async function saveUserSkill(skillId, markdown) {
  * @returns {Promise<object>}
  */
 export async function fetchPreferences() {
-  const res = await fetch(`${await getBaseUrl()}/preferences`)
+  const res = await fetch(`${await getBaseUrl()}${SIDECAR_PATHS.PREFERENCES}`)
   if (!res.ok) throw new Error(`Fetch preferences failed: ${res.status}`)
   return res.json()
 }
@@ -205,7 +257,7 @@ export async function fetchPreferences() {
  * @returns {Promise<object>} `{ items: [...] }` — each item may include `knowledge_base_id`, `display_name`
  */
 export async function listKnowledgeBases() {
-  const res = await fetch(`${await getBaseUrl()}/knowledge-bases`)
+  const res = await fetch(`${await getBaseUrl()}${SIDECAR_PATHS.KNOWLEDGE_BASES}`)
   if (!res.ok) throw new Error(`List knowledge bases failed: ${res.status}`)
   return res.json()
 }
@@ -217,8 +269,7 @@ export async function listKnowledgeBases() {
  * @returns {Promise<object>} serialized RetrievalResult
  */
 export async function searchKnowledgeBase(knowledgeBaseId, body) {
-  const encoded = encodeURIComponent(knowledgeBaseId)
-  const res = await fetch(`${await getBaseUrl()}/knowledge-bases/${encoded}/search`, {
+  const res = await fetch(`${await getBaseUrl()}${sidecarKnowledgeBasePath(knowledgeBaseId, 'search')}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
@@ -226,6 +277,78 @@ export async function searchKnowledgeBase(knowledgeBaseId, body) {
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }))
     throw new Error(err.error?.message || err.message || `KB search failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+/**
+ * Materialize finalized prose into MRAG (`POST .../materialize` — tagged ingest; Evolution backlog parity with Python client).
+ * @param {string} knowledgeBaseId
+ * @param {{ text: string, title?: string, source_uri?: string }} body
+ * @returns {Promise<object>}
+ */
+export async function materializeKnowledgeBaseText(knowledgeBaseId, body) {
+  const res = await fetch(`${await getBaseUrl()}${sidecarKnowledgeBasePath(knowledgeBaseId, 'materialize')}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(err.error?.message || err.message || `Materialize failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+/**
+ * List persisted skill-patch draft records (human-in-the-loop only; server never auto-merges).
+ * @returns {Promise<object>} `{ items: [...] }`
+ */
+export async function listSkillPatchDrafts() {
+  const res = await fetch(`${await getBaseUrl()}${SIDECAR_PATHS.SKILL_PATCH_DRAFTS}`)
+  if (!res.ok) throw new Error(`List skill patch drafts failed: ${res.status}`)
+  return res.json()
+}
+
+/**
+ * @param {{ title: string, body: string, session_id?: string, source?: string }} params
+ */
+export async function createSkillPatchDraft(params) {
+  const { title, body, session_id: sessionId = '', source = 'manual' } = params || {}
+  const res = await fetch(`${await getBaseUrl()}${SIDECAR_PATHS.SKILL_PATCH_DRAFTS}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, body, session_id: sessionId, source })
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(err.error?.message || err.message || `Create draft failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+/** @param {string} sessionId */
+export async function suggestSkillPatchDraftFromSession(sessionId) {
+  const res = await fetch(`${await getBaseUrl()}${SIDECAR_PATHS.SKILL_PATCH_DRAFT_SUGGEST_FROM_SESSION}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: sessionId })
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(err.error?.message || err.message || `Suggest draft failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+/** @param {string} draftId */
+export async function deleteSkillPatchDraft(draftId) {
+  const res = await fetch(`${await getBaseUrl()}${sidecarSkillPatchDraftPath(draftId)}`, {
+    method: 'DELETE'
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(err.error?.message || err.message || `Delete draft failed: ${res.status}`)
   }
   return res.json()
 }
@@ -256,7 +379,7 @@ export function extractCitationsFromToolContent(content) {
  * @param {string} id - skill ID
  */
 export async function activateSkill(id) {
-  const res = await fetch(`${await getBaseUrl()}/skills/${id}/activate`, { method: 'POST' })
+  const res = await fetch(`${await getBaseUrl()}${sidecarSkillTogglePath(id, 'activate')}`, { method: 'POST' })
   if (!res.ok) throw new Error(`Activate skill failed: ${res.status}`)
   return res.json()
 }
@@ -266,13 +389,13 @@ export async function activateSkill(id) {
  * @param {string} id - skill ID
  */
 export async function deactivateSkill(id) {
-  const res = await fetch(`${await getBaseUrl()}/skills/${id}/deactivate`, { method: 'POST' })
+  const res = await fetch(`${await getBaseUrl()}${sidecarSkillTogglePath(id, 'deactivate')}`, { method: 'POST' })
   if (!res.ok) throw new Error(`Deactivate skill failed: ${res.status}`)
   return res.json()
 }
 
 export async function runFormalAnalysis(request) {
-  const res = await fetch(`${await getBaseUrl()}/formal-analysis`, {
+  const res = await fetch(`${await getBaseUrl()}${SIDECAR_PATHS.FORMAL_ANALYSIS}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request)
@@ -290,12 +413,7 @@ export async function runFormalAnalysis(request) {
  * @returns {Promise<object>} `{ items, task_id? }`
  */
 export async function fetchArtifacts(taskId) {
-  const base = await getBaseUrl()
-  const path =
-    taskId != null && String(taskId).trim()
-      ? `/artifacts/task/${encodeURIComponent(String(taskId).trim())}`
-      : '/artifacts'
-  const res = await fetch(`${base}${path}`)
+  const res = await fetch(`${await getBaseUrl()}${sidecarArtifactsPath(taskId)}`)
   if (!res.ok) throw new Error(`Fetch artifacts failed: ${res.status}`)
   return res.json()
 }
@@ -306,7 +424,7 @@ export async function fetchArtifacts(taskId) {
  * @returns {Promise<object>}
  */
 export async function exportOfficeArtifact(payload) {
-  const res = await fetch(`${await getBaseUrl()}/artifacts/office`, {
+  const res = await fetch(`${await getBaseUrl()}${SIDECAR_PATHS.ARTIFACTS_OFFICE}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)

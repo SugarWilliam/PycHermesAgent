@@ -222,3 +222,138 @@ def co_occurrence_non_causal_escalation_hints(
                 }
             )
     return notes
+
+
+# Compact IPC / surveillance specs often mention multiple incompatible output profiles — flag for human review only.
+_RES_TOKEN_RE = re.compile(
+    r"\b(?:"
+    r"1080p|720p|480p|"
+    r"4k|2160p|4320p|"
+    r"1920\s*[x×]1080|1280\s*[x×]720|3840\s*[x×]2160|2560\s*[x×]1440|2592\s*[x×]1944"
+    r")\b",
+    re.IGNORECASE,
+)
+
+# Millisecond latency numbers in competing narrative arcs (marketing vs bench note).
+_LATENCY_MS_RE = re.compile(r"\b(\d{2,5})\s*ms\b", re.IGNORECASE)
+
+_ONVIF_RE = re.compile(r"\bonvif\b", re.IGNORECASE)
+_PROPRIETARY_ONLY_RE = re.compile(
+    r"(?:"
+    r"proprietary\s+only|"
+    r"vendor[- ]?locked|"
+    r"closed\s+protocol|"
+    r"\bpure\b\s*\bprivate\b|"
+    r"封闭式|封闭协议"
+    r")",
+    re.IGNORECASE,
+)
+
+
+def _resolution_bucket(tok: str) -> str | None:
+    """Map surface tokens onto coarse buckets — two buckets in one short block ⇒ profile conflict hint."""
+
+    t = re.sub(r"\s+", "", tok.lower()).replace("×", "x")
+
+    hd1080_aliases = frozenset({"1080p", "1920x1080"})
+    hd720_aliases = frozenset({"720p", "1280x720"})
+    uhd_aliases = frozenset({"2160p", "3840x2160", "4k"})
+    uhd8_aliases = frozenset({"4320p"})
+
+    if t in hd1080_aliases:
+        return "bucket_1080p"
+    if t in hd720_aliases:
+        return "bucket_720p"
+    if t in uhd_aliases:
+        return "bucket_uhd2160"
+    if t in uhd8_aliases:
+        return "bucket_uhd4320"
+    if re.fullmatch(r"\d{3,5}x\d{3,5}", t):
+        return f"bucket_wh_{t}"
+    return None
+
+
+def scan_mutex_video_resolution_tokens(
+    text_blocks: Sequence[str], *, max_block_chars: int = 520
+) -> list[str]:
+    """Multiple distinct codec/output profile mentions in one short snippet."""
+
+    for blk in text_blocks:
+        if not isinstance(blk, str):
+            continue
+        text = blk.strip()
+
+        if not text or len(text) > max_block_chars:
+            continue
+
+        buckets: set[str] = set()
+        for m in _RES_TOKEN_RE.finditer(text):
+            b = _resolution_bucket(m.group(0))
+
+            if b:
+                buckets.add(b)
+
+            if len(buckets) >= 2:
+                ordered = tuple(sorted(buckets))
+                return [
+                    "mutex_video_resolution_tokens_single_snippet_ipc_review",
+                    f"distinct_resolution_profiles_seen={ordered} — confirm one effective encode/decode/stream path.",
+                    "edge_escalation=do_not_select_output_profile_without_device_capability_matrix",
+                ]
+
+    return []
+
+
+def scan_competing_latency_ms_claims(
+    text_blocks: Sequence[str],
+    *,
+    max_block_chars: int = 620,
+    min_spread_ms: int = 150,
+    min_claims: int = 2,
+) -> list[str]:
+    """Two+ ms timings in one short excerpt with wide spread → reconcile measurement methodology."""
+
+    for blk in text_blocks:
+        if not isinstance(blk, str):
+            continue
+        text = blk.strip()
+
+        if not text or len(text) > max_block_chars:
+            continue
+
+        nums = [int(x) for x in _LATENCY_MS_RE.findall(text)]
+
+        if len(nums) < min_claims:
+            continue
+
+        lo, hi = min(nums), max(nums)
+
+        if hi - lo >= min_spread_ms:
+            return [
+                "competing_latency_ms_narratives_in_short_snippet",
+                f"latency_ms_seen={sorted(set(nums))} spread={hi - lo} — scope (LAN/WAN/device path) unspecified.",
+                "edge_escalation=do_not_merge_percentiles_into_single_sla_claim",
+            ]
+
+    return []
+
+
+def scan_onvif_proprietary_mutex_language(text_blocks: Sequence[str], *, max_block_chars: int = 840) -> list[str]:
+    """ONVIF interoperability language colliding with 'proprietary-only' storyline in same window."""
+
+    for blk in text_blocks:
+        if not isinstance(blk, str):
+            continue
+        text = blk.strip()
+
+        if not text or len(text) > max_block_chars:
+            continue
+
+        if _ONVIF_RE.search(text) and _PROPRIETARY_ONLY_RE.search(text):
+            return [
+                "onvif_vs_proprietary_mutex_language_ipc_review",
+                "Snippet couples ONVIF with proprietary-only framing — reconcile transport/profile vs vendor stacks.",
+                "edge_escalation=do_not_equate_optional_profile_support_with_closed_protocol_claims_without_SKU_facts",
+            ]
+
+    return []

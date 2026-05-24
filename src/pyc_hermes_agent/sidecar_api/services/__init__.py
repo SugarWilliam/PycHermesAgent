@@ -32,6 +32,7 @@ from pyc_hermes_agent.sidecar_api.services.mrag_service import (
     ingest_text_document,
     ingest_url_document,
     list_knowledge_bases,
+    materialize_text_document,
     rebuild_mrag_chunk_index,
     search_knowledge_base,
 )
@@ -46,11 +47,19 @@ from pyc_hermes_agent.sidecar_api.services.skill_service import (
     list_skills,
 )
 from pyc_hermes_agent.sidecar_api.services.office_artifacts import export_office_artifact_bundle
+from pyc_hermes_agent.sidecar_api.services.skill_patch_drafts import (
+    create_skill_patch_draft,
+    delete_skill_patch_draft,
+    list_skill_patch_drafts,
+    suggest_skill_patch_draft_from_session,
+)
 
 __all__ = [
     "SIDECAR_API_VERSION",
     "MRAGServiceRegistry",
     "create_knowledge_base",
+    "create_skill_patch_draft",
+    "delete_skill_patch_draft",
     "get_a2a_capability_surface",
     "get_config_snapshot",
     "get_health",
@@ -68,10 +77,12 @@ __all__ = [
     "ingest_pdf_document",
     "ingest_text_document",
     "ingest_url_document",
+    "materialize_text_document",
     "invoke_chat_completion",
     "invoke_formal_analysis",
     "list_asset_inventory",
     "list_knowledge_bases",
+    "list_skill_patch_drafts",
     "list_models",
     "list_providers",
     "list_rules",
@@ -82,6 +93,7 @@ __all__ = [
     "rebuild_mrag_chunk_index",
     "run_agent_loop",
     "search_knowledge_base",
+    "suggest_skill_patch_draft_from_session",
     "stream_agent_loop",
     "stream_chat_completion",
 ]

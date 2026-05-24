@@ -19,15 +19,17 @@ from urllib.request import Request, urlopen
 from pyc_hermes_agent.contracts import AgentLoopRequest, ChatCompletionRequest, MetaAnalysisRequest, RetrievalRequest
 from pyc_hermes_agent.sidecar_api.service import (
     create_knowledge_base,
+    create_skill_patch_draft,
+    delete_skill_patch_draft,
     get_config_snapshot,
     get_health,
-    get_runtime_paths_snapshot,
     get_hermes_bridge_health,
     get_hermes_capability_snapshot,
     get_hermes_memory_snapshot,
     get_hermes_sessions_snapshot,
     get_hermes_skills_snapshot,
     get_hermes_tools_snapshot,
+    get_runtime_paths_snapshot,
     ingest_file_document,
     ingest_text_document,
     ingest_url_document,
@@ -39,13 +41,15 @@ from pyc_hermes_agent.sidecar_api.service import (
     list_providers,
     list_rules,
     list_sidecar_artifacts,
+    list_skill_patch_drafts,
     list_skills,
+    materialize_text_document,
     run_agent_loop,
     search_knowledge_base,
     stream_agent_loop,
     stream_chat_completion,
+    suggest_skill_patch_draft_from_session,
 )
-
 
 HealthFetcher = Callable[[Path | None], Mapping[str, Any]]
 
@@ -132,6 +136,15 @@ def _read_http_error_json(error: HTTPError) -> dict[str, Any]:
     if not isinstance(parsed, dict):  # pragma: no cover - defensive boundary
         raise error
     return parsed
+
+
+def _http_delete_json(base_url: str, path: str, timeout: float) -> dict[str, Any]:
+    request = Request(f"{base_url}{path}", method="DELETE")
+    try:
+        with urlopen(request, timeout=timeout) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        return _read_http_error_json(exc)
 
 
 def _resolve_status_label(health: Mapping[str, Any]) -> str:
@@ -344,6 +357,79 @@ class SidecarClient:
             )
         return ingest_url_document(knowledge_base_id, url, text, title=title, root=self._root)
 
+    def materialize_text_document(
+        self,
+        knowledge_base_id: str,
+        text: str,
+        *,
+        title: str = "",
+        source_uri: str = "",
+    ) -> dict[str, Any]:
+        if self._base_url is not None:
+            return self._http_post(
+                f"/knowledge-bases/{quote(knowledge_base_id, safe='')}/materialize",
+                {"text": text, "title": title, "source_uri": source_uri},
+            )
+        return materialize_text_document(
+            knowledge_base_id,
+            text,
+            title=title,
+            source_uri=source_uri,
+            root=self._root,
+        )
+
+    def list_skill_patch_drafts(self) -> dict[str, Any]:
+        if self._base_url is not None:
+            return self._http_get("/skills/patch-drafts")
+        return list_skill_patch_drafts(self._root)
+
+    def create_skill_patch_draft(
+        self,
+        *,
+        title: str,
+        body: str,
+        session_id: str = "",
+        source: str = "manual",
+    ) -> dict[str, Any]:
+        if self._base_url is not None:
+            return self._http_post(
+                "/skills/patch-drafts",
+                {"title": title, "body": body, "session_id": session_id, "source": source},
+            )
+        return create_skill_patch_draft(
+            self._root,
+            title=title,
+            body=body,
+            session_id=session_id,
+            source=source,
+        )
+
+    def suggest_skill_patch_draft_from_session(self, session_id: str) -> dict[str, Any]:
+        if self._base_url is not None:
+            return self._http_post(
+                "/skills/patch-drafts/suggest-from-session",
+                {"session_id": session_id},
+            )
+        return suggest_skill_patch_draft_from_session(self._root, session_id)
+
+    def delete_skill_patch_draft(self, draft_id: str) -> dict[str, Any]:
+        normalized = draft_id.strip()
+        if self._base_url is not None:
+            return self._http_delete(f"/skills/patch-drafts/{quote(normalized, safe='')}")
+        if delete_skill_patch_draft(self._root, normalized):
+            return {"draft_id": normalized, "status": "deleted"}
+        from pyc_hermes_agent.sidecar_api.error_domains import DOMAIN_INTERNAL
+        from pyc_hermes_agent.sidecar_api.services.common import make_error_response
+
+        return make_error_response(
+            "SKILL_PATCH_DRAFT_MISSING",
+            "client",
+            f"Draft not found: {normalized}",
+            domain=DOMAIN_INTERNAL,
+            retryable=False,
+            degraded=False,
+        )
+
     def search_knowledge_base(self, knowledge_base_id: str, request: RetrievalRequest | Mapping[str, Any]) -> dict[str, Any]:
         serialized_request = _serialize_payload(request)
         if not isinstance(serialized_request, dict):
@@ -381,3 +467,8 @@ class SidecarClient:
         if self._base_url is None:
             raise RuntimeError("HTTP transport is not configured.")
         return _http_post_json(self._base_url, path, payload, self._timeout)
+
+    def _http_delete(self, path: str) -> dict[str, Any]:
+        if self._base_url is None:
+            raise RuntimeError("HTTP transport is not configured.")
+        return _http_delete_json(self._base_url, path, self._timeout)

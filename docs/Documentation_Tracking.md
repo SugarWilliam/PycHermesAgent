@@ -3,8 +3,12 @@
 **Purpose:** Maintain a single inventory for `docs/` so additions, moves, or major revisions are traceable alongside code changes.
 
 **Anchors:**
-- Governance: [`Project_Development_and_Release_Governance.md`](./Project_Development_and_Release_Governance.md)
-- Product execution spine: [`architecture/Phase3_Phase4_Productization_Roadmap_v0.3.0.md`](./architecture/Phase3_Phase4_Productization_Roadmap_v0.3.0.md) (Phase 3–4 umbrella)
+- Governance: [`Project_Development_and_Release_Governance.md`](./Project_Development_and_Release_Governance.md) (Gates **1–9**; Gate 9 = Phase 5 / fork tagging only)
+- Product execution spine: [`architecture/Phase3_Phase4_Productization_Roadmap_v0.3.0.md`](./architecture/Phase3_Phase4_Productization_Roadmap_v0.3.0.md) (Phase 3–4 umbrella; **§11** = tranche-one closure boundary)
+- Tranche-one exit vs code (living checklist): [`architecture/Phase3_Phase4_Exit_Checklist_v0.3.0.md`](./architecture/Phase3_Phase4_Exit_Checklist_v0.3.0.md)
+- Phase 5 strategy (post–tranche-one charter): [`architecture/Phase5_Evolution_Blueprint_v0.5.0.md`](./architecture/Phase5_Evolution_Blueprint_v0.5.0.md)
+- Release gates (ops): [`deployment/Production_Release_Gates.md`](./deployment/Production_Release_Gates.md)
+- Compatibility axes: [`architecture/Compatibility_Matrix.md`](./architecture/Compatibility_Matrix.md)
 - Release notes stubs: [`releases/README.md`](./releases/README.md)
 
 **Maintenance (约定):**
@@ -35,6 +39,21 @@ Plan documents underpinning **`Phase3_Phase4_Productization_Roadmap_v0.3.0.md`**
 | 3G | [`architecture/Phase3G_Windows_Release_Hardening_Plan_v0.3.0.md`](./architecture/Phase3G_Windows_Release_Hardening_Plan_v0.3.0.md) | Windows release hardening |
 | 3G1 | [`architecture/Phase3G1_Windows_Installer_Updater_Plan_v0.3.0.md`](./architecture/Phase3G1_Windows_Installer_Updater_Plan_v0.3.0.md) | Installer / updater |
 
+### 1.1 Living checklist (implementation truth)
+
+| Document | Role |
+|----------|------|
+| [`architecture/Phase3_Phase4_Exit_Checklist_v0.3.0.md`](./architecture/Phase3_Phase4_Exit_Checklist_v0.3.0.md) | Maps roadmap §2 to 已实现 / 部分 / 未见 — **首期工程退场依据** |
+
+### 1.2 Strategy & backlog (beyond single feature)
+
+| Document | Role |
+|----------|------|
+| [`architecture/Phase5_Evolution_Blueprint_v0.5.0.md`](./architecture/Phase5_Evolution_Blueprint_v0.5.0.md) | Phase 5 **column** charter (digital teammate; gateway fork) — **not** tranche-one exit |
+| [`architecture/Evolution_Backlog_Priorities_v0.4.0.md`](./architecture/Evolution_Backlog_Priorities_v0.4.0.md) | Cross-track backlog through **Phase 4**; fork to Phase‑5 backlog when program opens |
+| [`architecture/A2A_SubAgent_Platform_Seam_v0.4.0.md`](./architecture/A2A_SubAgent_Platform_Seam_v0.4.0.md) | A2A façade / federation seam notes |
+| [`architecture/Longevity_Stability_and_Team_Process_v0.4.0.md`](./architecture/Longevity_Stability_and_Team_Process_v0.4.0.md) | Long-running maintainability defaults |
+
 ---
 
 ## 2. Architecture baseline (historical anchors)
@@ -58,10 +77,10 @@ Plan documents underpinning **`Phase3_Phase4_Productization_Roadmap_v0.3.0.md`**
 |------|----------|
 | **Assessment** | [`assessment/Reassessment_v4_FactChecked_and_Upgraded.md`](./assessment/Reassessment_v4_FactChecked_and_Upgraded.md) |
 | **Constraints** | `constraints/*.md` (MetaHarness / MRAG / OpenCode / Windows packaging) |
-| **Deployment** | `deployment/*.md` (gates, usage, Windows sidecar) |
+| **Deployment** | [`deployment/Production_Release_Gates.md`](./deployment/Production_Release_Gates.md), [`deployment/Windows_Install_Upgrade_Rollback_Matrix_and_Updater_Proof_v0.4.0.md`](./deployment/Windows_Install_Upgrade_Rollback_Matrix_and_Updater_Proof_v0.4.0.md), [`deployment/PycHermesAgent_Usage_Deployment_Guide_v0.2.0.md`](./deployment/PycHermesAgent_Usage_Deployment_Guide_v0.2.0.md), [`deployment/Windows_Sidecar_Binary.md`](./deployment/Windows_Sidecar_Binary.md) |
 | **Design / ADRs** | `design/*.md` |
 | **Features** | [`features/PycHermesAgent_Feature_Details_v0.2.0.md`](./features/PycHermesAgent_Feature_Details_v0.2.0.md) |
-| **Releases** | `releases/v0.2.1.md`, `releases/v0.3.0.md`, [`releases/preview_draft.md`](./releases/preview_draft.md) |
+| **Releases** | `releases/v0.4.0.md`, `releases/v0.3.0.md`, `releases/v0.2.1.md`, [`releases/preview_draft.md`](./releases/preview_draft.md) |
 | **Superpowers** | `superpowers/specs/*.md`, `superpowers/plans/*.md` |
 | **Project root (docs)** | [`Project_Development_and_Release_Governance.md`](./Project_Development_and_Release_Governance.md), [`PycHermesAgent_Evaluation_Report_v1.0.md`](./PycHermesAgent_Evaluation_Report_v1.0.md), [`Development_Checkpoint_2026-05-18.md`](./Development_Checkpoint_2026-05-18.md) |
 
@@ -71,13 +90,17 @@ Plan documents underpinning **`Phase3_Phase4_Productization_Roadmap_v0.3.0.md`**
 
 Canonical path set (glob: `docs/**/*.md`):
 
+- `architecture/A2A_SubAgent_Platform_Seam_v0.4.0.md`
 - `architecture/Compatibility_Matrix.md`
 - `architecture/Execution_Blueprint_v0.2.0.md`
+- `architecture/Evolution_Backlog_Priorities_v0.4.0.md`
 - `architecture/Hermes_Mixed_Integration_Mapping_v0.2.0.md`
+- `architecture/Longevity_Stability_and_Team_Process_v0.4.0.md`
 - `architecture/Phase0_Blueprint_v0.2.0.md`
 - `architecture/Phase1_Roadmap_v0.2.0.md`
 - `architecture/Phase2_Toward_GA_v0.2.1.md`
 - `architecture/Phase3_Phase4_Productization_Roadmap_v0.3.0.md`
+- `architecture/Phase3_Phase4_Exit_Checklist_v0.3.0.md`
 - `architecture/Phase3A_Desktop_Integration_Plan_v0.3.0.md`
 - `architecture/Phase3B_Network_Search_Plan_v0.3.0.md`
 - `architecture/Phase3C_Multiformat_MRAG_Plan_v0.3.0.md`
@@ -93,6 +116,7 @@ Canonical path set (glob: `docs/**/*.md`):
 - `architecture/Phase3G_Windows_Release_Hardening_Plan_v0.3.0.md`
 - `architecture/PycHermesAgent_Architecture_v0.2.0.md`
 - `architecture/PycHermesAgent_Solution_Architecture_v0.2.0.md`
+- `architecture/Phase5_Evolution_Blueprint_v0.5.0.md`
 - `assessment/Reassessment_v4_FactChecked_and_Upgraded.md`
 - `constraints/meta-harness-boundaries.md`
 - `constraints/mrag-evidence-boundaries.md`
@@ -100,6 +124,7 @@ Canonical path set (glob: `docs/**/*.md`):
 - `constraints/windows-packaging.md`
 - `deployment/Production_Release_Gates.md`
 - `deployment/PycHermesAgent_Usage_Deployment_Guide_v0.2.0.md`
+- `deployment/Windows_Install_Upgrade_Rollback_Matrix_and_Updater_Proof_v0.4.0.md`
 - `deployment/Windows_Sidecar_Binary.md`
 - `design/ADR_Skill_Runtime_Permissions_Phase1_v0.2.0.md`
 - `design/Asset_Promotion_Strategy_v0.2.0.md`
@@ -114,6 +139,7 @@ Canonical path set (glob: `docs/**/*.md`):
 - `releases/README.md`
 - `releases/v0.2.1.md`
 - `releases/v0.3.0.md`
+- `releases/v0.4.0.md`
 - `superpowers/plans/2026-05-22-governance-first-runtime-and-docs-closure.md`
 - `superpowers/plans/2026-05-20-phase3-p0-foundation-calibration.md`
 - `superpowers/plans/2026-05-21-phase3a-a1-sidecar-startup.md`
