@@ -11,7 +11,8 @@
     "dist:dir": "electron-vite build && electron-builder --dir",
     "dist": "electron-vite build && electron-builder",
     "dist:win-unpacked": "electron-vite build && electron-builder --win dir",
-    "dist:win": "electron-vite build && electron-builder --win"
+    "dist:win": "electron-vite build && electron-builder --win",
+    "ci:generic-https-feed-proof": "node tools/ci_generic_https_feed_proof.cjs"
   },
   "dependencies": {
     "electron-updater": "^6.3.9",

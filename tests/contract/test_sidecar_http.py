@@ -11,7 +11,15 @@ from pyc_hermes_agent import SidecarClient
 from pyc_hermes_agent.asset_manager import AssetManager, calculate_asset_checksum
 from pyc_hermes_agent.artifact_engine import ArtifactEngine
 from pyc_hermes_agent.common import ensure_runtime_directories, resolve_runtime_paths
-from pyc_hermes_agent.contracts import AgentLoopRequest, MetaAnalysisRequest, ModelAssetManifest, RetrievalRequest
+from pyc_hermes_agent.contracts import (
+    A2A_PROTOCOL_ID,
+    A2A_PROTOCOL_VERSION,
+    AgentLoopRequest,
+    MetaAnalysisRequest,
+    ModelAssetManifest,
+    RetrievalRequest,
+    build_a2a_capability_document,
+)
 from pyc_hermes_agent.mrag_core.ownership import MRAG_LOCK_FILE
 from pyc_hermes_agent.sidecar_api import create_http_server
 from pyc_hermes_agent.sidecar_api.service import SIDECAR_API_VERSION
@@ -184,6 +192,26 @@ def test_sidecar_http_favicon_returns_no_content(tmp_path) -> None:
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
+
+
+def test_sidecar_http_capabilities_a2a_matches_contract_helpers(tmp_path) -> None:
+    server, thread = _start_server(root=tmp_path)
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        status_code, payload, headers = _get_json_with_headers(f"{base_url}/capabilities/a2a")
+        _root_status, root_payload, _ = _get_json_with_headers(f"{base_url}/")
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert status_code == 200
+    expected = build_a2a_capability_document(sidecar_api_version=SIDECAR_API_VERSION)
+    assert payload == expected
+    assert payload["a2a_protocol_id"] == A2A_PROTOCOL_ID
+    assert payload["a2a_protocol_version"] == A2A_PROTOCOL_VERSION
+    assert headers["X-Pyc-Sidecar-Api-Version"] == SIDECAR_API_VERSION
+    assert "/capabilities/a2a" in root_payload["routes"]
 
 
 def test_sidecar_http_server_sets_api_version_header_on_json_success(tmp_path) -> None:

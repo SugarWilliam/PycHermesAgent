@@ -361,6 +361,8 @@ def build_evidence_validation_pack(
     temporal = consistency.scan_dense_year_signals(text_blocks)
     temporal.extend(consistency.scan_relative_time_signals(problem_statement, text_blocks))
     temporal.extend(consistency.scan_version_literal_density(text_blocks))
+    temporal.extend(consistency.scan_wide_percentage_conflict_within_blocks(text_blocks))
+
     logic_signals = [*consistency.scan_problem_overclaim_signals(problem_statement)]
 
     kb_entries = int(kb_stats.get("citation_entry_count") or len(kb_list))

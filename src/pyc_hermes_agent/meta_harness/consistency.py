@@ -85,6 +85,43 @@ def scan_version_literal_density(text_blocks: Sequence[str]) -> list[str]:
     return []
 
 
+def scan_wide_percentage_conflict_within_blocks(text_blocks: Sequence[str], *, gap: int = 40, max_chars: int = 420) -> list[str]:
+    """If a *single short* excerpt lists percentages far apart, ask humans to reconcile (non-prover)."""
+
+    pct_re = re.compile(r"\b(\d{1,3})%")
+
+    hints: list[str] = []
+
+    for blk in text_blocks:
+        if not isinstance(blk, str):
+            continue
+        text = blk.strip()
+
+        if not text or len(text) > max_chars:
+            continue
+
+        nums = [int(m.group(1)) for m in pct_re.finditer(text)]
+
+        if len(nums) < 2:
+
+            continue
+
+        spread = max(nums) - min(nums)
+
+        if spread >= gap:
+            uniq = ",".join(str(n) for n in sorted(set(nums)))
+            hints.extend(
+                [
+                    "wide_percentage_spread_inside_single_snippet_requires_manual_calibration",
+                    f"percents_seen={uniq}; spread>= {gap}",
+                ]
+            )
+
+            break
+
+    return hints
+
+
 def tokenize_normalized(text: str) -> frozenset[str]:
     """Lower-case word-ish tokens."""
 

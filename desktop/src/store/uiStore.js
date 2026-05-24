@@ -17,7 +17,16 @@ const useUiStore = create((set) => ({
   /** Opens the context panel (user-driven navigation). */
   setContextData: (data) => set({ contextData: data, contextPanelCollapsed: false }),
   /** Replace right-rail snapshot without forcing the panel open (streaming formal path). */
-  setFormalContextSnapshot: (data) => set({ contextData: data })
+  setFormalContextSnapshot: (data) => set({ contextData: data }),
+
+  /** Increment when UI should open Sidebar → Settings (e.g. sidecar error banner CTA). */
+  settingsPanelRequestNonce: 0,
+  /** Expands sidebar and bumps nonce so Sidebar opens Settings overlay. */
+  requestSettingsPanel: () =>
+    set((s) => ({
+      sidebarCollapsed: false,
+      settingsPanelRequestNonce: s.settingsPanelRequestNonce + 1,
+    })),
 }))
 
 export default useUiStore

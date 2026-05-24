@@ -31,6 +31,8 @@ from pyc_hermes_agent.sidecar_api.logging import log_event
 from pyc_hermes_agent.sidecar_api.service import (
     SIDECAR_API_VERSION,
     create_knowledge_base,
+    export_office_artifact_bundle,
+    get_a2a_capability_surface,
     get_config_snapshot,
     get_health,
     get_hermes_bridge_health,
@@ -47,7 +49,6 @@ from pyc_hermes_agent.sidecar_api.service import (
     ingest_pdf_document,
     ingest_text_document,
     ingest_url_document,
-    export_office_artifact_bundle,
     invoke_chat_completion,
     invoke_formal_analysis,
     list_knowledge_bases,
@@ -311,6 +312,7 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
                     "routes": [
                         "/health",
                         "/runtime-paths",
+                        "/capabilities/a2a",
                         "/favicon.ico",
                         "/config",
                         "/providers",
@@ -381,6 +383,13 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
             return _get_or_bad_gateway(
                 lambda: get_runtime_paths_snapshot(root),
                 code="RUNTIME_PATHS_SNAPSHOT_FAILED",
+                domain=DOMAIN_INTERNAL,
+                details={},
+            )
+        if path == "/capabilities/a2a":
+            return _get_or_bad_gateway(
+                lambda: get_a2a_capability_surface(),
+                code="A2A_CAPABILITY_SURFACE_FAILED",
                 domain=DOMAIN_INTERNAL,
                 details={},
             )

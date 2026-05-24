@@ -1,5 +1,10 @@
 """Cross-layer contracts for PycHermesAgent."""
 
+from .a2a import (
+    A2A_PROTOCOL_ID,
+    A2A_PROTOCOL_VERSION,
+    build_a2a_capability_document,
+)
 from .schemas import (
     AgentPlan,
     AgentLoopEvent,
@@ -46,6 +51,8 @@ from .schemas import (
 )
 
 __all__ = [
+    "A2A_PROTOCOL_ID",
+    "A2A_PROTOCOL_VERSION",
     "AgentPlan",
     "AgentLoopEvent",
     "ChatCompletionChunk",
@@ -55,6 +62,7 @@ __all__ = [
     "ChatCompletionResult",
     "ChatMessage",
     "Citation",
+    "build_a2a_capability_document",
     "CapabilityDescriptor",
     "DocumentChunk",
     "ErrorEnvelope",

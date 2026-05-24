@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from pyc_hermes_agent.llm_gateway.rules import discover_ordered_rule_documents
+from pyc_hermes_agent.sidecar_api.services.common import SIDECAR_API_VERSION
 
 
 def rules_manifest_bundle(workspace_root: Path) -> dict[str, Any]:
@@ -33,7 +34,17 @@ def rules_manifest_bundle(workspace_root: Path) -> dict[str, Any]:
         "items": items,
         "workspace_root_hint": str(workspace_root.resolve()),
         "generated_at_unix": time.time(),
-        "manifest_version": 1,
+        "manifest_version": 2,
+        "runtime_profile": {
+            "bundle_kind": "rules_fingerprint_audit",
+            "sidecar_api_version": SIDECAR_API_VERSION,
+            "rules_discovery_engine": "discover_ordered_rule_documents_v1",
+            "assembly_channel": "sidecar_prompt_assembly",
+            "notes": (
+                "Fingerprints mirror ordered discovery used for prompts; supersession semantics depend on "
+                "caller-enforced precedence, not SHA-256 alone."
+            ),
+        },
         "precedence_explainer": (
             "precedence_order starts at filesystem root-facing rules (low index) "
             "and walks toward workspace leaf; prompt assembly merges in that ascending order "

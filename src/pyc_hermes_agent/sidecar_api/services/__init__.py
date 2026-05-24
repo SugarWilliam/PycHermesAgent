@@ -35,6 +35,7 @@ from pyc_hermes_agent.sidecar_api.services.mrag_service import (
     rebuild_mrag_chunk_index,
     search_knowledge_base,
 )
+from pyc_hermes_agent.sidecar_api.services.a2a_capability import get_a2a_capability_surface
 from pyc_hermes_agent.sidecar_api.services.skill_service import (
     get_hermes_bridge_health,
     get_hermes_capability_snapshot,
@@ -50,6 +51,7 @@ __all__ = [
     "SIDECAR_API_VERSION",
     "MRAGServiceRegistry",
     "create_knowledge_base",
+    "get_a2a_capability_surface",
     "get_config_snapshot",
     "get_health",
     "get_hermes_bridge_health",

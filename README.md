@@ -120,6 +120,10 @@ Use docs by authority level:
 - `docs/Documentation_Tracking.md` — `docs/` inventory and tracking index
 - `docs/Project_Development_and_Release_Governance.md` — top-level development and release authority
 - `docs/architecture/Compatibility_Matrix.md` — current contract and version baseline
+- `docs/architecture/Evolution_Backlog_Priorities_v0.4.0.md` — cross-track backlog (intel, MRAG, desktop, A2A)
+- `docs/architecture/A2A_SubAgent_Platform_Seam_v0.4.0.md` — reserved sub-agent / A2A contract surface (`GET /capabilities/a2a`)
+- `docs/architecture/Longevity_Stability_and_Team_Process_v0.4.0.md` — long-running team cadence defaults
+- `docs/deployment/Windows_Install_Upgrade_Rollback_Matrix_and_Updater_Proof_v0.4.0.md` — install / upgrade / rollback matrix and updater proof checklist
 - `docs/architecture/Phase3_Phase4_Productization_Roadmap_v0.3.0.md` — Phase 3 → 4 productization roadmap
 - `docs/deployment/Production_Release_Gates.md` — current release-gate operations baseline
 - `docs/deployment/Windows_Sidecar_Binary.md` — Windows sidecar PyInstaller artifact notes

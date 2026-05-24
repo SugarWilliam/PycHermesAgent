@@ -14,7 +14,7 @@ from pyc_hermes_agent.sidecar_api.error_domains import DOMAIN_INTERNAL
 from pyc_hermes_agent.sidecar_api.logging import log_event  # noqa: F401 - re-exported
 
 
-SIDECAR_API_VERSION = "0.7"
+SIDECAR_API_VERSION = "0.9"
 MRAG_RETRIEVAL_MODES = ["lexical", "semantic", "hybrid"]
 MRAG_RUNTIME_NOTE = "JSON-backed MRAGService is the active sidecar runtime; SQLite/FTS5 artifacts exist separately and are not the active sidecar backend."
 

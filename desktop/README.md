@@ -20,6 +20,10 @@ npm run dist                 # installer / platform defaults from electron-build
 
 Repo-level production gates additionally run **`../scripts/electron_dist_layout_smoke.py desktop --require-unpacked-resources`** after **`dist:dir`** to verify `out/{main,preload,renderer}` and that `dist-installer/*unpacked/resources/` exists.
 
+## CI — updater feed sanity (generic provider)
+
+Ubuntu CI runs **`desktop-generic-https-feed-proof`** (see root `.github/workflows/ci.yml`): **`npm run ci:generic-https-feed-proof`**, implemented as `tools/ci_generic_https_feed_proof.cjs`. It publishes **`latest-linux.yml`** over **HTTPS localhost** (ephemeral OpenSSL cert) and asserts **`electron-updater` → `GenericProvider`** can fetch and parse the channel file (`resolveFiles` smoke). **Scope:** YAML/layout/parser parity only — **not** full Electron installer download, deltas, or code signing.
+
 ## Sidecar Startup Contract
 
 **Single authoritative policy:** URL resolution and launch decisions are owned by the **Electron main process** (`electron/sidecarRuntime.js`). The renderer must not invent a competing base URL; it uses **`window.sidecar.getRuntimeConfig()`** / **`sidecarClient.js`** (`resolved_url`).
@@ -52,7 +56,7 @@ Same order as implemented in `resolveSidecarRuntimeConfig()`:
 
 ### Health and degraded UX (renderer)
 
-- `SidecarStatusBanner` polls **`getStatus()`** + **`checkHealth()`** (`/health` payload: `status_label`, `state`, `degradation_reasons`). Chinese banner copy reflects startup errors, probe failures, and degraded / ready-with-warnings states.
+- `SidecarStatusBanner` polls **`getStatus()`** + **`checkHealth()`** (`/health` payload: `status_label`, `state`, `degradation_reasons`). Chinese banner copy reflects startup errors, probe failures, and degraded / ready-with-warnings states; **连接设置** opens the Sidebar **Settings** overlay (adjust sidecar URL / launch command — see Startup Contract below).
 - **Context panel — Sidecar runtime:** summarizes **Base URL**, **startup state** (attach vs launching vs unreachable), **`/health` aggregate** (`status_label` / `state` when reachable), and optional **raw JSON** for `runtimeStatus` plus the IPC health probe envelope (supports Phase 3A A2 diagnostics).
 - **IPC:** `sidecar:url`, `getRuntimeConfig`, `setRuntimeConfig`, `getStatus`, `checkHealth`, `restart`.
 
@@ -69,7 +73,7 @@ The request body includes **`activated_skills`** (names of toggled-on **builtin*
 ## Sidecar services in the shell (Phase 3A A4)
 
 - **Skills:** `GET /skills` → builtins (activatable) + project `items`; failures surface in the Skills panel (`lastFetchError`). `saveUserSkill()` posts to `POST /skills/user`.
-- **Rules:** `GET /rules` → ordered rule document paths (`precedence_order`); use `fetchRules()` / `fetchRulesManifest()` (`GET /rules/manifest`, audit fingerprints) in `sidecarClient.js` (Context → **Sidecar runtime** lists a short preview).
+- **Rules:** `GET /rules` → ordered rule document paths (`precedence_order`); use `fetchRules()` / `fetchRulesManifest()` (`GET /rules/manifest`: **`manifest_version: 2`**, fingerprints + **`runtime_profile`**) in `sidecarClient.js` (Context → **Sidecar runtime** lists a short preview).
 - **Preferences:** `GET /preferences` loads into **Context → Sidecar runtime** (read-only snapshot; use **Refresh sidecar probes & snapshots**).
 - **Knowledge bases:** `GET /knowledge-bases` lists local MRAG KBs (`listKnowledgeBases()`). `POST /knowledge-bases/{id}/search` runs retrieval (`searchKnowledgeBase()`).
 - **`/retrieve` in chat:** Sending `/retrieve <query>` calls the APIs above with **hybrid** mode (`semantic_weight=0.35`, `top_k=8`, `include_citations=true`). Default KB is **`GET /knowledge-bases` first item**; optionally pick another under Context → **MRAG KB for /retrieve**.

@@ -63,7 +63,7 @@
 
 | 状态 | 说明 | 代码 / 交付依据 |
 |------|------|-----------------|
-| **已实现（确定性子集 + IPC 语义对照子集）** | ``lexical`` / ``semantic`` / ``hybrid``：默认 **确定性 trigram** 语义分量；可选安装 **`sentence-transformers`**（`pip install '.[mrag-dense]'`）后通过 ``PYC_HERMES_MRAG_EMBEDDING_BACKEND`` 或 ``RetrievalRequest.embedding_backend`` 启用 **dense** 编码器（缺依赖则回退 trigram 并在 ``RetrievalResult.warnings`` 提示）。Synthetic 基准：``benchmarks/mrag/run_expanded_hybrid_benchmark.py``；**IPC/视频监控语料-shaped** 对照：``benchmarks/mrag/run_ipc_business_hybrid_benchmark.py``（随 `RELEASE_GATES_PRODUCTION=1` 的 ``release_gates.py`` 路径）。Formal 路径 `analysis_card.evidence_chain` 含 **Phase 3F1** 校验；`consistency.py` 另含 **相对时间措辞** 与 **多版本号字面量** 提示（非证明器）。**与路线图「代表性业务基准集全面胜出」**仍可继续加强。 | `mrag_core/retrieve.py`、`mrag_core/embeddings.py`、`mrag_core/embedding_backend.py`；`benchmarks/mrag/run_lexical_hybrid_proof.py`、`benchmarks/mrag/run_expanded_hybrid_benchmark.py`、`benchmarks/mrag/run_ipc_business_hybrid_benchmark.py`；`tests/contract/test_mrag_core.py`、`tests/contract/test_ipc_semantic_benchmark.py`、`tests/contract/test_embedding_backend_contract.py`；`meta_harness/evidence_chain.py`、`meta_harness/consistency.py`；`tests/contract/test_evidence_chain_validation.py` |
+| **已实现（确定性子集 + IPC 语义对照子集）** | ``lexical`` / ``semantic`` / ``hybrid``：默认 **确定性 trigram** 语义分量；可选安装 **`sentence-transformers`**（`pip install '.[mrag-dense]'`）后通过 ``PYC_HERMES_MRAG_EMBEDDING_BACKEND`` 或 ``RetrievalRequest.embedding_backend`` 启用 **dense** 编码器（缺依赖则回退 trigram 并在 ``RetrievalResult.warnings`` 提示）。Synthetic 基准：``benchmarks/mrag/run_expanded_hybrid_benchmark.py``；**IPC/视频监控语料-shaped** 对照：``benchmarks/mrag/run_ipc_business_hybrid_benchmark.py``（随 `RELEASE_GATES_PRODUCTION=1` 的 ``release_gates.py`` 路径）。Formal 路径 `analysis_card.evidence_chain` 含 **Phase 3F1** 校验；`consistency.py` 另含 **相对时间措辞**、**多版本号字面量** 与 **同块百分比离散跨度**提示（非证明器）。**与路线图「代表性业务基准集全面胜出」**仍可继续加强。 | `mrag_core/retrieve.py`、`mrag_core/embeddings.py`、`mrag_core/embedding_backend.py`；`benchmarks/mrag/run_lexical_hybrid_proof.py`、`benchmarks/mrag/run_expanded_hybrid_benchmark.py`、`benchmarks/mrag/run_ipc_business_hybrid_benchmark.py`；`tests/contract/test_mrag_core.py`、`tests/contract/test_ipc_semantic_benchmark.py`、`tests/contract/test_embedding_backend_contract.py`；`meta_harness/evidence_chain.py`、`meta_harness/consistency.py`；`tests/contract/test_evidence_chain_validation.py` |
 
 ---
 
@@ -86,7 +86,8 @@
 2. **Track B（本轮已落地骨干）**：`web_search_normalized` / `run_web_search_tool` 可选 ``workspace_root``；**TTL 磁盘缓存**（`cache/web_search`）、**进程内分钟/小时配额**、**失败退避**、**latency_ms / quota / cache_hit** metadata（实现：`hermes_engine/web_search_runtime.py`）。  
 3. **Track D（本轮已落地骨干）**：`SKILL.md` front-matter 支持 **`priority`**（整数，用于激活顺序）与 **`overlap_group`**（同组多激活会在 `skill_runtime_audit` / `AgentLoop` audit 提示）；`rules_manifest_bundle` 增加 **`precedence_explainer`**。远端同步 / 可视化仍为后续。  
 4. **Dense MRAG（可选垂直）**：`[mrag-dense]` extra + env ``PYC_HERMES_MRAG_EMBEDDING_BACKEND`` / per-request ``RetrievalRequest.embedding_backend``；无依赖时安全回退 **trigram**。  
-5. **Phase 4**：Windows 干净机安装 / 升级 / downgrade 与 **electron-updater** 在线证明仍为下一层。
+5. **Phase 4**：Windows 干净机安装 / 升级 / downgrade 与 **electron-updater** 在线证明仍为下一层；执行清单见 `docs/deployment/Windows_Install_Upgrade_Rollback_Matrix_and_Updater_Proof_v0.4.0.md`。  
+6. **v0.4 扩展索引**：跨轨 backlog、子代理 / A2A 接缝、团队协作节奏见 `docs/architecture/Evolution_Backlog_Priorities_v0.4.0.md`、`docs/architecture/A2A_SubAgent_Platform_Seam_v0.4.0.md`、`docs/architecture/Longevity_Stability_and_Team_Process_v0.4.0.md`。Sidecar 已暴露 **`GET /capabilities/a2a`**（契约 JSON，暂无对等流量）。
 
 ---
 

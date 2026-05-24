@@ -8,6 +8,7 @@
 - Phase 2 (usable workbench): **complete** — see `docs/architecture/Phase2_Toward_GA_v0.2.1.md` (not production).
 - Phase 3 → 4 **exit criteria vs code** (living checklist): see `docs/architecture/Phase3_Phase4_Exit_Checklist_v0.3.0.md` (maps Roadmap §2 to 已实现 / 部分 / 未见).
 - Phase 4 **automation tier (engineering)**: `.github/workflows/ci.yml` jobs `production-gates` + `desktop-windows-unpacked` (Windows `win-unpacked` + `electron_dist_layout_smoke.py --prefer-unpacked win`); not store-ready signing/GA without separate release governance.
+- **v0.4 evolution backlog + A2A seam + updater matrix (docs)**: see `docs/architecture/Evolution_Backlog_Priorities_v0.4.0.md`, `docs/architecture/A2A_SubAgent_Platform_Seam_v0.4.0.md`, `docs/deployment/Windows_Install_Upgrade_Rollback_Matrix_and_Updater_Proof_v0.4.0.md`, `docs/architecture/Longevity_Stability_and_Team_Process_v0.4.0.md`.
 
 ## Project Identity
 - Product name: `PycHermesAgent`

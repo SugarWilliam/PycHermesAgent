@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import useChatStore from '../../store/chatStore'
 import useUiStore from '../../store/uiStore'
 import SettingsPanel from '../settings/SettingsPanel'
@@ -23,8 +23,15 @@ export default function Sidebar() {
   const setActiveConversation = useChatStore((s) => s.setActiveConversation)
   const deleteConversation = useChatStore((s) => s.deleteConversation)
   const toggleSidebar = useUiStore((s) => s.toggleSidebar)
+  const settingsPanelRequestNonce = useUiStore((s) => s.settingsPanelRequestNonce)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [skillsExpanded, setSkillsExpanded] = useState(false)
+
+  useEffect(() => {
+    if (settingsPanelRequestNonce > 0) {
+      setSettingsOpen(true)
+    }
+  }, [settingsPanelRequestNonce])
 
   const { today, earlier } = groupByDate(conversations)
 

@@ -1,4 +1,5 @@
 import { useSidecarBanner, useSidecarStatusStore } from '../../store/sidecarStatusStore'
+import useUiStore from '../../store/uiStore'
 
 const tierClasses = {
   error: 'bg-red-600/95 text-white border-b border-red-700',
@@ -11,6 +12,7 @@ export default function SidecarStatusBanner() {
   const fetchState = useSidecarStatusStore((s) => s.fetchState)
   const refresh = useSidecarStatusStore((s) => s.refresh)
   const restart = useSidecarStatusStore((s) => s.restart)
+  const requestSettingsPanel = useUiStore((s) => s.requestSettingsPanel)
 
   if (!banner.visible) {
     return null
@@ -38,6 +40,16 @@ export default function SidecarStatusBanner() {
         >
           刷新状态
         </button>
+        {banner.tier === 'error' && banner.showRestart ? (
+          <button
+            type="button"
+            onClick={() => requestSettingsPanel()}
+            className="px-2 py-1 rounded bg-white/15 hover:bg-white/25 transition"
+            title="在设置中核对侧车 URL / 启动命令（见 README Sidecar Startup）"
+          >
+            连接设置
+          </button>
+        ) : null}
         {banner.showRestart ? (
           <button
             type="button"
