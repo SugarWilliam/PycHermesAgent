@@ -68,6 +68,8 @@ Phase 4 is complete when:
 - Release gates cover packaging, install-time immutability, upgrade checks, and desktop smoke validation.
 - The product is positioned for release candidates instead of engineering preview-only use.
 
+**Implementation status (rolling):** see `docs/architecture/Phase3_Phase4_Exit_Checklist_v0.3.0.md` for a three-state (已实现 / 部分实现 / 未见或未达标) mapping to the repository.
+
 ---
 
 ## 3. Capability Gap vs Original Product Goal
