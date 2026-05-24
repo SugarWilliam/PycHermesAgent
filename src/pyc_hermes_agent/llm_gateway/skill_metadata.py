@@ -16,6 +16,8 @@ class SkillMetadata:
     compatibility: Optional[str] = None
     metadata: Dict[str, str] = field(default_factory=dict)
     skill_origin: str = "project"
+    priority: int = 0
+    overlap_group: Optional[str] = None
 
 
 def parse_skill_metadata(path: Path) -> SkillMetadata:
@@ -57,6 +59,21 @@ def parse_skill_metadata(path: Path) -> SkillMetadata:
     if not name or not description:
         raise ValueError(f"Skill metadata missing required fields in {path}")
 
+    raw_priority = str(frontmatter.get("priority", "0")).strip()
+
+    priority = 0
+    try:
+        priority = int(raw_priority)
+
+    except ValueError:
+        priority = 0
+
+    overlap_group_raw = frontmatter.get("overlap_group") or ""
+
+    overlap_group_norm = overlap_group_raw.strip()
+
+    overlap_group_final = overlap_group_norm if overlap_group_norm else None
+
     return SkillMetadata(
         name=name,
         description=description,
@@ -64,4 +81,7 @@ def parse_skill_metadata(path: Path) -> SkillMetadata:
         license=frontmatter.get("license"),
         compatibility=frontmatter.get("compatibility"),
         metadata=nested_metadata,
+        skill_origin="project",
+        priority=max(-10_000, min(10_000, priority)),
+        overlap_group=overlap_group_final,
     )

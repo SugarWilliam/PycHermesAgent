@@ -6,10 +6,13 @@ import json
 import os
 import time
 from collections.abc import Callable, Mapping
+from pathlib import Path
 from typing import Any
 from urllib.error import URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+
+from pyc_hermes_agent.hermes_engine import web_search_runtime as ws_rt
 
 _DISABLE_ENV = "PYC_HERMES_DISABLE_WEB_SEARCH"
 _ENV_PROVIDER = "PYC_HERMES_WEB_SEARCH_PROVIDER"
@@ -237,46 +240,146 @@ def web_search_wikipedia(
     return _payload_from_arrays(q, provider=provider, titles=titles, summaries=summaries, urls=urls, max_results=max_results)
 
 
+def _wrap_timed(payload: dict[str, Any], t0: float, **extra_meta: Any) -> dict[str, Any]:
+    latency_ms = max(0, int((time.perf_counter() - t0) * 1000))
+    merged_extra = {"latency_ms": latency_ms, **extra_meta}
+    if isinstance(payload.get("meta"), dict):
+        meta = dict(payload["meta"])
+        meta.update(merged_extra)
+        out = dict(payload)
+        out["meta"] = meta
+        return out
+    return ws_rt.merge_meta(payload, merged_extra)
+
+
+def _duckduckgo_tracked(query: str, *, max_results: int, opener: Callable[..., Any] | None = None) -> dict[str, Any]:
+    backoff = ws_rt.provider_backoff_until("duckduckgo")
+    if backoff:
+        base = _empty_payload(query, error="BACKOFF", provider_hint="duckduckgo")
+        return ws_rt.merge_meta(
+            base,
+            {"backoff_until_unix": backoff, "circuit_provider": "duckduckgo"},
+        )
+
+    raw = web_search_duckduckgo(query, max_results=max_results, opener=opener)
+    if raw.get("ok"):
+        ws_rt.note_provider_success("duckduckgo")
+        return dict(raw)
+
+    ws_rt.note_provider_failure("duckduckgo")
+    return dict(raw)
+
+
+def _wikipedia_tracked(query: str, *, max_results: int, opener: Callable[..., Any] | None = None) -> dict[str, Any]:
+    backoff = ws_rt.provider_backoff_until("wikipedia")
+    if backoff:
+        base = _empty_payload(query, error="BACKOFF", provider_hint="wikipedia")
+        return ws_rt.merge_meta(
+            base,
+            {"backoff_until_unix": backoff, "circuit_provider": "wikipedia"},
+        )
+
+    raw = web_search_wikipedia(query, max_results=max_results, opener=opener)
+    if raw.get("ok"):
+        ws_rt.note_provider_success("wikipedia")
+        return dict(raw)
+
+    ws_rt.note_provider_failure("wikipedia")
+    return dict(raw)
+
+
 def web_search_normalized(
     query: str,
     *,
     max_results: int = 8,
     opener: Callable[..., Any] | None = None,
     provider: str | None = None,
+    workspace_root: Path | str | None = None,
 ) -> dict[str, Any]:
     """
     Normalize search into ``results`` + ``citations`` (desktop-compatible).
 
     Pick ``duckduckgo``, ``wikipedia``, or ``chain`` via optional ``provider`` argument
     or ``PYC_HERMES_WEB_SEARCH_PROVIDER`` env (chain tries DuckDuckGo, then Wikipedia when empty).
+
+    Optional ``workspace_root`` chooses the packaging cache subdirectory under writable ``cache/web_search``.
     """
+    ws_path = Path(workspace_root).expanduser() if workspace_root else None
+    cache_dir = ws_rt.resolve_web_search_cache_dir(ws_path)
+
     q = query.strip()
+    hint = _normalize_provider(provider)
+
+    base_meta_skeleton: dict[str, Any] = {"cache_hit": False, "cache_dir": str(cache_dir)}
+
     if os.environ.get(_DISABLE_ENV, "").strip().lower() in {"1", "true", "yes", "on"}:
-        return _empty_payload(q, disabled=True, provider_hint=_normalize_provider(provider))
+        out = _empty_payload(q, disabled=True, provider_hint=hint)
+        return ws_rt.merge_meta(out, base_meta_skeleton)
 
     if not q:
-        return _empty_payload(q, error="EMPTY_QUERY", provider_hint=_normalize_provider(provider))
+        out = _empty_payload(q, error="EMPTY_QUERY", provider_hint=hint)
+        return ws_rt.merge_meta(out, base_meta_skeleton)
 
     selected = _normalize_provider(provider)
+    cache_key_provider = selected
+    cache_fp = ws_rt.cache_file_path(cache_dir, provider=cache_key_provider, query=q, max_results=max_results)
+    cached = ws_rt.read_disk_cache(cache_fp)
+    if cached is not None:
+        merged = ws_rt.merge_meta(cached, {**base_meta_skeleton, "cache_hit": True, "latency_ms": 0})
+        return merged
+
+    ok_reserve, quota_meta = ws_rt.try_consume_network_quota_slot()
+    if not ok_reserve:
+        base = _empty_payload(q, error="QUOTA_EXCEEDED", provider_hint=selected)
+        return ws_rt.merge_meta(base, {**base_meta_skeleton, **quota_meta})
+
+    t0 = time.perf_counter()
 
     if selected == "duckduckgo":
-        return web_search_duckduckgo(q, max_results=max_results, opener=opener)
-    if selected == "wikipedia":
-        return web_search_wikipedia(q, max_results=max_results, opener=opener)
+        raw = _duckduckgo_tracked(q, max_results=max_results, opener=opener)
+        out = _wrap_timed(raw, t0, **quota_meta)
+    elif selected == "wikipedia":
+        raw = _wikipedia_tracked(q, max_results=max_results, opener=opener)
+        out = _wrap_timed(raw, t0, **quota_meta)
+    else:
+        sources_tried: list[str] = []
+        backoff_meta: dict[str, Any] = {}
 
-    # chain → prefer DuckDuckGo; if empty, fall back to Wikipedia.
-    ddg = web_search_duckduckgo(q, max_results=max_results, opener=opener)
-    if ddg["citations"]:
-        fused = dict(ddg)
-        fused["provider"] = "chain"
-        fused["meta"] = {"sources_tried": ["duckduckgo"]}
-        return fused
+        ddg = _duckduckgo_tracked(q, max_results=max_results, opener=opener)
+        if isinstance(ddg.get("meta"), dict) and ddg["meta"].get("circuit_provider"):
+            backoff_meta.setdefault("skipped_for_backoff", []).append("duckduckgo")
 
-    wiki = web_search_wikipedia(q, max_results=max_results, opener=opener)
-    fused_w = dict(wiki)
-    fused_w["provider"] = "chain"
-    fused_w["meta"] = {"sources_tried": ["duckduckgo", "wikipedia"]}
-    return fused_w
+        if ddg.get("citations"):
+            fused = dict(ddg)
+            fused["provider"] = "chain"
+            fused.setdefault("meta", {})
+            fused["meta"] = {**dict(fused["meta"]), "sources_tried": ["duckduckgo"]}
+            out = _wrap_timed(fused, t0, **quota_meta, **backoff_meta)
+        else:
+            sources_tried.append("duckduckgo")
+
+            wiki = _wikipedia_tracked(q, max_results=max_results, opener=opener)
+            if isinstance(wiki.get("meta"), dict) and wiki["meta"].get("circuit_provider"):
+                backoff_meta.setdefault("skipped_for_backoff", []).append("wikipedia")
+
+            fused_w = dict(wiki)
+            fused_w["provider"] = "chain"
+            fused_w.setdefault("meta", {})
+            fused_w["meta"] = {**dict(fused_w["meta"]), "sources_tried": [*sources_tried, "wikipedia"]}
+            extra_chain = dict(quota_meta)
+            extra_chain.update(backoff_meta)
+            if backoff_meta.get("skipped_for_backoff"):
+                fused_w.setdefault("warnings", [])
+                if isinstance(fused_w["warnings"], list):
+                    fused_w["warnings"].append("provider_skipped_for_backoff")
+            out = _wrap_timed(fused_w, t0, **extra_chain)
+
+    out = ws_rt.merge_meta(out, base_meta_skeleton)
+    meta_block = out.get("meta") if isinstance(out.get("meta"), dict) else {}
+    cache_hit_false = isinstance(meta_block, dict) and meta_block.get("cache_hit") is False
+    if out.get("ok") and out.get("citations") and cache_hit_false:
+        ws_rt.write_disk_cache(cache_fp, out)
+    return out
 
 
 def run_web_search_tool(arguments: dict[str, Any]) -> dict[str, Any]:
@@ -286,13 +389,16 @@ def run_web_search_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     raw_provider = arguments.get("provider", None)
     resolved_provider = None if raw_provider in (None, "") else str(raw_provider)
 
+    raw_ws = arguments.get("workspace_root", None)
+    workspace_root = Path(str(raw_ws)).expanduser() if raw_ws else None
+
     try:
         max_results = int(raw_max) if raw_max is not None else 8
     except (TypeError, ValueError):
         max_results = 8
 
     capped_max = max(1, min(max_results, 20))
-    return web_search_normalized(query, max_results=capped_max, provider=resolved_provider)
+    return web_search_normalized(query, max_results=capped_max, provider=resolved_provider, workspace_root=workspace_root)
 
 
 def _empty_payload(

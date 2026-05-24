@@ -34,6 +34,11 @@ def rules_manifest_bundle(workspace_root: Path) -> dict[str, Any]:
         "workspace_root_hint": str(workspace_root.resolve()),
         "generated_at_unix": time.time(),
         "manifest_version": 1,
+        "precedence_explainer": (
+            "precedence_order starts at filesystem root-facing rules (low index) "
+            "and walks toward workspace leaf; prompt assembly merges in that ascending order "
+            "(later documents supersede conflicting guidance only when callers enforce explicit precedence)."
+        ),
     }
 
 

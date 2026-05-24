@@ -62,4 +62,4 @@ def load_skill_metadata(start_path: Path) -> List[SkillMetadata]:
         meta = replace(parse_skill_metadata(skill_path), skill_origin="project")
         merged[meta.name] = meta
 
-    return [merged[name] for name in sorted(merged.keys())]
+    return sorted(merged.values(), key=lambda m: (-m.priority, m.name.lower()))

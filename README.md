@@ -19,6 +19,10 @@ Current repository baseline:
 4. `meta_harness.MetaFramework.execute()` remains the formal-analysis entry point.
 5. The Electron desktop is a usable preview workbench with streaming chat, sessions, settings, citations, and a main-process-owned sidecar startup contract.
 6. `scripts/release_gates.py` is the local verification baseline for the repository.
+7. **`web_search` resilience (Track B):** TTL on-disk cache (under packaging ``cache/web_search``), per-process minute/hour quotas, provider backoff, and ``meta`` telemetry such as ``latency_ms`` / ``cache_hit`` / ``quota_remaining_*`` (`hermes_engine/web_search_runtime.py`). The tool accepts optional JSON ``workspace_root`` to sandbox cache paths consistently with the writable layout.
+8. **MRAG hybrid semantics:** deterministic trigram embeddings remain default; installing ``pip install -e '.[mrag-dense]'`` unlocks sentence-transformers encoders selectable via ``PYC_HERMES_MRAG_EMBEDDING_BACKEND`` (or ``RetrievalRequest.embedding_backend`` per call). Missing deps fall back gracefully with retrieval warnings (`mrag_core/embedding_backend.py`).
+9. **Skills governance (Track D):** SKILL front matter supports numeric ``priority`` (controls activation ordering + system prompt stacking) and ``overlap_group`` (multi-skill overlaps surface hints under ``AgentLoop`` audit payloads via `skill_runtime_audit.py`).
+10. **Deterministic benchmarks:** synthetic lexical/hybrid regressions (`benchmarks/mrag/run_expanded_hybrid_benchmark.py`) plus IPC-oriented shaped corpora (`benchmarks/mrag/run_ipc_business_hybrid_benchmark.py`, also wired into production release gates).
 
 ## Continuous integration
 

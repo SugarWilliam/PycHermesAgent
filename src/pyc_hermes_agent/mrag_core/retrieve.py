@@ -5,15 +5,14 @@ from __future__ import annotations
 import math
 import re
 from collections import Counter
+from pathlib import Path
 from typing import Iterable, List
 
 from pyc_hermes_agent.contracts import Citation, RetrievalHit, RetrievalRequest, RetrievalResult
 from pyc_hermes_agent.mrag_core.document import KnowledgeBase
-from pyc_hermes_agent.mrag_core.embeddings import character_trigram_embedding, cosine_similarity
+from pyc_hermes_agent.mrag_core.embedding_backend import resolve_embedding_backend
 
 TOKEN_RE = re.compile(r"[A-Za-z0-9_\-\u4e00-\u9fff]+")
-
-_EMB_DIM = 256
 
 
 def retrieve(knowledge_base: KnowledgeBase, request: RetrievalRequest) -> RetrievalResult:
@@ -37,16 +36,33 @@ def retrieve(knowledge_base: KnowledgeBase, request: RetrievalRequest) -> Retrie
     elif mode == "semantic":
         weight = 1.0
 
-    query_embedding = character_trigram_embedding(query_text, dim=_EMB_DIM)
+    backend, be_warnings = resolve_embedding_backend(
+        workspace_root=Path.cwd(),
+        request_override=request.embedding_backend,
+    )
+
+    query_embedding = backend.embed_query(query_text)
 
     lexical_norms: List[float] = []
     semantic_scores: List[float] = []
-    for chunk in knowledge_base.chunks:
+
+    if weight > 0.0:
+        corpus = [chunk.text for chunk in knowledge_base.chunks]
+        chunk_mat = backend.embed_passages(corpus)
+
+        sem_raw: List[float] = []
+        for row_idx in range(chunk_mat.shape[0]):
+            dot = float(query_embedding @ chunk_mat[row_idx])
+            sem_raw.append(max(0.0, min(1.0, dot)))
+
+        semantic_scores.extend(sem_raw)
+    else:
+        semantic_scores = [0.0 for _ in knowledge_base.chunks]
+
+    for chunk, sem in zip(knowledge_base.chunks, semantic_scores, strict=True):
         chunk_tokens = _tokenize(chunk.text)
         raw_lex = _lexical_score(query_tokens, chunk_tokens) if query_tokens else 0.0
         lexical_norms.append(raw_lex)
-        sem = cosine_similarity(query_embedding, character_trigram_embedding(chunk.text, dim=_EMB_DIM))
-        semantic_scores.append(max(0.0, min(1.0, sem)))
 
     max_lex = max(lexical_norms, default=0.0) or 1.0
     lexical_norms = [s / max_lex for s in lexical_norms]
@@ -57,6 +73,7 @@ def retrieve(knowledge_base: KnowledgeBase, request: RetrievalRequest) -> Retrie
         if combined <= 0.0:
             continue
         qtoks = query_tokens if query_tokens else [query_text]
+
         scored_hits.append(
             RetrievalHit(
                 document_id=chunk.document_id,
@@ -68,9 +85,11 @@ def retrieve(knowledge_base: KnowledgeBase, request: RetrievalRequest) -> Retrie
         )
 
     scored_hits.sort(key=lambda hit: hit.score, reverse=True)
+
     top_hits = scored_hits[: request.top_k]
 
     citations: List[Citation] = []
+
     if request.include_citations:
         for hit in top_hits:
             document = knowledge_base.documents.get(hit.document_id)
@@ -93,14 +112,19 @@ def retrieve(knowledge_base: KnowledgeBase, request: RetrievalRequest) -> Retrie
 
     coverage = min(1.0, len(top_hits) / max(request.top_k, 1))
     confidence = top_hits[0].score if top_hits else 0.0
-    warnings: List[str] = []
+    warnings: List[str] = [*be_warnings]
+
     if mode == "hybrid":
         warnings.append(
             f"Hybrid retrieval: lexical_weight={1.0 - weight:.2f}, semantic_weight={weight:.2f} "
-            "(semantic uses deterministic character trigram vectors, not a neural encoder)."
+            f"(semantic encoder={backend.name!r}, dim={backend.dim})."
         )
+
     elif mode == "semantic":
-        warnings.append("Semantic retrieval uses deterministic character trigram vectors (local-first); for neural embeddings use a future pluggable encoder.")
+        warnings.append(
+            f"Semantic retrieval uses encoder={backend.name!r} (dim={backend.dim}); "
+            "install optional ``[mrag-dense]`` and set env for sentence-transformers when needed."
+        )
     return RetrievalResult(hits=top_hits, citations=citations, coverage=coverage, confidence=confidence, warnings=warnings)
 
 

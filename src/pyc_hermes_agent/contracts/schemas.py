@@ -493,6 +493,9 @@ class RetrievalRequest:
     retrieval_mode: str = "lexical"
     #: Weight for semantic component in hybrid mode (0..1). Ignored when retrieval_mode is lexical or semantic.
     semantic_weight: float = 0.35
+    #: empty → follow ``PYC_HERMES_MRAG_EMBEDDING_BACKEND``; trigram → deterministic hashed trigrams;
+    #: sentence_transformer / dense → optional ``sentence-transformers`` encoder when installed.
+    embedding_backend: str = ""
 
 
 @dataclass(slots=True)

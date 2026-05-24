@@ -18,10 +18,13 @@ Align automation with `docs/architecture/Execution_Blueprint_v0.2.0.md` and `doc
 | Full gate (default CI) | `uv run python scripts/release_gates.py` with `RELEASE_GATES_RUFF=1`, `RELEASE_GATES_MYPY=1` |
 | Production add-ons | `RELEASE_GATES_PRODUCTION=1 uv run python scripts/release_gates.py` (includes prior steps unless `--no-pytest`). Also exports **CycloneDX 1.5** Python SBOM to `build/sbom-python.cdx.json` (`build/` gitignored). |
 | MRAG planner + backup | `uv run pyc-hermes-mrag-migrate /path/to/mrag/root --backup-to /path/to/backup-parent --json` |
-| Expanded MRAG benchmark | `uv run python benchmarks/mrag/run_expanded_hybrid_benchmark.py` (also runs in `RELEASE_GATES_PRODUCTION=1` path) |
+| Expanded MRAG benchmark | `uv run python benchmarks/mrag/run_expanded_hybrid_benchmark.py` |
+| IPC-style business MRAG benchmark | `uv run python benchmarks/mrag/run_ipc_business_hybrid_benchmark.py` |
 | Desktop pack | `cd desktop && npm ci && npm audit --omit=dev --audit-level=critical && npm run dist:dir` |
 | Electron unpacked layout smoke | `python scripts/electron_dist_layout_smoke.py desktop --require-unpacked-resources` (after dist; pass `--prefer-unpacked win` or `linux`; verifies `desktop/out/` and unpacked `dist-installer/*unpacked/resources/`) |
 | Windows NSIS headless smoke | **From dir:** `pwsh scripts/windows_nsis_silent_upgrade_smoke.ps1 -DistDir desktop/dist-installer`; **dual semver (CI):** `-PreviousInstaller` + `-UpgradeInstaller` (+ `-ExpectedVersionSubstringAfterUpgrade`) — see **`desktop-windows-nsis-silent`**. |
+
+**MRAG benchmarks (production gate):** The expanded hybrid script and the IPC-style business benchmark both run automatically when ``RELEASE_GATES_PRODUCTION=1`` / ``scripts/release_gates.py --with-production`` reaches the migrate + benchmark section.
 
 **Linux vs Windows unpacked:** CI **contract-tests** exercises Linux `dist-installer/*-unpacked` via `production-gates`.
 The dedicated **`desktop-windows-unpacked`** workflow job (``windows-latest``) runs ``npm run dist:win-unpacked`` **and**

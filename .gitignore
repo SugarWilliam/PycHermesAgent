@@ -10,6 +10,10 @@ htmlcov/
 
 .venv/
 venv/
+
+# Local writable sandbox when sidecar tools use a workspace --root
+.pyc_hermes_agent_runtime/
+
 dist/
 build/
 # Windows electron-builder expects tracked assets under desktop/build/

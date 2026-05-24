@@ -28,6 +28,7 @@ from pyc_hermes_agent.hermes_engine.rule_context import build_rule_context_messa
 from pyc_hermes_agent.hermes_engine.session_context import bind_session_context
 from pyc_hermes_agent.hermes_engine.session_store import AgentSessionStore
 from pyc_hermes_agent.hermes_engine.skill_context import SKILLS_RUNTIME_POLICY, build_skill_context_messages
+from pyc_hermes_agent.llm_gateway.skill_runtime_audit import collect_skill_audit_hints, sort_skill_names_for_context
 from pyc_hermes_agent.hermes_engine.tool_registry import ToolRegistry
 from pyc_hermes_agent.hermes_engine.web_search import ALLOWED_WEB_SEARCH_PROVIDERS, run_web_search_tool
 from pyc_hermes_agent.llm_gateway import LLMChatChunk, LLMChatRequest, LLMChatResponse, LLMMessage, execute_chat
@@ -156,18 +157,24 @@ class AgentLoop:
         registry = tool_registry or self._tool_registry
         tools = _resolve_loop_tools(request, registry)
         plan = build_agent_plan(messages, tools) if planning_enabled else None
-        normalized_activated_skills = [name.strip() for name in (activated_skills or []) if name.strip()]
-        skill_messages = build_skill_context_messages(self._root, activated_skills)
-        tool_results: list[ToolCallResult] = []
-        last_response = LLMChatResponse()
+        normalized_activated_skills = sort_skill_names_for_context(self._root, activated_skills or [])
+
+        skill_messages = build_skill_context_messages(self._root, normalized_activated_skills)
+
+        skill_audit = collect_skill_audit_hints(self._root, normalized_activated_skills)
+
         rule_messages, rule_paths = build_rule_context_messages(self._root)
 
         audit_base: dict[str, Any] = {
             "skills_runtime_policy": dict(SKILLS_RUNTIME_POLICY),
             "activated_skills": normalized_activated_skills,
+            "skill_runtime_audit": skill_audit,
             "rule_sources": [{"path": str(p)} for p in rule_paths],
             "analysis_mode": analysis_mode,
         }
+
+        tool_results: list[ToolCallResult] = []
+        last_response = LLMChatResponse()
 
         active_model = request.model or (existing_session.model if existing_session is not None else "")
         retry_count = 0

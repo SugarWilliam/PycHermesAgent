@@ -5,10 +5,12 @@ from .runtime import execute_chat, stream_chat
 from .resolver import resolve_llm_config, sort_models_free_first
 from .rules import discover_ordered_rule_documents, discover_rule_files
 from .skill_metadata import SkillMetadata, parse_skill_metadata
+from .skill_runtime_audit import collect_skill_audit_hints, sort_skill_names_for_context
 from .skills import discover_skills, load_skill_metadata
 from .types import LLMChatChunk, LLMChatRequest, LLMChatResponse, LLMMessage, ModelSpec, ProviderConfig, ProviderSpec, ResolvedLLMConfig
 
 __all__ = [
+    "collect_skill_audit_hints",
     "discover_ordered_rule_documents",
     "discover_rule_files",
     "discover_skills",
@@ -29,5 +31,6 @@ __all__ = [
     "SkillMetadata",
     "stream_chat",
     "sort_models_free_first",
+    "sort_skill_names_for_context",
     "parse_skill_metadata",
 ]

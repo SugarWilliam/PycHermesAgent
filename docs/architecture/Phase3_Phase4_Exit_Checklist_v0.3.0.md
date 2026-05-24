@@ -2,7 +2,7 @@
 
 **Status:** Living checklist（随实现更新）  
 **Authority:** `docs/architecture/Phase3_Phase4_Productization_Roadmap_v0.3.0.md` §2  
-**Last reviewed:** 2026-05-24（Windows CI：`win-unpacked` + electron layout smoke；`icon.ico` 入库）  
+**Last reviewed:** 2026-05-24（Track B web_search 缓存/配额；IPC 业务 MRAG 基准；Track D skill 优先级；可选 dense 嵌入）  
 
 **三态定义**
 
@@ -51,7 +51,7 @@
 
 | 状态 | 说明 | 代码 / 交付依据 |
 |------|------|-----------------|
-| **已实现（基线）** | **Skills：** ``PYC_HERMES_USER_SKILLS_HOME`` 下 `**/SKILL.md` 与用户/项目同名合并（项目优先）；元数据 ``skill_origin``；激活技能与策略进入 `extra_system_messages`。**Rules：** 根→叶有序收集 `AGENTS.md`/`CLAUDE.md`，经 `build_rule_context_messages` 注入；`start` 事件与 `AgentLoopResult.audit`（含 ``rule_sources``、激活技能、运行时策略摘要）可追溯。**HTTP：** `GET /rules/manifest`（摘要指纹）、`POST /skills/user`（落盘运行时 user skill）。**桌面：** Context → Sidecar runtime 可复制 manifest JSON；侧栏 Skills 内嵌发布表单调用 `saveUserSkill`。远端同步 / 优先级可视化 / 全流程「技能即代码」仍为后续。 | `llm_gateway/rules.py`、`llm_gateway/skill_metadata.py`、`llm_gateway/skills.py`；`hermes_engine/rule_context.py`、`hermes_engine/skill_context.py`、`hermes_engine/agent_loop.py`；`sidecar_api/services/skill_service.py`、`rules_manifest.py`、`user_skill_publish.py`；`desktop/src/components/layout/ContextPanel.jsx`、`desktop/src/components/skills/SkillPanel.jsx` |
+| **已实现（基线 + Track D 扩展）** | **Skills：** 继续支持 ``PYC_HERMES_USER_SKILLS_HOME``、运行时 `user_skills`、``.opencode/skills`` 三源合并；“项目”路径仍可按名称覆盖同名单元。新增 **`priority`**（整数，越大越靠前）与 **`overlap_group`**（同组多重激活时在 audit 中产生人工复核 hint）。`sort_skill_names_for_context`/`collect_skill_audit_hints` 将排序与告警写入 ``AgentLoop`` audit（``skill_runtime_audit``）。**Rules：** ``AGENTS.md``/``CLAUDE.md`` discover → prompt 组装路径保持；manifest bundle 增补 ``precedence_explainer`` 说明 ``precedence_order`` 语义。**HTTP：** `GET /rules/manifest`、`POST /skills/user` 等保持不变。**桌面：** Skill/Context UX 仍可继续增强远端同步及可视化编辑器。 | `llm_gateway/skill_metadata.py`、`llm_gateway/skills.py`、`llm_gateway/skill_runtime_audit.py`；`hermes_engine/skill_context.py`、`hermes_engine/agent_loop.py`；`sidecar_api/services/rules_manifest.py`、`skill_service.py`、`user_skill_publish.py` |
 
 ### 1.5 基础 **PPT 与 XLSX 生成**（导出产物，非仅摄取）
 
@@ -63,7 +63,7 @@
 
 | 状态 | 说明 | 代码 / 交付依据 |
 |------|------|-----------------|
-| **已实现（确定性子集）** | ``lexical`` / ``semantic``（字符 trigram）/ ``hybrid`` + 语义权重已实现；仓库内 **固定文档对 + 查询** 上可复现「hybrid 与 lexical 的首条命中不一致」（证明混合项改变排序）；扩展基准见 **`benchmarks/mrag/run_expanded_hybrid_benchmark.py`**（CI / production gates）。Formal 模式下 `analysis_card.evidence_chain` 汇总 **`web_search` / `knowledge_retrieve`** grounding 提示；并嵌 **Phase 3F1 baseline** ``evidence_chain.validation``（归一化条目、显式冲突骨架、非因果链边、逻辑/时间词汇级扫描、策略提示与人工核对清单；不改变 CE/SR、非定理证明器）。神经网络编码器仍为后续。**与路线图「代表性业务基准集胜出」的全面证明**可作 Phase 3F 加强。 | `mrag_core/retrieve.py`、`mrag_core/embeddings.py`；`benchmarks/mrag/run_lexical_hybrid_proof.py`、`benchmarks/mrag/run_expanded_hybrid_benchmark.py`；`tests/contract/test_mrag_core.py`；`meta_harness/evidence_hints.py`、`meta_harness/evidence_chain.py`、`meta_harness/consistency.py`、`meta_harness/source_policy.py`、`sidecar_api/services/chat_service.py`；`tests/contract/test_evidence_chain_validation.py` |
+| **已实现（确定性子集 + IPC 语义对照子集）** | ``lexical`` / ``semantic`` / ``hybrid``：默认 **确定性 trigram** 语义分量；可选安装 **`sentence-transformers`**（`pip install '.[mrag-dense]'`）后通过 ``PYC_HERMES_MRAG_EMBEDDING_BACKEND`` 或 ``RetrievalRequest.embedding_backend`` 启用 **dense** 编码器（缺依赖则回退 trigram 并在 ``RetrievalResult.warnings`` 提示）。Synthetic 基准：``benchmarks/mrag/run_expanded_hybrid_benchmark.py``；**IPC/视频监控语料-shaped** 对照：``benchmarks/mrag/run_ipc_business_hybrid_benchmark.py``（随 `RELEASE_GATES_PRODUCTION=1` 的 ``release_gates.py`` 路径）。Formal 路径 `analysis_card.evidence_chain` 含 **Phase 3F1** 校验；`consistency.py` 另含 **相对时间措辞** 与 **多版本号字面量** 提示（非证明器）。**与路线图「代表性业务基准集全面胜出」**仍可继续加强。 | `mrag_core/retrieve.py`、`mrag_core/embeddings.py`、`mrag_core/embedding_backend.py`；`benchmarks/mrag/run_lexical_hybrid_proof.py`、`benchmarks/mrag/run_expanded_hybrid_benchmark.py`、`benchmarks/mrag/run_ipc_business_hybrid_benchmark.py`；`tests/contract/test_mrag_core.py`、`tests/contract/test_ipc_semantic_benchmark.py`、`tests/contract/test_embedding_backend_contract.py`；`meta_harness/evidence_chain.py`、`meta_harness/consistency.py`；`tests/contract/test_evidence_chain_validation.py` |
 
 ---
 
@@ -82,10 +82,11 @@
 
 ## 3. 建议的下一轮封闭顺序（仅占位）
 
-1. **Phase 3F**：扩展基准已在 CI/production gates。**Phase 3F1（baseline）** 已实现结构化 ``analysis_card.evidence_chain.validation``（`meta_harness/evidence_chain.py`、`meta_harness/consistency.py`、`meta_harness/source_policy.py`；契约见 `tests/contract/test_evidence_chain_validation.py` / `tests/contract/test_logic_temporal_consistency.py`）。更广义的自动逻辑证明 / 全量 temporal 消解仍为后续 backlog。  
-2. **Track B**：`web_search` 离线缓存 / 配额与可观测性（multi-provider 已有基线）。  
-3. **Track D**：规则与技能的优先级可视化、远端同步、「技能即代码」评审流（HTTP manifest + desktop 导出 + user skill POST 已基线就绪）。  
-4. **Phase 4**：Windows 干净机安装 / 升级 / downgrade 门禁化。
+1. **Phase 3F（本轮已落地骨干）**：扩展合成基准保持；新增 **IPC/安防语料-shaped** deterministic 对照（``run_ipc_business_hybrid_benchmark.py``）；`consistency.py` 增补 **相对时间** / **semver 字面密度** hint 并汇入 `build_evidence_chain_validation`。**更广义的逻辑证明器 / 全时序消解** 仍为 backlog。  
+2. **Track B（本轮已落地骨干）**：`web_search_normalized` / `run_web_search_tool` 可选 ``workspace_root``；**TTL 磁盘缓存**（`cache/web_search`）、**进程内分钟/小时配额**、**失败退避**、**latency_ms / quota / cache_hit** metadata（实现：`hermes_engine/web_search_runtime.py`）。  
+3. **Track D（本轮已落地骨干）**：`SKILL.md` front-matter 支持 **`priority`**（整数，用于激活顺序）与 **`overlap_group`**（同组多激活会在 `skill_runtime_audit` / `AgentLoop` audit 提示）；`rules_manifest_bundle` 增加 **`precedence_explainer`**。远端同步 / 可视化仍为后续。  
+4. **Dense MRAG（可选垂直）**：`[mrag-dense]` extra + env ``PYC_HERMES_MRAG_EMBEDDING_BACKEND`` / per-request ``RetrievalRequest.embedding_backend``；无依赖时安全回退 **trigram**。  
+5. **Phase 4**：Windows 干净机安装 / 升级 / downgrade 与 **electron-updater** 在线证明仍为下一层。
 
 ---
 

@@ -11,7 +11,8 @@ Usage (from repo root):
     ./.venv/bin/python scripts/release_gates.py --with-production      # env RELEASE_GATES_PRODUCTION=1
 
 Production extras (after ruff/mypy when enabled): ``uv lock --check``, Python CycloneDX 1.5 SBOM export (``uv export``),
-MRAG migrate CLI on a temp dir with ``--backup-to``, expanded MRAG benchmark script, ``npm ci`` + ``npm audit --omit=dev --audit-level=critical``
+MRAG migrate CLI on a temp dir with ``--backup-to``, expanded + **IPC-business** MRAG benchmark scripts,
+``npm ci`` + ``npm audit --omit=dev --audit-level=critical``
 + ``npm run dist:dir`` under ``desktop/`` plus ``scripts/electron_dist_layout_smoke.py --require-unpacked-resources`` (requires npm).
 Optional ``RELEASE_GATES_PYINSTALLER=1`` verifies the ``ga``
 extra (PyInstaller import). See ``docs/deployment/Production_Release_Gates.md``.
@@ -287,6 +288,9 @@ def main(argv: list[str] | None = None) -> int:
                 return 1
         if _run([uv_bin, "run", "python", "benchmarks/mrag/run_expanded_hybrid_benchmark.py"], cwd=ROOT) != 0:
             print("release_gates: MRAG expanded benchmark failed", flush=True)
+            return 1
+        if _run([uv_bin, "run", "python", "benchmarks/mrag/run_ipc_business_hybrid_benchmark.py"], cwd=ROOT) != 0:
+            print("release_gates: MRAG IPC-style business benchmark failed", flush=True)
             return 1
 
         desktop = ROOT / "desktop"

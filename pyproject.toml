@@ -34,6 +34,10 @@ dev = [
 ]
 office = ["openpyxl>=3.1.2", "python-pptx>=0.6.23"]
 image = ["pillow>=10.3", "pytesseract>=0.3.10"]
+mrag-dense = [
+  "sentence-transformers>=3.3.1",
+]
+
 packaging = [
     "pyinstaller>=6.6",
 ]
@@ -66,6 +70,9 @@ line-length = 160
 # Ruff: pyflakes + pycodestyle (errors/warnings). Phase includes line-length=160 to keep E501 tractable.
 select = ["F", "E", "W"]
 ignore = []
+
+[tool.ruff.lint.per-file-ignores]
+"benchmarks/**/*.py" = ["E402"]
 
 [tool.mypy]
 python_version = "3.11"

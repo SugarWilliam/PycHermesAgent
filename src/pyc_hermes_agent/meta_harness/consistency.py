@@ -27,6 +27,63 @@ _CAUSAL_ABSOLUTE_CRE = re.compile("|".join(f"(?:{p})" for p in _CAUSAL_ABSOLUTES
 # Mirrors / duplication risk between independent URIs (co-occurrence ≠ causation wording).
 _NEAR_DUP_NOTE = "High lexical overlap across different anchors may indicate mirrored summaries — do not infer agreement."
 
+_REL_TIME_PHRASES = (
+    r"\blast\s+week\b",
+    r"\blast\s+month\b",
+    r"\byesterday\b",
+    r"\b刚刚\b",
+    r"\b前天\b",
+    r"\b上月\b",
+)
+
+_REL_TIME_CRE = re.compile("|".join(f"(?:{p})" for p in _REL_TIME_PHRASES), re.IGNORECASE)
+
+_SEMVER_TOKEN = re.compile(r"\b\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?\b")
+
+
+def scan_relative_time_signals(problem_statement: str, text_blocks: Sequence[str]) -> list[str]:
+    """Flag relative-time language when problem + snippets need explicit calendar anchoring."""
+
+    joined = " ".join(
+        blk.strip()
+        for blk in [problem_statement, *list(text_blocks)]
+        if isinstance(blk, str) and blk.strip()
+    )
+    if not joined:
+        return []
+    if _REL_TIME_CRE.search(joined):
+        return [
+            "relative_time_language_requires_explicit_anchor_clock",
+            "Map each relative reference to an absolute window (version, build, or UTC) before concluding timelines.",
+        ]
+    return []
+
+
+def scan_version_literal_density(text_blocks: Sequence[str]) -> list[str]:
+    """Heuristic: many distinct semver tokens in compact snippets → reconcile release ordering manually."""
+
+    tokens: list[str] = []
+
+    seen: set[str] = set()
+    blob = "\n".join(b for b in text_blocks if isinstance(b, str) and b.strip())
+    if not blob:
+        return []
+
+    for m in _SEMVER_TOKEN.finditer(blob):
+        tok = m.group(0)
+
+        if tok not in seen:
+            seen.add(tok)
+            tokens.append(tok)
+
+        if len(tokens) >= 4 and len(blob) <= 560:
+            return [
+                "multiple_distinct_versions_in_compact_context",
+                "Confirm whether cited versions coexist, supersede each other, or reference different SKU lines.",
+            ]
+
+    return []
+
 
 def tokenize_normalized(text: str) -> frozenset[str]:
     """Lower-case word-ish tokens."""
