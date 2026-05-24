@@ -8,7 +8,7 @@ const COMMANDS = [
   { name: 'new', icon: '✨', description: 'Start new conversation' },
   { name: 'help', icon: '❓', description: 'Show available commands' },
   { name: 'analyze', icon: '📊', description: 'Force formal analysis on next message' },
-  { name: 'retrieve', icon: '🔍', description: 'Search knowledge bases' }
+  { name: 'retrieve', icon: '🔍', description: 'MRAG: /retrieve <query> (KB in Context)' }
 ]
 
 export default function useSlashCommands({ onExecute }) {

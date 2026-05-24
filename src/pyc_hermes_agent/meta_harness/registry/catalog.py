@@ -63,9 +63,7 @@ _DEFAULT_CAPABILITIES = [
 
 class CapabilityRegistry:
     def __init__(self, bridge: Optional["LegacyMetaBridge"] = None) -> None:
-        self._capabilities: Dict[str, CapabilityDescriptor] = {
-            capability.id: capability for capability in _DEFAULT_CAPABILITIES
-        }
+        self._capabilities: Dict[str, CapabilityDescriptor] = {capability.id: capability for capability in _DEFAULT_CAPABILITIES}
         self._bridge = bridge
 
     def register(self, descriptor: CapabilityDescriptor) -> None:

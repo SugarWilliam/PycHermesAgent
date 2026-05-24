@@ -11,8 +11,9 @@ Usage (from repo root):
     ./.venv/bin/python scripts/release_gates.py --with-production      # env RELEASE_GATES_PRODUCTION=1
 
 Production extras (after ruff/mypy when enabled): ``uv lock --check``, Python CycloneDX 1.5 SBOM export (``uv export``),
-MRAG migrate CLI on a temp dir with ``--backup-to``, ``npm ci`` + ``npm audit --omit=dev --audit-level=critical``
-+ ``npm run dist:dir`` under ``desktop/`` (requires npm). Optional ``RELEASE_GATES_PYINSTALLER=1`` verifies the ``ga``
+MRAG migrate CLI on a temp dir with ``--backup-to``, expanded MRAG benchmark script, ``npm ci`` + ``npm audit --omit=dev --audit-level=critical``
++ ``npm run dist:dir`` under ``desktop/`` plus ``scripts/electron_dist_layout_smoke.py --require-unpacked-resources`` (requires npm).
+Optional ``RELEASE_GATES_PYINSTALLER=1`` verifies the ``ga``
 extra (PyInstaller import). See ``docs/deployment/Production_Release_Gates.md``.
 
     ./.venv/bin/python scripts/release_gates.py --export-meta-benchmarks DIR
@@ -205,10 +206,7 @@ def main(argv: list[str] | None = None) -> int:
         if _run([sys.executable, "-m", "mypy", "-p", "pyc_hermes_agent"]) != 0:
             return 1
 
-    want_prod = (
-        args.with_production
-        or os.environ.get("RELEASE_GATES_PRODUCTION", "").lower() in ("1", "true", "yes")
-    )
+    want_prod = args.with_production or os.environ.get("RELEASE_GATES_PRODUCTION", "").lower() in ("1", "true", "yes")
     if want_prod:
         uv_bin = shutil.which("uv")
         if not uv_bin:
@@ -249,9 +247,7 @@ def main(argv: list[str] | None = None) -> int:
         if want_pyinstaller:
             if _run([uv_bin, "sync", "--frozen", "--extra", "dev", "--extra", "ga"], cwd=ROOT) != 0:
                 return 1
-            if (
-                subprocess.run([sys.executable, "-c", "import PyInstaller"], cwd=ROOT, check=False).returncode != 0
-            ):
+            if subprocess.run([sys.executable, "-c", "import PyInstaller"], cwd=ROOT, check=False).returncode != 0:
                 print("release_gates: PyInstaller import failed (needs ga extra synced)", flush=True)
                 return 1
             print("release_gates: PyInstaller (ga extra) import OK", flush=True)
@@ -289,6 +285,10 @@ def main(argv: list[str] | None = None) -> int:
                     flush=True,
                 )
                 return 1
+        if _run([uv_bin, "run", "python", "benchmarks/mrag/run_expanded_hybrid_benchmark.py"], cwd=ROOT) != 0:
+            print("release_gates: MRAG expanded benchmark failed", flush=True)
+            return 1
+
         desktop = ROOT / "desktop"
         npm_bin = shutil.which("npm")
         if (desktop / "package.json").is_file():
@@ -304,6 +304,23 @@ def main(argv: list[str] | None = None) -> int:
                 return 1
             if _run([npm_bin, "run", "dist:dir"], cwd=desktop) != 0:
                 return 1
+            electron_smoke = ROOT / "scripts" / "electron_dist_layout_smoke.py"
+            if electron_smoke.is_file():
+                unpacked_pref = "win" if sys.platform.startswith("win") else "linux"
+                if (
+                    _run(
+                        [
+                            sys.executable,
+                            str(electron_smoke),
+                            str(desktop),
+                            "--require-unpacked-resources",
+                            "--prefer-unpacked",
+                            unpacked_pref,
+                        ]
+                    )
+                    != 0
+                ):
+                    return 1
         print("release_gates: production packaging checks OK", flush=True)
 
     if not (ROOT / ".git").is_dir():

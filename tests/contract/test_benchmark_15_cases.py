@@ -14,9 +14,7 @@ from benchmarks.meta_harness.run_benchmark import run_benchmark  # noqa: E402
 class TestBenchmark15Cases:
     def test_benchmark_passes(self) -> None:
         report = run_benchmark()
-        assert report["passed"] is True, (
-            f"MetaHarness won {report['metrics_won']}/4 metrics (need >=3)"
-        )
+        assert report["passed"] is True, f"MetaHarness won {report['metrics_won']}/4 metrics (need >=3)"
 
     def test_all_15_cases_evaluated(self) -> None:
         report = run_benchmark()
@@ -24,7 +22,4 @@ class TestBenchmark15Cases:
 
     def test_wins_at_least_3_metrics(self) -> None:
         report = run_benchmark()
-        assert report["metrics_won"] >= 3, (
-            f"Won {report['metrics_won']} metrics: "
-            f"{[(k, v['score']) for k, v in report['metrics'].items()]}"
-        )
+        assert report["metrics_won"] >= 3, f"Won {report['metrics_won']} metrics: {[(k, v['score']) for k, v in report['metrics'].items()]}"

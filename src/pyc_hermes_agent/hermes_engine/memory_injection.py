@@ -28,11 +28,7 @@ def build_prompt_messages(
         if plan_message is not None:
             system_messages.append(plan_message)
     if extra_system_messages:
-        system_messages.extend(
-            _copy_message(message)
-            for message in extra_system_messages
-            if message.role == "system" and message.content.strip()
-        )
+        system_messages.extend(_copy_message(message) for message in extra_system_messages if message.role == "system" and message.content.strip())
 
     if len(conversation_messages) <= _RECENT_CONVERSATION_LIMIT:
         return [*system_messages, *conversation_messages]

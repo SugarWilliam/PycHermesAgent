@@ -16,10 +16,7 @@ from pyc_hermes_agent.sidecar_api.logging import log_event  # noqa: F401 - re-ex
 
 SIDECAR_API_VERSION = "0.7"
 MRAG_RETRIEVAL_MODES = ["lexical", "semantic", "hybrid"]
-MRAG_RUNTIME_NOTE = (
-    "JSON-backed MRAGService is the active sidecar runtime; SQLite/FTS5 artifacts exist separately "
-    "and are not the active sidecar backend."
-)
+MRAG_RUNTIME_NOTE = "JSON-backed MRAGService is the active sidecar runtime; SQLite/FTS5 artifacts exist separately and are not the active sidecar backend."
 
 
 def _repo_root() -> Path:
@@ -241,10 +238,11 @@ def list_models(root: Path | None = None):
 
 
 def list_rules(root: Path | None = None):
-    from pyc_hermes_agent.llm_gateway import discover_rule_files
+    from pyc_hermes_agent.llm_gateway.rules import discover_ordered_rule_documents
 
     base = root or _repo_root()
-    return [{"path": str(path), "name": path.name} for path in discover_rule_files(base)]
+    docs = discover_ordered_rule_documents(base)
+    return [{"path": str(path), "name": path.name, "precedence_order": index} for index, path in enumerate(docs)]
 
 
 def list_asset_inventory(root: Path | None = None) -> Dict[str, Any]:

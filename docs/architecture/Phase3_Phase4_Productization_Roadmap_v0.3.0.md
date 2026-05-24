@@ -56,6 +56,7 @@ Phase 3 is complete when:
 
 - Desktop launches and connects to a real local sidecar without mock infrastructure.
 - Real-time network search is available as a tool and visible in desktop evidence flows.
+- **Local-first MRAG search** is callable as the **`knowledge_retrieve`** tool (default Hermes MetaHarness ToolRegistry alongside `web_search`) and merges into desktop + formal citations / `analysis_card.evidence_chain` without bypassing `MetaFramework.execute()`.
 - MRAG supports at least `text`, `url`, `html`, `pdf`, `docx`, `xlsx`, `pptx`, and `image` ingestion.
 - Customer-loaded skills and rules participate in the runtime through explicit, auditable activation.
 - Basic PPT and XLSX generation is available as exported artifacts.
@@ -81,6 +82,7 @@ Phase 4 is complete when:
 | Hermes inheritance | Read-only bridge + product runtime | Better continuity with Hermes memory/session behaviors without collapsing boundaries |
 | MRAG | SQLite/FTS5 + PDF + file/url text | Multi-format ingestion, stronger citation fidelity, better semantic retrieval, and stronger multi-source evidence convergence |
 | Network grounding | Not implemented | **`web_search` tool** (urllib + DuckDuckGo instant JSON) + citations; richer providers remain future work |
+| AgentLoop MRAG grounding | Retrieval via sidecar ingestion only | **`knowledge_retrieve`** tool binds default registry to workspace `MRAGService` searches for formal/desktop citation paths |
 | Skills | Builtins + `.opencode/skills` metadata and controlled context binding | User-loadable runtime activation, UI, audit, priority model, and agent-authored skills from user request or long-term usage patterns |
 | Rules | Discovery only | Runtime prompt assembly and precedence enforcement |
 | Authoring | Artifact engine foundation only | PPT/XLSX creation workflows |
@@ -122,10 +124,10 @@ Phase 4 is complete when:
 
 | ID | Task | Format / scope | Acceptance |
 |----|------|----------------|------------|
-| C1 | HTML ingest | Raw HTML and cleaned content extraction | Title, source URI, body text preserved |
+| C1 | HTML ingest | Raw HTML and cleaned content extraction | **Baseline shipped:** `mrag_core/html_extractor.py`（`<title>` + 可见正文，跳过 script/style 等）· `parse_file_document` `.html` / `.htm` · `tests/contract/test_mrag_core.py` |
 | C2 | DOCX ingest | Paragraphs, headings, table text | **Baseline shipped:** ZIP/XML paragraph text via `mrag_core/docx_extractor.py` (`source_type="docx"`); heading/table fidelity + provenance refinement remain |
 | C3 | XLSX ingest | Workbook/sheet/table/cell text extraction | **Baseline shipped:** OOXML ZIP workbook + worksheets + shared strings via `mrag_core/xlsx_extractor.py` (`source_type="xlsx"`); per-cell citations & rich provenance refinement remain |
-| C4 | PPTX ingest | Slide title/body/notes extraction | Citations identify slide number |
+| C4 | PPTX ingest | Slide title/body/notes extraction | **Baseline shipped:** 幻灯片正文 + OOXML `notesSlide` relationship；chunk `section`：`slide-*` / `notes-*` · `tests/contract/test_pptx_extractor_rels.py` |
 | C5 | Image ingest | OCR-first extraction and source metadata | Searchable text from supported image files |
 | C6 | Unified parser registry | Format dispatch under `mrag_core` | Ingestion path stays centralized |
 | C7 | Rich citation metadata | Page/sheet/slide/section/source-type all preserved | Desktop citation panel shows origin clearly |

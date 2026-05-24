@@ -2,6 +2,11 @@
 
 from .agent_loop import AgentLoop, AgentLoopResult, LLMExecutor, create_meta_harness_tool_registry
 from .integration_mapping import HermesCapabilityMapping, HermesMixedIntegrationPlan, find_capability_mapping, get_mixed_integration_plan
+from .knowledge_retrieve_tool import (
+    KNOWLEDGE_RETRIEVE_MODES,
+    knowledge_retrieve_handler_for_workspace,
+    run_knowledge_retrieve_tool,
+)
 from .memory_injection import build_memory_message, build_prompt_messages
 from .persistent_memory import PersistentMemorySnapshot, PersistentMemoryStore
 from .planner import build_agent_plan, build_plan_message
@@ -55,8 +60,11 @@ __all__ = [
     "get_sessions_snapshot",
     "get_skills_snapshot",
     "get_tools_snapshot",
+    "KNOWLEDGE_RETRIEVE_MODES",
+    "knowledge_retrieve_handler_for_workspace",
     "normalize_tool_call",
     "parse_tool_call_arguments",
+    "run_knowledge_retrieve_tool",
     "tool_definition_from_descriptor",
     "tool_definition_to_openai",
 ]

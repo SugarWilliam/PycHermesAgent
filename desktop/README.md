@@ -18,6 +18,8 @@ npm run dist:win-unpacked    # Windows unpacked (`desktop/build/icon.ico` is tra
 npm run dist                 # installer / platform defaults from electron-builder
 ```
 
+Repo-level production gates additionally run **`../scripts/electron_dist_layout_smoke.py desktop --require-unpacked-resources`** after **`dist:dir`** to verify `out/{main,preload,renderer}` and that `dist-installer/*unpacked/resources/` exists.
+
 ## Sidecar Startup Contract
 
 **Single authoritative policy:** URL resolution and launch decisions are owned by the **Electron main process** (`electron/sidecarRuntime.js`). The renderer must not invent a competing base URL; it uses **`window.sidecar.getRuntimeConfig()`** / **`sidecarClient.js`** (`resolved_url`).
@@ -66,13 +68,18 @@ The request body includes **`activated_skills`** (names of toggled-on **builtin*
 
 ## Sidecar services in the shell (Phase 3A A4)
 
-- **Skills:** `GET /skills` → builtins (activatable) + project `items`; failures surface in the Skills panel (`lastFetchError`).
-- **Preferences:** `GET /preferences` loads into **Context → Sidecar runtime** (read-only snapshot; use **Refresh probes & preferences**).
-- **Citations:** `CitationList` is fed from **`tool.result` payloads** when the JSON body includes `citations` (or `retrieval.citations` / `result.citations`). Citations reset when the user sends a new message.
+- **Skills:** `GET /skills` → builtins (activatable) + project `items`; failures surface in the Skills panel (`lastFetchError`). `saveUserSkill()` posts to `POST /skills/user`.
+- **Rules:** `GET /rules` → ordered rule document paths (`precedence_order`); use `fetchRules()` / `fetchRulesManifest()` (`GET /rules/manifest`, audit fingerprints) in `sidecarClient.js` (Context → **Sidecar runtime** lists a short preview).
+- **Preferences:** `GET /preferences` loads into **Context → Sidecar runtime** (read-only snapshot; use **Refresh sidecar probes & snapshots**).
+- **Knowledge bases:** `GET /knowledge-bases` lists local MRAG KBs (`listKnowledgeBases()`). `POST /knowledge-bases/{id}/search` runs retrieval (`searchKnowledgeBase()`).
+- **`/retrieve` in chat:** Sending `/retrieve <query>` calls the APIs above with **hybrid** mode (`semantic_weight=0.35`, `top_k=8`, `include_citations=true`). Default KB is **`GET /knowledge-bases` first item**; optionally pick another under Context → **MRAG KB for /retrieve**.
+- **Artifacts listing:** `GET /artifacts` and `GET /artifacts/task/{task_id}` (`fetchArtifacts()`); **Context → Sidecar artifacts** shows recent records. **Open** invokes **`desktopHost.openPath`** (preload → `shell:open-path`). In plain Vite/browser dev without Electron, paths can be copied to the clipboard instead.
+- **Office export:** `POST /artifacts/office`（`xlsx` / `pptx` + `spec`）→ `exportOfficeArtifact()` in `sidecarClient.js`（落盘后按 `GET /artifacts` 枚举）。
+- **Citations:** `CitationList` is filled from **`/retrieve`** (full MRAG citations, or synthesized from hits) and from **`tool.result`** payloads when the JSON includes `citations` (or `retrieval.citations` / `result.citations`). Citations reset when the user sends a new normal chat message (`sendMessage`).
 
 ## Architecture
 
 - `electron/main.js` — Electron main process, sidecar health probe
-- `electron/preload.js` — contextBridge IPC exposure
+- `electron/preload.js` — contextBridge IPC exposure (`sidecar`, `desktopHost`)
 - `src/` — React renderer (Vite + Tailwind)
 - `electron.vite.config.js` — electron-vite build configuration

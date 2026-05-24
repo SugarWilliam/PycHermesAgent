@@ -33,13 +33,9 @@ def plan_migrations(storage_root: Path) -> list[str]:
             continue
         kb_id = raw.get("knowledge_base_id", manifest_path.parent.name)
         if iv_int > MRAG_INDEX_FORMAT_VERSION:
-            actions.append(
-                f"blocked: {kb_id} index_format_version={iv_int} > supported {MRAG_INDEX_FORMAT_VERSION}; upgrade app"
-            )
+            actions.append(f"blocked: {kb_id} index_format_version={iv_int} > supported {MRAG_INDEX_FORMAT_VERSION}; upgrade app")
         elif iv_int < MRAG_INDEX_FORMAT_VERSION:
-            actions.append(
-                f"note: {kb_id} on index_format_version={iv_int}; upgrade requires documented rebuild (see ADR / matrix)"
-            )
+            actions.append(f"note: {kb_id} on index_format_version={iv_int}; upgrade requires documented rebuild (see ADR / matrix)")
         else:
             actions.append(f"ok: {kb_id} index_format_version={iv_int}")
 

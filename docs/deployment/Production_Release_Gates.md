@@ -18,9 +18,15 @@ Align automation with `docs/architecture/Execution_Blueprint_v0.2.0.md` and `doc
 | Full gate (default CI) | `uv run python scripts/release_gates.py` with `RELEASE_GATES_RUFF=1`, `RELEASE_GATES_MYPY=1` |
 | Production add-ons | `RELEASE_GATES_PRODUCTION=1 uv run python scripts/release_gates.py` (includes prior steps unless `--no-pytest`). Also exports **CycloneDX 1.5** Python SBOM to `build/sbom-python.cdx.json` (`build/` gitignored). |
 | MRAG planner + backup | `uv run pyc-hermes-mrag-migrate /path/to/mrag/root --backup-to /path/to/backup-parent --json` |
+| Expanded MRAG benchmark | `uv run python benchmarks/mrag/run_expanded_hybrid_benchmark.py` (also runs in `RELEASE_GATES_PRODUCTION=1` path) |
 | Desktop pack | `cd desktop && npm ci && npm audit --omit=dev --audit-level=critical && npm run dist:dir` |
+| Electron unpacked layout smoke | `python scripts/electron_dist_layout_smoke.py desktop --require-unpacked-resources` (after dist; verifies `desktop/out/` and unpacked `dist-installer/*unpacked/resources/`) |
 
-**Linux vs Windows unpacked:** CI production gates exercise `dist:dir` on Ubuntu (electron-builder emits `dist-installer/linux-unpacked`). For **Windows unpacked** artifacts (Phase 3 Track G installer smoke precursor), run on **`windows-latest`** or a developer machine: `npm run dist:win-unpacked` after adding `desktop/build/icon.ico` (referenced by `package.json` `build.win.icon`).
+**Linux vs Windows unpacked:** CI **contract-tests** exercises Linux `dist-installer/*-unpacked` via `production-gates`.
+The dedicated **`desktop-windows-unpacked`** workflow job (``windows-latest``) runs ``npm run dist:win-unpacked`` **and**
+**`scripts/electron_dist_layout_smoke.py ... --require-unpacked-resources --prefer-unpacked win`** so Windows
+artifacts get the same structural checks as Linux. **Installer signing, auto-updater channel validation, and true
+clean-machine human smoke** remain out-of-band (next layer).
 
 Production gates also honour **`RELEASE_GATES_PYINSTALLER=1`** (runs **`uv sync --frozen --extra dev --extra ga`** then verifies **`PyInstaller`** imports; **`frozen`** avoids unexpected lock churn).
 

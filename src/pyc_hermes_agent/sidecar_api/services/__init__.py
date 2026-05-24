@@ -44,6 +44,7 @@ from pyc_hermes_agent.sidecar_api.services.skill_service import (
     get_hermes_tools_snapshot,
     list_skills,
 )
+from pyc_hermes_agent.sidecar_api.services.office_artifacts import export_office_artifact_bundle
 
 __all__ = [
     "SIDECAR_API_VERSION",
@@ -74,6 +75,7 @@ __all__ = [
     "list_rules",
     "list_sidecar_artifacts",
     "list_skills",
+    "export_office_artifact_bundle",
     "make_error_response",
     "rebuild_mrag_chunk_index",
     "run_agent_loop",

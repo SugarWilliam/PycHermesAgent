@@ -15,14 +15,16 @@ Current repository baseline:
 
 1. Governance, architecture, compatibility, and packaging constraints are in place under `AGENTS.md` and `docs/`.
 2. Contract-tested Python sidecar routes are implemented, including JSON and SSE agent-loop surfaces.
-3. Product-owned `hermes_engine.AgentLoop` is implemented with tool dispatch, session persistence, retry budgeting, and analysis-mode support.
+3. Product-owned `hermes_engine.AgentLoop` is implemented with tool dispatch, session persistence, retry budgeting, and analysis-mode support. Default `create_meta_harness_tool_registry()` tools include **`formal_analysis`**, **`web_search`**, and **`knowledge_retrieve`** (local MRAG search bound to workspace root).
 4. `meta_harness.MetaFramework.execute()` remains the formal-analysis entry point.
 5. The Electron desktop is a usable preview workbench with streaming chat, sessions, settings, citations, and a main-process-owned sidecar startup contract.
 6. `scripts/release_gates.py` is the local verification baseline for the repository.
 
 ## Continuous integration
 
-Push and pull requests to `main` run **`.github/workflows/ci.yml`** (Python 3.11 and 3.12): `pip install -e ".[dev]"`, **`pyc-hermes-packaging-probe`** under a simulated Windows-style layout, `scripts/release_gates.py` (contract tests + whitespace + heuristic secret scan).
+Push and pull requests to `main` run **`.github/workflows/ci.yml`** with **three jobs**: **Python 3.11 + 3.12** MRAG proofs + **`pyc-hermes-packaging-probe`** (simulated Windows-style dirs) + **`scripts/release_gates.py`** (pytest + whitespace + heuristic secret scan + optional ruff/mypy as configured); **`production-gates`** (Ubuntu: `RELEASE_GATES_PRODUCTION=1` SBOM/migrate/Linux desktop **`dist:dir`** + **`electron_dist_layout_smoke`**); and **`desktop-windows-unpacked`** (Windows **`win-unpacked`** + same smoke harness with **`--prefer-unpacked win`**, relying on **`desktop/build/icon.ico`**).
+
+Use **`uv`** locally as in `scripts/release_gates.py` docs — CI installs via **`uv sync --extra dev`**. Signing/store-ready releases are **`release.yml`** + governance docs, not implied by CI alone (`docs/deployment/Production_Release_Gates.md`).
 
 ## Quick Start
 

@@ -41,14 +41,16 @@ class PDFExtractionResult:
                 end = min(len(text), start + chunk_size)
                 chunk_text = text[start:end].strip()
                 if chunk_text:
-                    chunks.append({
-                        "text": chunk_text,
-                        "metadata": {
-                            "page": page.page_number,
-                            "source": self.source_path,
-                            "title": self.title,
-                        },
-                    })
+                    chunks.append(
+                        {
+                            "text": chunk_text,
+                            "metadata": {
+                                "page": page.page_number,
+                                "source": self.source_path,
+                                "title": self.title,
+                            },
+                        }
+                    )
                 if end == len(text):
                     break
                 start = end - overlap
@@ -80,8 +82,12 @@ def _extract_with_fitz(path: Optional[Path], data: Optional[bytes], title: str) 
     doc.close()
     source = str(path) if path else title
     return PDFExtractionResult(
-        source_path=source, title=title, page_count=len(doc) if not pages else len(pages),
-        pages=pages, total_chars=total_chars, extraction_errors=errors,
+        source_path=source,
+        title=title,
+        page_count=len(doc) if not pages else len(pages),
+        pages=pages,
+        total_chars=total_chars,
+        extraction_errors=errors,
     )
 
 
@@ -107,8 +113,12 @@ def _extract_with_pdfplumber(path: Optional[Path], data: Optional[bytes], title:
 
     source = str(path) if path else title
     return PDFExtractionResult(
-        source_path=source, title=title, page_count=len(pages),
-        pages=pages, total_chars=total_chars, extraction_errors=errors,
+        source_path=source,
+        title=title,
+        page_count=len(pages),
+        pages=pages,
+        total_chars=total_chars,
+        extraction_errors=errors,
     )
 
 

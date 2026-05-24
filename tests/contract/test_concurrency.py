@@ -128,16 +128,18 @@ def test_sqlite_store_concurrent_search_during_insert(tmp_path: Path) -> None:
         s._conn.execute("PRAGMA busy_timeout=10000")
         for i in range(30):
             try:
-                s.insert_chunks([
-                    ChunkRecord(
-                        chunk_id=f"ins-{i}",
-                        document_id="doc-ins",
-                        content=f"inserted content {i}",
-                        source_uri="test://ins",
-                        position=i,
-                        metadata="{}",
-                    )
-                ])
+                s.insert_chunks(
+                    [
+                        ChunkRecord(
+                            chunk_id=f"ins-{i}",
+                            document_id="doc-ins",
+                            content=f"inserted content {i}",
+                            source_uri="test://ins",
+                            position=i,
+                            metadata="{}",
+                        )
+                    ]
+                )
             except sqlite3.OperationalError:
                 pass
         s.close()

@@ -105,10 +105,7 @@ class MethodSelector:
         bridge = bridge or self._bridge
         pin_id = routing_pin_method_id(request)
         if selected is not None and pin_id and selected.id == pin_id:
-            return (
-                f"Pinned {selected.id} via meta_routing (preconditions satisfied; "
-                f"max evidence {selected.max_evidence_grade})."
-            )
+            return f"Pinned {selected.id} via meta_routing (preconditions satisfied; max evidence {selected.max_evidence_grade})."
         if selected is None:
             return (
                 "No direct method match was found after precondition checks; "
@@ -122,10 +119,7 @@ class MethodSelector:
             blocked = [d for d in selected.dependencies if not bridge.status(d).available]
             if blocked:
                 missing = ", ".join(blocked)
-                base += (
-                    f" Dependencies currently unavailable: {missing}; "
-                    f"bridge execution will be degraded until restored."
-                )
+                base += f" Dependencies currently unavailable: {missing}; bridge execution will be degraded until restored."
         return base
 
     def assumptions(self, request: MetaAnalysisRequest, selected: Optional[CapabilityDescriptor]) -> list[str]:

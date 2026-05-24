@@ -114,6 +114,33 @@ def test_mrag_docx_ingest_and_search_paragraph_text(tmp_path: Path) -> None:
     assert result.citations[0].source_type == "docx"
 
 
+def test_mrag_html_file_ingest_strips_markup_and_reads_title(tmp_path: Path) -> None:
+    from pyc_hermes_agent.mrag_core.parse import parse_file_document
+
+    html_body = """<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/><title>MRAG HTML &amp; Title Track</title>
+<script type="text/javascript">window.__evil_script_marker__()</script><style>p { display: none; }</style></head>
+<body><p>Visible paragraph for HTML ingestion zeta token.</p></body></html>"""
+    html_path = tmp_path / "page.html"
+    html_path.write_text(html_body, encoding="utf-8")
+
+    parsed = parse_file_document(html_path)
+    assert parsed.source_type == "html"
+    assert parsed.title == "MRAG HTML & Title Track"
+    assert parsed.metadata.get("html_title") == "MRAG HTML & Title Track"
+    assert "evil_script_marker" not in parsed.text.lower()
+    assert "Visible paragraph for HTML ingestion zeta token" in parsed.text
+
+    service = MRAGService(storage_root=tmp_path / "html-store")
+    kb = service.create_knowledge_base("html-kb-id")
+    service.ingest_file(kb.knowledge_base_id, html_path)
+    result = service.search(kb.knowledge_base_id, RetrievalRequest(query="HTML ingestion zeta", top_k=3))
+    assert result.hits
+    assert result.citations
+    assert result.citations[0].source_type == "html"
+
+
 def test_mrag_xlsx_ingest_and_search_shared_string(tmp_path: Path) -> None:
     workbook_xml = """<?xml version="1.0" encoding="UTF-8"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
@@ -412,6 +439,92 @@ def test_mrag_hybrid_retrieval_combines_signals(tmp_path) -> None:
     )
     assert hybrid.hits and lexical.hits
     assert any("hybrid" in w.lower() for w in hybrid.warnings)
+
+
+def test_mrag_lexical_and_hybrid_can_rank_top_hit_differently(tmp_path: Path) -> None:
+    """Hybrid (trigram semantic + lexical) must be able to change top-1 vs pure lexical."""
+    service = MRAGService(storage_root=tmp_path / "rank")
+    kb = service.create_knowledge_base("rank")
+    doc_a = "AAA BBB common filler words alpha beta gamma delta epsilon zeta eta theta"
+    doc_b = "unusualpatternZZZYYY isolated rare token corpus zzz yyy unusualpatternZZZYYY cluster"
+    query = "AAA BBB unusualpatternZZZYYY"
+
+    service.ingest_text(kb.knowledge_base_id, doc_a, title="lex-heavy", source_uri="memory://a", source_type="markdown")
+    service.ingest_text(kb.knowledge_base_id, doc_b, title="hybrid-shift", source_uri="memory://b", source_type="markdown")
+
+    lexical = service.search(kb.knowledge_base_id, RetrievalRequest(query=query, top_k=2, retrieval_mode="lexical"))
+    hybrid = service.search(
+        kb.knowledge_base_id,
+        RetrievalRequest(query=query, top_k=2, retrieval_mode="hybrid", semantic_weight=0.65),
+    )
+    assert lexical.hits and hybrid.hits
+    assert lexical.hits[0].document_id != hybrid.hits[0].document_id
+
+
+def test_mrag_pptx_ingest_extracts_slide_text(tmp_path: Path) -> None:
+    pytest.importorskip("pptx")
+    from pptx import Presentation
+    from pptx.util import Inches
+
+    path = tmp_path / "deck.pptx"
+    prs = Presentation()
+    layout_idx = 6 if len(prs.slide_layouts) > 6 else max(0, len(prs.slide_layouts) - 1)
+    layout = prs.slide_layouts[layout_idx]
+
+    s1 = prs.slides.add_slide(layout)
+    b1 = s1.shapes.add_textbox(Inches(0.5), Inches(1), Inches(8), Inches(1))
+    b1.text_frame.text = "alpha onboarding MRAG pptx deck intro."
+
+    s2 = prs.slides.add_slide(layout)
+    b2 = s2.shapes.add_textbox(Inches(0.5), Inches(1), Inches(8), Inches(1))
+    b2.text_frame.text = "gamma_secret_token_xyz slides body unique phrase."
+
+    try:
+        prs.slides[0].notes_slide.notes_text_frame.text = "PRIVATE_SPEAKER_NOTE_MARKER only in speaker notes pane."
+    except Exception:
+        pass
+
+    prs.save(path)
+
+    service = MRAGService(storage_root=tmp_path / "pptx-ingest")
+    kb = service.create_knowledge_base("pptx-ingest-kb")
+    doc = service.ingest_file(kb.knowledge_base_id, path)
+
+    assert doc.source_type == "pptx"
+    assert "[Slide 1]" in doc.text and "[Slide 2]" in doc.text
+
+    r_slide2 = service.search(kb.knowledge_base_id, RetrievalRequest(query="gamma_secret_token_xyz", top_k=3))
+    assert r_slide2.citations
+    assert any(c.section == "slide-2" for c in r_slide2.citations)
+
+    r_slide1 = service.search(kb.knowledge_base_id, RetrievalRequest(query="alpha onboarding pptx deck intro", top_k=3))
+    assert r_slide1.citations
+    assert any(c.section == "slide-1" for c in r_slide1.citations)
+
+    rn = service.search(kb.knowledge_base_id, RetrievalRequest(query="PRIVATE_SPEAKER_NOTE_MARKER only", top_k=3))
+    if rn.citations:
+        assert any((c.section or "").startswith("notes-") for c in rn.citations)
+
+
+def test_mrag_image_ingest_accepts_tesseract_output(tmp_path: Path) -> None:
+    pytest.importorskip("PIL")
+    pytest.importorskip("pytesseract")
+
+    from PIL import Image
+
+    img_path = tmp_path / "scan.png"
+    Image.new("RGB", (16, 16), color=(240, 240, 240)).save(img_path)
+
+    with patch("pytesseract.image_to_string", return_value="Captured OCR headline for ingest.\n"):
+        service = MRAGService(storage_root=tmp_path / "img-ingest")
+        kb = service.create_knowledge_base("ocr-kb")
+        doc = service.ingest_file(kb.knowledge_base_id, img_path)
+
+    assert doc.source_type == "image"
+    assert "OCR headline" in doc.text
+
+    hits = service.search(kb.knowledge_base_id, RetrievalRequest(query="OCR headline ingest", top_k=2))
+    assert hits.hits
 
 
 def test_mrag_unknown_retrieval_mode_returns_warning() -> None:

@@ -55,19 +55,19 @@ def _extract_session_fts_sql(upstream_root: Path) -> str:
 
 def _extract_session_schema_version(upstream_root: Path) -> int | None:
     text = _read_text(upstream_root / "hermes_state.py")
-    raw = _search_value(r'^SCHEMA_VERSION\s*=\s*(\d+)', text)
+    raw = _search_value(r"^SCHEMA_VERSION\s*=\s*(\d+)", text)
     return int(raw) if raw else None
 
 
 def _extract_session_db_path_hint(upstream_root: Path) -> str:
     text = _read_text(upstream_root / "hermes_state.py")
-    return _search_value(r'^DEFAULT_DB_PATH\s*=\s*(.+)$', text)
+    return _search_value(r"^DEFAULT_DB_PATH\s*=\s*(.+)$", text)
 
 
 def _extract_sql_objects(schema_sql: str, object_type: str) -> list[str]:
     if not schema_sql:
         return []
-    pattern = re.compile(rf'CREATE\s+(?:UNIQUE\s+)?{object_type}\s+IF\s+NOT\s+EXISTS\s+([a-zA-Z0-9_]+)', re.IGNORECASE)
+    pattern = re.compile(rf"CREATE\s+(?:UNIQUE\s+)?{object_type}\s+IF\s+NOT\s+EXISTS\s+([a-zA-Z0-9_]+)", re.IGNORECASE)
     return _unique([match.group(1) for match in pattern.finditer(schema_sql)])
 
 
@@ -100,7 +100,7 @@ def _build_session_operations(upstream_root: Path) -> list[HermesSessionOperatio
     text = _read_text(upstream_root / "hermes_state.py")
     operations: list[HermesSessionOperation] = []
     for name, category in _SESSION_OPERATIONS:
-        pattern = re.compile(rf'^\s*def\s+{re.escape(name)}\b', re.MULTILINE)
+        pattern = re.compile(rf"^\s*def\s+{re.escape(name)}\b", re.MULTILINE)
         operations.append(
             HermesSessionOperation(
                 name=name,
@@ -115,7 +115,7 @@ def _extract_model_tools_public_api(upstream_root: Path) -> list[str]:
     text = _read_text(upstream_root / "model_tools.py")
     names: list[str] = []
     for name, _ in _TOOL_OPERATIONS:
-        pattern = re.compile(rf'^\s*def\s+{re.escape(name)}\b', re.MULTILINE)
+        pattern = re.compile(rf"^\s*def\s+{re.escape(name)}\b", re.MULTILINE)
         if pattern.search(text):
             names.append(name)
     return names
@@ -123,7 +123,7 @@ def _extract_model_tools_public_api(upstream_root: Path) -> list[str]:
 
 def _extract_legacy_toolset_aliases(upstream_root: Path) -> list[str]:
     text = _read_text(upstream_root / "model_tools.py")
-    match = re.search(r'_LEGACY_TOOLSET_MAP\s*=\s*\{(.*?)\n\}', text, re.DOTALL)
+    match = re.search(r"_LEGACY_TOOLSET_MAP\s*=\s*\{(.*?)\n\}", text, re.DOTALL)
     if not match:
         return []
     return sorted(_unique(re.findall(r'["\']([^"\']+)["\']\s*:', match.group(1))))
@@ -159,7 +159,7 @@ def _build_tool_operations(upstream_root: Path) -> list[HermesToolOperation]:
     operations: list[HermesToolOperation] = []
     for name, category in _TOOL_OPERATIONS:
         haystack = model_tools_text if name not in {"resolve_toolset", "validate_toolset"} else toolsets_text
-        pattern = re.compile(rf'^\s*def\s+{re.escape(name)}\b', re.MULTILINE)
+        pattern = re.compile(rf"^\s*def\s+{re.escape(name)}\b", re.MULTILINE)
         operations.append(
             HermesToolOperation(
                 name=name,
@@ -173,7 +173,7 @@ def _build_tool_operations(upstream_root: Path) -> list[HermesToolOperation]:
 def _extract_toolset_hints(tool_name: str, toolsets_text: str) -> list[str]:
     hints: list[str] = []
     simple_pattern = re.compile(
-        rf'''["\']([^"\']+)["\']\s*:\s*\[[^\]]*["\']{re.escape(tool_name)}["\']''',
+        rf"""["\']([^"\']+)["\']\s*:\s*\[[^\]]*["\']{re.escape(tool_name)}["\']""",
         re.DOTALL,
     )
     hints.extend(simple_pattern.findall(toolsets_text))
@@ -238,16 +238,8 @@ def _build_tool_descriptors(upstream_root: Path) -> list[HermesToolDescriptor]:
 def _build_memory_manager_descriptor(upstream_root: Path) -> HermesMemoryManagerDescriptor:
     manager_text = _read_text(upstream_root / "agent" / "memory_manager.py")
     provider_text = _read_text(upstream_root / "agent" / "memory_provider.py")
-    public_api = [
-        name
-        for name, _ in _MEMORY_OPERATIONS
-        if re.search(rf'^\s*def\s+{re.escape(name)}\b', manager_text, re.MULTILINE)
-    ]
-    helper_functions = [
-        name
-        for name in ("sanitize_context", "build_memory_context_block", "StreamingContextScrubber")
-        if name in manager_text
-    ]
+    public_api = [name for name, _ in _MEMORY_OPERATIONS if re.search(rf"^\s*def\s+{re.escape(name)}\b", manager_text, re.MULTILINE)]
+    helper_functions = [name for name in ("sanitize_context", "build_memory_context_block", "StreamingContextScrubber") if name in manager_text]
     features: list[str] = []
     if "Only ONE external plugin provider is allowed" in manager_text:
         features.append("single-external-provider")
@@ -273,7 +265,7 @@ def _build_memory_operations(upstream_root: Path) -> list[HermesMemoryOperation]
     manager_text = _read_text(upstream_root / "agent" / "memory_manager.py")
     operations: list[HermesMemoryOperation] = []
     for name, category in _MEMORY_OPERATIONS:
-        pattern = re.compile(rf'^\s*def\s+{re.escape(name)}\b', re.MULTILINE)
+        pattern = re.compile(rf"^\s*def\s+{re.escape(name)}\b", re.MULTILINE)
         operations.append(
             HermesMemoryOperation(
                 name=name,
@@ -292,7 +284,7 @@ def _build_memory_provider_descriptor(provider_path: Path, upstream_root: Path) 
     loadable = False
     provider_name = provider_path.parent.name
     try:
-        hooks = [name for name in _MEMORY_PROVIDER_HOOKS if re.search(rf'^\s*def\s+{re.escape(name)}\b', text, re.MULTILINE)]
+        hooks = [name for name in _MEMORY_PROVIDER_HOOKS if re.search(rf"^\s*def\s+{re.escape(name)}\b", text, re.MULTILINE)]
         class_methods = _extract_class_methods(text, "MemoryProvider")
         if class_methods:
             hooks = [name for name in hooks if name not in class_methods]
@@ -300,7 +292,7 @@ def _build_memory_provider_descriptor(provider_path: Path, upstream_root: Path) 
     except SyntaxError as exc:
         parse_error = f"SyntaxError: {exc.msg}"
 
-    name_match = re.search(r'@property\s+\n\s*@abstractmethod\s+\n\s*def\s+name', text)
+    name_match = re.search(r"@property\s+\n\s*@abstractmethod\s+\n\s*def\s+name", text)
     if name_match:
         provider_name = "memory-provider-base"
     return HermesMemoryProviderDescriptor(
@@ -317,9 +309,7 @@ def _build_memory_provider_descriptor(provider_path: Path, upstream_root: Path) 
 
 
 def _build_memory_provider_descriptors(upstream_root: Path) -> list[HermesMemoryProviderDescriptor]:
-    descriptors = [
-        _build_memory_provider_descriptor(upstream_root / "agent" / "memory_provider.py", upstream_root)
-    ]
+    descriptors = [_build_memory_provider_descriptor(upstream_root / "agent" / "memory_provider.py", upstream_root)]
     for provider_path in sorted((upstream_root / "plugins" / "memory").glob("*/__init__.py")) if (upstream_root / "plugins" / "memory").exists() else []:
         descriptors.append(_build_memory_provider_descriptor(provider_path, upstream_root))
     return descriptors

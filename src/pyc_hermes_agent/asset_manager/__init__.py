@@ -181,18 +181,11 @@ class AssetManager:
         if checksum != expected_checksum:
             raise ValueError("Asset checksum does not match the manifest checksum.")
         if manifest.size_bytes and manifest.size_bytes != size_bytes:
-            raise ValueError(
-                f"Asset size does not match the manifest size: expected {manifest.size_bytes}, got {size_bytes}"
-            )
+            raise ValueError(f"Asset size does not match the manifest size: expected {manifest.size_bytes}, got {size_bytes}")
         if manifest.compatible_index_format != self._index_format_version:
-            raise ValueError(
-                "Asset index format is incompatible: "
-                f"expected {self._index_format_version}, got {manifest.compatible_index_format}"
-            )
+            raise ValueError(f"Asset index format is incompatible: expected {self._index_format_version}, got {manifest.compatible_index_format}")
         if not _version_satisfies(self._app_version, manifest.compatible_app_range):
-            raise ValueError(
-                f"Asset app compatibility range {manifest.compatible_app_range!r} does not include {self._app_version!r}"
-            )
+            raise ValueError(f"Asset app compatibility range {manifest.compatible_app_range!r} does not include {self._app_version!r}")
 
     def _verify_existing_install(self, installed: InstalledModelAsset, manifest: ModelAssetManifest) -> None:
         if asdict(installed.manifest) != asdict(manifest):
@@ -249,11 +242,7 @@ def calculate_asset_size(source: Path) -> int:
 
 def _iter_asset_files(root: Path) -> list[Path]:
     return sorted(
-        (
-            path
-            for path in root.rglob("*")
-            if path.is_file() and path.relative_to(root).as_posix() != _ASSET_MANIFEST_FILENAME
-        ),
+        (path for path in root.rglob("*") if path.is_file() and path.relative_to(root).as_posix() != _ASSET_MANIFEST_FILENAME),
         key=lambda path: path.relative_to(root).as_posix(),
     )
 

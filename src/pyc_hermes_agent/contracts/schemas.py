@@ -111,9 +111,7 @@ class AgentLoopRequest:
     def __post_init__(self) -> None:
         _allowed = ("casual", "structured", "formal")
         if self.analysis_mode not in _allowed:
-            raise ValueError(
-                f"AgentLoopRequest.analysis_mode must be one of: {', '.join(_allowed)}"
-            )
+            raise ValueError(f"AgentLoopRequest.analysis_mode must be one of: {', '.join(_allowed)}")
         if self.max_iterations < 1:
             raise ValueError("AgentLoopRequest.max_iterations must be >= 1")
         if self.retry_budget < 0:
@@ -148,7 +146,10 @@ class AgentLoopResult:
     plan: Optional[AgentPlan] = None
     messages: List[ChatMessage] = field(default_factory=list)
     tool_results: List[ToolCallResult] = field(default_factory=list)
+
     raw_response: Dict[str, Any] = field(default_factory=dict)
+
+    audit: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -210,9 +211,7 @@ class MetaAnalysisRequest:
 
     def __post_init__(self) -> None:
         if not isinstance(self.problem_statement, str) or not self.problem_statement.strip():
-            raise ValueError(
-                "MetaAnalysisRequest.problem_statement must be a non-empty string"
-            )
+            raise ValueError("MetaAnalysisRequest.problem_statement must be a non-empty string")
 
 
 @dataclass(slots=True)

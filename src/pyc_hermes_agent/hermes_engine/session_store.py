@@ -88,10 +88,7 @@ def _copy_message(message: ChatMessage) -> ChatMessage:
         role=message.role,
         content=message.content,
         tool_call_id=message.tool_call_id,
-        tool_calls=[
-            ToolCall(id=call.id, type=call.type, name=call.name, arguments=call.arguments)
-            for call in message.tool_calls
-        ],
+        tool_calls=[ToolCall(id=call.id, type=call.type, name=call.name, arguments=call.arguments) for call in message.tool_calls],
     )
 
 

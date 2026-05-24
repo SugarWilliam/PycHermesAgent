@@ -30,9 +30,7 @@ class SQLiteChunkStore:
     def open(self) -> None:
         """Open connection and ensure schema."""
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(
-            str(self._db_path), check_same_thread=False
-        )
+        self._conn = sqlite3.connect(str(self._db_path), check_same_thread=False)
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._ensure_schema()
 
@@ -45,14 +43,9 @@ class SQLiteChunkStore:
     def insert_chunks(self, chunks: List[ChunkRecord]) -> int:
         """Bulk insert chunks. Returns count inserted."""
         assert self._conn is not None
-        rows = [
-            (c.chunk_id, c.document_id, c.content, c.source_uri, c.position, c.metadata)
-            for c in chunks
-        ]
+        rows = [(c.chunk_id, c.document_id, c.content, c.source_uri, c.position, c.metadata) for c in chunks]
         self._conn.executemany(
-            "INSERT OR REPLACE INTO chunks "
-            "(chunk_id, document_id, content, source_uri, position, metadata) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT OR REPLACE INTO chunks (chunk_id, document_id, content, source_uri, position, metadata) VALUES (?, ?, ?, ?, ?, ?)",
             rows,
         )
         self._conn.commit()
@@ -90,9 +83,7 @@ class SQLiteChunkStore:
     def delete_document(self, document_id: str) -> int:
         """Delete all chunks for a document. Returns count deleted."""
         assert self._conn is not None
-        cur = self._conn.execute(
-            "DELETE FROM chunks WHERE document_id = ?", (document_id,)
-        )
+        cur = self._conn.execute("DELETE FROM chunks WHERE document_id = ?", (document_id,))
         self._conn.commit()
         return cur.rowcount
 

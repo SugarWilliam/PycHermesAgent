@@ -159,13 +159,7 @@ class HermesFacade:
             runtime_result, runtime_warnings = _probe_memory_runtime(upstream_root)
             if runtime_result is not None:
                 integration = _bridge_memory_integration(integration, runtime_result, operations, providers)
-        warnings = _unique(
-            [
-                f"Memory provider metadata issue for {provider.path}: {provider.parse_error}"
-                for provider in providers
-                if provider.parse_error
-            ]
-        )
+        warnings = _unique([f"Memory provider metadata issue for {provider.path}: {provider.parse_error}" for provider in providers if provider.parse_error])
         warnings.extend(runtime_warnings)
         if runtime_snapshot.checkout_present and not providers:
             warnings.append("No Hermes memory providers were discovered from vendored sources.")
@@ -193,13 +187,7 @@ class HermesFacade:
             runtime_result, runtime_warnings = _probe_skills_runtime(upstream_root)
             if runtime_result is not None:
                 integration = _bridge_skills_integration(integration, runtime_result, skills)
-        warnings = _unique(
-            [
-                f"Skill metadata issue for {skill.path}: {skill.parse_error}"
-                for skill in skills
-                if skill.parse_error
-            ]
-        )
+        warnings = _unique([f"Skill metadata issue for {skill.path}: {skill.parse_error}" for skill in skills if skill.parse_error])
         warnings.extend(runtime_warnings)
         self._skills_snapshot = HermesSkillsSnapshot(
             integration=integration,
@@ -225,13 +213,7 @@ class HermesFacade:
             runtime_result, runtime_warnings = _probe_tools_runtime(upstream_root)
             if runtime_result is not None:
                 integration = _bridge_tools_integration(integration, runtime_result, operations, tools)
-        warnings = _unique(
-            [
-                f"Tool metadata issue for {tool.path}: {tool.parse_error}"
-                for tool in tools
-                if tool.parse_error
-            ]
-        )
+        warnings = _unique([f"Tool metadata issue for {tool.path}: {tool.parse_error}" for tool in tools if tool.parse_error])
         warnings.extend(runtime_warnings)
         if runtime_snapshot.checkout_present and not tools:
             warnings.append("No Hermes builtin tools were discovered from vendored sources.")

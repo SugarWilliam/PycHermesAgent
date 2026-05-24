@@ -18,9 +18,7 @@ from pyc_hermes_agent.mrag_core.retrieve import retrieve
 class MRAGService:
     def __init__(self, *, storage_root: Path | None = None) -> None:
         self._storage_root = storage_root.resolve() if storage_root is not None else None
-        self._storage_owner: MRAGStorageOwner | None = (
-            acquire_mrag_storage_owner(self._storage_root) if self._storage_root is not None else None
-        )
+        self._storage_owner: MRAGStorageOwner | None = acquire_mrag_storage_owner(self._storage_root) if self._storage_root is not None else None
         self._knowledge_bases: Dict[str, KnowledgeBase] = {}
         if self._storage_root is None:
             return

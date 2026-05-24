@@ -153,12 +153,80 @@ export async function fetchSkills() {
 }
 
 /**
+ * List AGENTS.md / CLAUDE.md rule sources ordered by precedence (matches sidecar `/rules`).
+ * @returns {Promise<object>} `{ items: ... }`
+ */
+export async function fetchRules() {
+  const res = await fetch(`${await getBaseUrl()}/rules`)
+  if (!res.ok) throw new Error(`Fetch rules failed: ${res.status}`)
+  return res.json()
+}
+
+/**
+ * Rules fingerprint bundle (`path`, bytes, SHA-256 digest) aligned with precedence order — for audit/export.
+ * @returns {Promise<object>}
+ */
+export async function fetchRulesManifest() {
+  const res = await fetch(`${await getBaseUrl()}/rules/manifest`)
+  if (!res.ok) throw new Error(`Fetch rules manifest failed: ${res.status}`)
+  return res.json()
+}
+
+/**
+ * Persist Markdown for a workspace-scoped user skill (writable runtime `user_skills/`).
+ * @param {string} skillId - Skill id / slug (`skill_id`)
+ * @param {string} markdown - Full SKILL.md body (YAML frontmatter supported)
+ */
+export async function saveUserSkill(skillId, markdown) {
+  const res = await fetch(`${await getBaseUrl()}/skills/user`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ skill_id: skillId, markdown })
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(err.error?.message || err.message || `Save user skill failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+/**
  * Load sidecar-backed user preferences (Hermes memory / analysis defaults).
  * @returns {Promise<object>}
  */
 export async function fetchPreferences() {
   const res = await fetch(`${await getBaseUrl()}/preferences`)
   if (!res.ok) throw new Error(`Fetch preferences failed: ${res.status}`)
+  return res.json()
+}
+
+/**
+ * List indexed knowledge bases (MRAG Phase 3).
+ * @returns {Promise<object>} `{ items: [...] }` — each item may include `knowledge_base_id`, `display_name`
+ */
+export async function listKnowledgeBases() {
+  const res = await fetch(`${await getBaseUrl()}/knowledge-bases`)
+  if (!res.ok) throw new Error(`List knowledge bases failed: ${res.status}`)
+  return res.json()
+}
+
+/**
+ * Search within a knowledge base.
+ * @param {string} knowledgeBaseId - MRAG knowledge_base_id
+ * @param {object} body - RetrievalRequest-compatible fields ({ query, top_k?, retrieval_mode?, semantic_weight?, include_citations? })
+ * @returns {Promise<object>} serialized RetrievalResult
+ */
+export async function searchKnowledgeBase(knowledgeBaseId, body) {
+  const encoded = encodeURIComponent(knowledgeBaseId)
+  const res = await fetch(`${await getBaseUrl()}/knowledge-bases/${encoded}/search`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(err.error?.message || err.message || `KB search failed: ${res.status}`)
+  }
   return res.json()
 }
 
@@ -212,6 +280,40 @@ export async function runFormalAnalysis(request) {
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }))
     throw new Error(err.error?.message || err.message || `Analysis failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+/**
+ * List sidecar artifact records (`ArtifactEngine`).
+ * @param {string} [taskId] - Optional task scope (`GET /artifacts/task/{task_id}`)
+ * @returns {Promise<object>} `{ items, task_id? }`
+ */
+export async function fetchArtifacts(taskId) {
+  const base = await getBaseUrl()
+  const path =
+    taskId != null && String(taskId).trim()
+      ? `/artifacts/task/${encodeURIComponent(String(taskId).trim())}`
+      : '/artifacts'
+  const res = await fetch(`${base}${path}`)
+  if (!res.ok) throw new Error(`Fetch artifacts failed: ${res.status}`)
+  return res.json()
+}
+
+/**
+ * Create structured XLSX/PPTX artifacts on the sidecar (Phase 3 Track E).
+ * @param {object} payload - `{ task_id, format: 'xlsx'|'pptx', spec, filename? }`
+ * @returns {Promise<object>}
+ */
+export async function exportOfficeArtifact(payload) {
+  const res = await fetch(`${await getBaseUrl()}/artifacts/office`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(err.error?.message || err.message || `Office export failed: ${res.status}`)
   }
   return res.json()
 }

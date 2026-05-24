@@ -125,9 +125,7 @@ def _check_llm_gateway() -> ComponentHealth:
 
         return ComponentHealth(name="llm_gateway", state=HealthState.READY)
     except ImportError:
-        return ComponentHealth(
-            name="llm_gateway", state=HealthState.DEGRADED, message="llm_gateway module not importable"
-        )
+        return ComponentHealth(name="llm_gateway", state=HealthState.DEGRADED, message="llm_gateway module not importable")
     except Exception as exc:
         return ComponentHealth(name="llm_gateway", state=HealthState.DEGRADED, message=str(exc))
 
@@ -140,9 +138,7 @@ def _check_meta_harness() -> ComponentHealth:
         MetaFramework()
         return ComponentHealth(name="meta_harness", state=HealthState.READY)
     except ImportError:
-        return ComponentHealth(
-            name="meta_harness", state=HealthState.DEGRADED, message="meta_harness module not importable"
-        )
+        return ComponentHealth(name="meta_harness", state=HealthState.DEGRADED, message="meta_harness module not importable")
     except Exception as exc:
         return ComponentHealth(name="meta_harness", state=HealthState.DEGRADED, message=str(exc))
 
@@ -155,9 +151,7 @@ def _check_mrag() -> ComponentHealth:
         # If we can import and no active lock contention is detected, consider ready.
         return ComponentHealth(name="mrag", state=HealthState.READY)
     except ImportError:
-        return ComponentHealth(
-            name="mrag", state=HealthState.DEGRADED, message="mrag_core module not importable"
-        )
+        return ComponentHealth(name="mrag", state=HealthState.DEGRADED, message="mrag_core module not importable")
     except Exception as exc:
         return ComponentHealth(name="mrag", state=HealthState.DEGRADED, message=str(exc))
 
@@ -173,17 +167,11 @@ def _check_hermes_bridge(root: Any = None) -> ComponentHealth:
         bridge = get_hermes_bridge_health(r)
         if bridge.get("bridge_ready"):
             if bridge.get("warnings"):
-                return ComponentHealth(
-                    name="hermes_bridge", state=HealthState.READY_WITH_WARNINGS, message="bridge has warnings"
-                )
+                return ComponentHealth(name="hermes_bridge", state=HealthState.READY_WITH_WARNINGS, message="bridge has warnings")
             return ComponentHealth(name="hermes_bridge", state=HealthState.READY)
         if bridge.get("checkout_present") and bridge.get("import_ready"):
-            return ComponentHealth(
-                name="hermes_bridge", state=HealthState.DEGRADED, message="bridge not fully ready"
-            )
-        return ComponentHealth(
-            name="hermes_bridge", state=HealthState.UNAVAILABLE, message="bridge unavailable"
-        )
+            return ComponentHealth(name="hermes_bridge", state=HealthState.DEGRADED, message="bridge not fully ready")
+        return ComponentHealth(name="hermes_bridge", state=HealthState.UNAVAILABLE, message="bridge unavailable")
     except Exception as exc:
         return ComponentHealth(name="hermes_bridge", state=HealthState.DEGRADED, message=str(exc))
 

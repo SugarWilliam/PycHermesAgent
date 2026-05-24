@@ -97,9 +97,7 @@ def run_value_proof_benchmark(
             guided_overclaim_detections += 1
         if case_id == "graph_shape_routing" and guided["formal_method_id"] == "A-22":
             graph_routes_a22 += 1
-        if case_id == "dependency_visibility" and any(
-            "complex_systems_adapters" in item for item in guided["structured_risks"]
-        ):
+        if case_id == "dependency_visibility" and any("complex_systems_adapters" in item for item in guided["structured_risks"]):
             dependency_risk_surfaces += 1
         if guided["formal_method_id"] not in (None, "", "manual-review"):
             guided_non_manual += 1

@@ -63,38 +63,28 @@ def _make_fake_hermes_checkout(root: Path, *, missing: set[str] | None = None) -
             "}\n"
         ),
         "tools/registry.py": (
-            "class Registry:\n"
-            "    def register(self, **kwargs):\n        return None\n\n"
-            "registry = Registry()\n\n"
-            "def discover_builtin_tools():\n    return []\n"
+            "class Registry:\n    def register(self, **kwargs):\n        return None\n\nregistry = Registry()\n\ndef discover_builtin_tools():\n    return []\n"
         ),
         "toolsets.py": (
-            "def resolve_toolset(name):\n    return ['demo_tool']\n\n"
-            "def validate_toolset(name):\n    return True\n\n"
-            "TOOLSETS = {'safe': ['demo_tool']}\n"
+            "def resolve_toolset(name):\n    return ['demo_tool']\n\ndef validate_toolset(name):\n    return True\n\nTOOLSETS = {'safe': ['demo_tool']}\n"
         ),
-        "hermes_constants.py": (
-            "import os\n"
-            "from pathlib import Path\n\n"
-            "def get_hermes_home() -> Path:\n"
-            "    return Path(os.environ.get('HERMES_HOME', '.'))\n"
-        ),
+        "hermes_constants.py": ("import os\nfrom pathlib import Path\n\ndef get_hermes_home() -> Path:\n    return Path(os.environ.get('HERMES_HOME', '.'))\n"),
         "hermes_state.py": (
             "from hermes_constants import get_hermes_home\n\n"
             "DEFAULT_DB_PATH = get_hermes_home() / 'state.db'\n"
             "SCHEMA_VERSION = 11\n"
-            "SCHEMA_SQL = \"\"\"\n"
+            'SCHEMA_SQL = """\n'
             "CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, parent_session_id TEXT, handoff_state TEXT);\n"
             "CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT NOT NULL);\n"
             "CREATE TABLE IF NOT EXISTS state_meta (key TEXT PRIMARY KEY, value TEXT);\n"
             "CREATE INDEX IF NOT EXISTS idx_sessions_started ON sessions(id);\n"
-            "\"\"\"\n"
-            "FTS_SQL = \"\"\"\n"
+            '"""\n'
+            'FTS_SQL = """\n'
             "CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(content);\n"
-            "\"\"\"\n"
-            "FTS_TRIGRAM_SQL = \"\"\"\n"
+            '"""\n'
+            'FTS_TRIGRAM_SQL = """\n'
             "CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts_trigram USING fts5(content, tokenize='trigram');\n"
-            "\"\"\"\n"
+            '"""\n'
             "class SessionDB:\n"
             "    def __init__(self, db_path=None):\n"
             "        self.db_path = db_path or DEFAULT_DB_PATH\n"
@@ -157,15 +147,7 @@ def _make_fake_hermes_checkout(root: Path, *, missing: set[str] | None = None) -
             "        'count': len(skills),\n"
             "    })\n"
         ),
-        "skills/testing/demo/SKILL.md": (
-            "---\n"
-            "name: demo-skill\n"
-            "description: Demo skill description.\n"
-            "metadata:\n"
-            "  category: testing\n"
-            "---\n"
-            "# Demo Skill\n"
-        ),
+        "skills/testing/demo/SKILL.md": ("---\nname: demo-skill\ndescription: Demo skill description.\nmetadata:\n  category: testing\n---\n# Demo Skill\n"),
         "tools/demo_tool.py": (
             "from tools.registry import registry\n\n"
             "registry.register(\n"
@@ -298,6 +280,7 @@ def test_sidecar_lists_rules_and_skills() -> None:
     rules = list_rules(root)
     skills = list_skills(root)
     assert any(rule["name"] == "AGENTS.md" for rule in rules)
+    assert all(isinstance(rule.get("precedence_order"), int) for rule in rules)
     skill = next(item for item in skills if item["name"] == "meta-harness-governance")
     assert skill["id"] == "meta-harness-governance"
     assert skill["category"] == "prompt"
@@ -543,6 +526,183 @@ def test_sidecar_agent_loop_runs_formal_analysis_tool() -> None:
     assert response["iterations"] == 2
     assert response["retry_count"] == 0
     assert response["tool_results"][0]["structured_content"]["selected_method"] == "A-22"
+
+
+def test_sidecar_formal_run_merges_web_search_into_analysis_card(monkeypatch) -> None:
+    from pyc_hermes_agent.contracts import AgentLoopResult, ChatMessage, MetaAnalysisResult, ToolCallResult
+    from pyc_hermes_agent.sidecar_api.services import chat_service as _chat_svc
+
+    captured: list[MetaAnalysisRequest] = []
+
+    def _stub_execute(_self, req: MetaAnalysisRequest) -> MetaAnalysisResult:
+        captured.append(req)
+        return MetaAnalysisResult(
+            selected_method="A-1",
+            method_rationale="stub",
+            evidence_grade="CE-C1",
+            sr_grade="SR-C1",
+        )
+
+    class _FakeAgentLoop:
+        def __init__(self, *, root=None):
+            self.root = root
+
+        def run(self, request, **_kwargs):
+            return AgentLoopResult(
+                session_id="s-formal-net",
+                model=request.model or "openai-compatible/demo-model",
+                provider_id="openai-compatible",
+                content="Done with grounding.",
+                finish_reason="stop",
+                iterations=1,
+                retry_count=0,
+                messages=[
+                    ChatMessage(role="user", content="Formal problem statement"),
+                    ChatMessage(role="assistant", content="Done with grounding."),
+                ],
+                tool_results=[
+                    ToolCallResult(
+                        tool_call_id="tc-ws",
+                        name="web_search",
+                        content="{}",
+                        is_error=False,
+                        structured_content={
+                            "citations": [{"source_uri": "https://example.com/e1", "snippet": "Evidence snippet"}],
+                        },
+                    ),
+                ],
+                raw_response={"choices": []},
+            )
+
+    monkeypatch.setattr(_chat_svc.MetaFramework, "execute", _stub_execute)
+    monkeypatch.setattr(_chat_svc, "AgentLoop", _FakeAgentLoop)
+
+    response = run_agent_loop(
+        AgentLoopRequest(
+            session_id="s-formal-net",
+            model="openai-compatible/demo-model",
+            analysis_mode="formal",
+            messages=[{"role": "user", "content": "Formal problem statement"}],
+        )
+    )
+
+    assert response["content"] == "Done with grounding."
+    card = response.get("analysis_card")
+    assert card is not None
+    assert card["network_refs"] == ["https://example.com/e1"]
+    assert card["formal_grounding_refs"] == ["https://example.com/e1"]
+    assert isinstance(card["network_citations"], list) and card["network_citations"]
+    assert card.get("local_kb_citations") == []
+    assert captured and captured[0].data_refs == ["https://example.com/e1"]
+    grounding = captured[0].data.get("network_grounding", {})
+    assert grounding.get("citation_count") == 1
+
+    ec = card.get("evidence_chain")
+    assert isinstance(ec, dict)
+    assert ec.get("distinct_host_count") == 1
+    assert ec.get("hosts") == ["example.com"]
+    stats = ec.get("stats") or {}
+    assert stats.get("web", {}).get("unique_network_uris") == 1
+    assert stats.get("kb", {}).get("citation_entry_count") == 0
+    assert "network_tool_refs_only_no_kb_citations" in ec["hints"]
+    assert ec["validation"]["schema"] == "phase3f1/evidence-validation/v1"
+
+
+def test_sidecar_formal_analysis_card_merges_kb_citations_with_web_search(monkeypatch) -> None:
+    from pyc_hermes_agent.contracts import AgentLoopResult, ChatMessage, MetaAnalysisResult, ToolCallResult
+    from pyc_hermes_agent.sidecar_api.services import chat_service as _chat_svc
+
+    captured: list[MetaAnalysisRequest] = []
+
+    overlap_uri = "https://overlap.example/o1"
+
+    def _stub_execute(_self, req: MetaAnalysisRequest) -> MetaAnalysisResult:
+        captured.append(req)
+        return MetaAnalysisResult(
+            selected_method="A-ms",
+            method_rationale="stub",
+            evidence_grade="CE-C1",
+            sr_grade="SR-C1",
+        )
+
+    class _FakeAgentLoop:
+        def __init__(self, *, root=None):
+            self.root = root
+
+        def run(self, request, **_kwargs):
+            return AgentLoopResult(
+                session_id="s-multi",
+                model=request.model or "openai-compatible/demo-model",
+                provider_id="openai-compatible",
+                content="Multi-source grounding.",
+                finish_reason="stop",
+                iterations=1,
+                retry_count=0,
+                messages=[
+                    ChatMessage(role="user", content="Formal blended"),
+                    ChatMessage(role="assistant", content="Multi-source grounding."),
+                ],
+                tool_results=[
+                    ToolCallResult(
+                        tool_call_id="tc-ws",
+                        name="web_search",
+                        content="{}",
+                        is_error=False,
+                        structured_content={"citations": [{"source_uri": overlap_uri, "snippet": "live web summary about topic alpha delta"}]},
+                    ),
+                    ToolCallResult(
+                        tool_call_id="tc-mrag",
+                        name="knowledge_retrieve",
+                        content="{}",
+                        is_error=False,
+                        structured_content={
+                            "retrieval": {
+                                "citations": [
+                                    {
+                                        "document_id": "doc-alpha",
+                                        "chunk_id": "chunk-9",
+                                        "source_uri": overlap_uri,
+                                        "snippet": "archived kb copy discusses unrelated beta epsilon zeta completely",
+                                        "source_type": "pdf",
+                                    }
+                                ]
+                            }
+                        },
+                    ),
+                ],
+                raw_response={"choices": []},
+            )
+
+    monkeypatch.setattr(_chat_svc.MetaFramework, "execute", _stub_execute)
+    monkeypatch.setattr(_chat_svc, "AgentLoop", _FakeAgentLoop)
+
+    response = run_agent_loop(
+        AgentLoopRequest(
+            session_id="s-multi",
+            model="openai-compatible/demo-model",
+            analysis_mode="formal",
+            messages=[{"role": "user", "content": "Formal blended"}],
+        )
+    )
+
+    card = response.get("analysis_card")
+    assert card is not None
+    assert captured
+    merged = captured[0].data_refs
+    assert merged == [overlap_uri]
+
+    assert card["network_refs"] == [overlap_uri]
+    assert card["formal_grounding_refs"] == merged
+
+    kb = captured[0].data.get("local_kb_grounding", {})
+    assert kb.get("citation_count") == 1
+
+    ec = card["evidence_chain"]
+    assert "multi_source_web_and_kb_grounding" in ec["hints"]
+    assert "http_uri_overlap_across_kb_and_web" in ec["hints"]
+    assert ec["overlap_http_uris"] == [overlap_uri]
+    conf_kinds = {c.get("kind") for c in (ec.get("validation") or {}).get("conflicts") or []}
+    assert "cross_lane_http_uri_snippet_variance" in conf_kinds
 
 
 def test_sidecar_passes_activated_skills_to_agent_loop() -> None:

@@ -13,16 +13,15 @@ from typing import TYPE_CHECKING, Any, Dict, Iterator, Optional
 if TYPE_CHECKING:
     import numpy as np
 
+
 def _get_numpy():
     """Lazy-load numpy only when bridge fallback execution actually needs it."""
     try:
         import numpy as np
+
         return np
     except ImportError:
-        raise ImportError(
-            "numpy is required for legacy bridge execution. "
-            "Install with: pip install numpy>=1.26"
-        )
+        raise ImportError("numpy is required for legacy bridge execution. Install with: pip install numpy>=1.26")
 
 
 # Keep the MVP bridge limited to legacy surfaces with stable local contracts or
@@ -30,17 +29,12 @@ def _get_numpy():
 # harness models their dependency availability more explicitly.
 _RUNTIME_DISABLED_MODULE_ERRORS = {
     "org_personal_adapters": (
-        "Legacy org_personal_adapters execution is disabled in the current MVP bridge "
-        "because it depends on optional pandas/scipy stacks."
+        "Legacy org_personal_adapters execution is disabled in the current MVP bridge because it depends on optional pandas/scipy stacks."
     ),
     "complex_systems_adapters": (
-        "Legacy complex_systems_adapters execution is disabled in the current MVP bridge "
-        "because it depends on optional pandas/scipy stacks."
+        "Legacy complex_systems_adapters execution is disabled in the current MVP bridge because it depends on optional pandas/scipy stacks."
     ),
-    "stats_module": (
-        "Legacy stats_module execution is disabled in the current MVP bridge; "
-        "use statistical_rigor or method-specific routes instead."
-    ),
+    "stats_module": ("Legacy stats_module execution is disabled in the current MVP bridge; use statistical_rigor or method-specific routes instead."),
 }
 
 

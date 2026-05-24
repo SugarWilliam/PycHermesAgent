@@ -18,13 +18,18 @@ from pyc_hermes_agent.contracts import (
     ToolCallResult,
     ToolDefinition,
 )
+from pyc_hermes_agent.hermes_engine.knowledge_retrieve_tool import (
+    KNOWLEDGE_RETRIEVE_MODES,
+    knowledge_retrieve_handler_for_workspace,
+)
 from pyc_hermes_agent.hermes_engine.memory_injection import build_prompt_messages
 from pyc_hermes_agent.hermes_engine.planner import build_agent_plan
+from pyc_hermes_agent.hermes_engine.rule_context import build_rule_context_messages
 from pyc_hermes_agent.hermes_engine.session_context import bind_session_context
 from pyc_hermes_agent.hermes_engine.session_store import AgentSessionStore
 from pyc_hermes_agent.hermes_engine.skill_context import SKILLS_RUNTIME_POLICY, build_skill_context_messages
 from pyc_hermes_agent.hermes_engine.tool_registry import ToolRegistry
-from pyc_hermes_agent.hermes_engine.web_search import run_web_search_tool
+from pyc_hermes_agent.hermes_engine.web_search import ALLOWED_WEB_SEARCH_PROVIDERS, run_web_search_tool
 from pyc_hermes_agent.llm_gateway import LLMChatChunk, LLMChatRequest, LLMChatResponse, LLMMessage, execute_chat
 from pyc_hermes_agent.meta_harness import MetaFramework
 
@@ -59,7 +64,7 @@ class AgentLoop:
         self._root = (root or Path(__file__).resolve().parents[3]).resolve()
         self._llm_executor = llm_executor
         self._llm_stream_executor = llm_stream_executor
-        self._tool_registry = tool_registry or create_meta_harness_tool_registry()
+        self._tool_registry = tool_registry or create_meta_harness_tool_registry(workspace_root=self._root)
         resolved_storage_root = storage_root if storage_root is not None else root
         self._session_store = session_store or AgentSessionStore(root=resolved_storage_root)
 
@@ -155,6 +160,15 @@ class AgentLoop:
         skill_messages = build_skill_context_messages(self._root, activated_skills)
         tool_results: list[ToolCallResult] = []
         last_response = LLMChatResponse()
+        rule_messages, rule_paths = build_rule_context_messages(self._root)
+
+        audit_base: dict[str, Any] = {
+            "skills_runtime_policy": dict(SKILLS_RUNTIME_POLICY),
+            "activated_skills": normalized_activated_skills,
+            "rule_sources": [{"path": str(p)} for p in rule_paths],
+            "analysis_mode": analysis_mode,
+        }
+
         active_model = request.model or (existing_session.model if existing_session is not None else "")
         retry_count = 0
         recovery_message: ChatMessage | None = None
@@ -208,6 +222,7 @@ class AgentLoop:
                 "activated_skills": normalized_activated_skills,
                 "skills_runtime_policy": dict(SKILLS_RUNTIME_POLICY),
                 "analysis_mode": analysis_mode,
+                "rule_sources": [str(p) for p in rule_paths],
             },
         )
         if plan is not None:
@@ -217,7 +232,7 @@ class AgentLoop:
             for iteration in range(1, max_iterations + 1):
                 current_iteration = iteration
                 with bind_session_context(resolved_session_id):
-                    extra_system_messages = [*skill_messages]
+                    extra_system_messages = [*rule_messages, *skill_messages]
                     if analysis_mode == "structured":
                         extra_system_messages.append(ChatMessage(role="system", content=_STRUCTURED_MODE_SYSTEM_MESSAGE))
                     if recovery_message is not None:
@@ -334,6 +349,7 @@ class AgentLoop:
                         messages=messages,
                         tool_results=tool_results,
                         raw_response=last_response.raw_response,
+                        audit=dict(audit_base),
                     )
                     yield emit(
                         "done",
@@ -526,7 +542,7 @@ class AgentLoop:
         )
 
 
-def create_meta_harness_tool_registry() -> ToolRegistry:
+def create_meta_harness_tool_registry(*, workspace_root: Path | None = None) -> ToolRegistry:
     registry = ToolRegistry()
     registry.register_function(
         "formal_analysis",
@@ -552,12 +568,44 @@ def create_meta_harness_tool_registry() -> ToolRegistry:
     registry.register_function(
         "web_search",
         run_web_search_tool,
-        description="Network-grounded shallow search (instant-answer JSON). Returns results[] and citations[] for the desktop evidence pane.",
+        description=(
+            "Network-grounded search: DuckDuckGo instant JSON, Wikipedia OpenSearch, or chain (DDG then wiki). "
+            "Uses PYC_HERMES_WEB_SEARCH_PROVIDER when provider arg omitted."
+        ),
         parameters={
             "type": "object",
             "properties": {
                 "query": {"type": "string"},
                 "max_results": {"type": "integer", "minimum": 1, "maximum": 20},
+                "provider": {
+                    "type": "string",
+                    "enum": sorted(ALLOWED_WEB_SEARCH_PROVIDERS),
+                    "description": "Optional; omit to honour PYC_HERMES_WEB_SEARCH_PROVIDER.",
+                },
+            },
+            "required": ["query"],
+        },
+    )
+    registry.register_function(
+        "knowledge_retrieve",
+        knowledge_retrieve_handler_for_workspace(workspace_root),
+        description=(
+            "Search local MRAG knowledge bases (same JSON MRAG backend as sidecar POST /knowledge-bases/{id}/search). "
+            "Omits knowledge_base_id to query the catalog's first KB."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "query": {"type": "string"},
+                "knowledge_base_id": {"type": "string", "description": "Optional KB id; defaults to first listed KB."},
+                "top_k": {"type": "integer", "minimum": 1, "maximum": 32},
+                "retrieval_mode": {
+                    "type": "string",
+                    "enum": KNOWLEDGE_RETRIEVE_MODES,
+                    "description": "Hybrid combines lexical retrieval with deterministic trigram semantic similarity.",
+                },
+                "semantic_weight": {"type": "number"},
+                "include_citations": {"type": "boolean"},
             },
             "required": ["query"],
         },

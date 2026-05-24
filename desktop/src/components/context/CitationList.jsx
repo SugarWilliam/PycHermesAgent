@@ -6,7 +6,7 @@ export default function CitationList() {
   if (!citations || citations.length === 0) {
     return (
       <p className="text-xs text-gray-500 dark:text-gray-400 py-1">
-        No retrieval citations yet (populated when tools return JSON with a <code className="text-[10px]">citations</code> array).
+        No retrieval citations yet. Use <code className="text-[10px]">/retrieve &lt;query&gt;</code> when the sidecar exposes MRAG, or rely on agent tools returning a <code className="text-[10px]">citations</code> array.
       </p>
     )
   }

@@ -222,11 +222,7 @@ def _extract_config_keys(text: str) -> list[str]:
 def _build_placeholder_snapshot(spec: _PlaceholderSpec, runtime_snapshot: HermesRuntimeSnapshot) -> HermesIntegrationSnapshot:
     upstream_root = Path(runtime_snapshot.upstream_root)
     surfaces = _surface_lookup(runtime_snapshot)
-    available_surfaces = [
-        surface_id
-        for surface_id in spec.required_surfaces
-        if surfaces.get(surface_id) is not None and surfaces[surface_id].available
-    ]
+    available_surfaces = [surface_id for surface_id in spec.required_surfaces if surfaces.get(surface_id) is not None and surfaces[surface_id].available]
     missing_surfaces = [surface_id for surface_id in spec.required_surfaces if surface_id not in available_surfaces]
     detected_entrypoints = _detect_entrypoints(upstream_root, spec.source_paths, spec.entrypoints)
     discovered_paths = _discover_paths(upstream_root, spec.discovery_patterns) if runtime_snapshot.checkout_present else []

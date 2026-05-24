@@ -34,6 +34,12 @@ jobs:
       - name: Sync dependencies (uv.lock + dev)
         run: uv sync --extra dev --python ${{ matrix.python-version }}
 
+      - name: MRAG lexical vs hybrid proof (deterministic subset)
+        run: uv run python benchmarks/mrag/run_lexical_hybrid_proof.py
+
+      - name: MRAG expanded benchmark (Phase 3F)
+        run: uv run python benchmarks/mrag/run_expanded_hybrid_benchmark.py
+
       - name: Packaging probe smoke (simulated Windows-style dirs on Linux)
         run: |
           set -e
@@ -67,6 +73,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Install Python (layout smoke harness)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
@@ -74,10 +85,15 @@ jobs:
           cache: npm
           cache-dependency-path: desktop/package-lock.json
 
-      - name: npm ci + electron-vite build + win dir
+      - name: npm ci + audit + electron-vite win-unpacked
         run: |
           npm ci
+          npm audit --omit=dev --audit-level=critical
           npm run dist:win-unpacked
+
+      - name: Electron unpacked layout smoke (Windows)
+        working-directory: ${{ github.workspace }}
+        run: python scripts/electron_dist_layout_smoke.py desktop --require-unpacked-resources --prefer-unpacked win
 
   production-gates:
     name: Production packaging gates (lockfile, MRAG migrate, desktop dir pack)
@@ -102,6 +118,12 @@ jobs:
 
       - name: Sync Python (3.11) + GA optional deps
         run: uv sync --extra dev --extra ga --python 3.11
+
+      - name: MRAG lexical vs hybrid proof (deterministic subset)
+        run: uv run python benchmarks/mrag/run_lexical_hybrid_proof.py
+
+      - name: MRAG expanded benchmark (Phase 3F)
+        run: uv run python benchmarks/mrag/run_expanded_hybrid_benchmark.py
 
       - name: Production gate extras
         env:

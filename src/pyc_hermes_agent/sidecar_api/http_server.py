@@ -47,6 +47,7 @@ from pyc_hermes_agent.sidecar_api.service import (
     ingest_pdf_document,
     ingest_text_document,
     ingest_url_document,
+    export_office_artifact_bundle,
     invoke_chat_completion,
     invoke_formal_analysis,
     list_knowledge_bases,
@@ -90,6 +91,7 @@ def _get_skills_audit() -> dict[str, Any]:
     auditor = SkillAuditor(storage_path=storage_path)
     auditor.load()
     from dataclasses import asdict
+
     return {
         "entries": [asdict(e) for e in auditor.get_recent_entries()],
         "usage_counts": auditor.get_usage_counts(),
@@ -314,9 +316,12 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
                         "/providers",
                         "/models",
                         "/rules",
+                        "/rules/manifest",
                         "/skills",
+                        "/skills/user",
                         "/assets",
                         "/artifacts",
+                        "/artifacts/office",
                         "/artifacts/task/{task_id}",
                         "/hermes/capability",
                         "/hermes/bridge-health",
@@ -400,6 +405,29 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
                 domain=DOMAIN_LLM,
                 details={},
             )
+        if path == "/rules/manifest":
+            from pyc_hermes_agent.sidecar_api.services.common import _repo_root
+            from pyc_hermes_agent.sidecar_api.services.rules_manifest import rules_manifest_bundle
+
+            base_path = Path(root).resolve() if root is not None else _repo_root()
+
+            try:
+                return rules_manifest_bundle(base_path), HTTPStatus.OK
+            except Exception as exc:  # pragma: no cover - defensive parity with gateway helpers
+
+                return (
+                    make_error_response(
+                        "RULE_MANIFEST_FAILED",
+                        "runtime",
+                        str(exc),
+                        domain=DOMAIN_INTERNAL,
+                        degraded=False,
+                        details={"path": path},
+                    ),
+                    HTTPStatus.BAD_GATEWAY,
+
+                )
+
         if path == "/rules":
             return _get_or_bad_gateway(
                 lambda: {"items": list_rules(root)},
@@ -511,6 +539,20 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
             skill_id = unquote(deactivate_match.group(1))
             return deactivate_skill(skill_id), HTTPStatus.OK
 
+        if path == "/skills/user":
+            from pyc_hermes_agent.sidecar_api.services.user_skill_publish import persist_user_skill_markdown
+
+            sid = payload.get("skill_id", "")
+            markdown_raw = payload.get("markdown", "")
+            if not isinstance(sid, str) or not sid.strip():
+                raise ValueError("Field 'skill_id' is required.")
+            if not isinstance(markdown_raw, str) or not markdown_raw.strip():
+                raise ValueError("Field 'markdown' is required.")
+            bundle = persist_user_skill_markdown(
+                skill_id_raw=sid.strip(), markdown_body=markdown_raw, root=self._server_root()
+            )
+            return bundle, HTTPStatus.CREATED
+
         if path == "/formal-analysis":
             response = invoke_formal_analysis(MetaAnalysisRequest(**payload))
             status = HTTPStatus.OK if "error" not in response else HTTPStatus.BAD_GATEWAY
@@ -589,6 +631,10 @@ class SidecarRequestHandler(BaseHTTPRequestHandler):
                 ),
                 HTTPStatus.CREATED,
             )
+
+        if path == "/artifacts/office":
+            bundle = export_office_artifact_bundle(payload, root=self._server_root())
+            return bundle, HTTPStatus.CREATED
 
         pdf_match = _KB_DOCUMENT_PDF_PATTERN.fullmatch(path)
         if pdf_match:

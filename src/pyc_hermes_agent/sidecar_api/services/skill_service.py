@@ -70,7 +70,7 @@ def list_skills(root: Path | None = None) -> List[Dict[str, Any]]:
                 "description": skill.description,
                 "category": category,
                 "active": False,
-                "source_kind": "project",
+                "source_kind": skill.skill_origin,
                 "path": str(skill.path),
                 "license": skill.license,
                 "compatibility": skill.compatibility,

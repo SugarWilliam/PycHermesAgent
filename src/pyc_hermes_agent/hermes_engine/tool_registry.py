@@ -136,9 +136,13 @@ class ToolRegistry:
         existing_descriptor = self._descriptors.get(normalized_definition.name)
         existing_handler = self._handlers.get(normalized_definition.name)
         resolved_handler = handler if handler is not None else existing_handler
-        base_descriptor = descriptor or existing_descriptor or _descriptor_from_definition(
-            normalized_definition,
-            registered=resolved_handler is not None,
+        base_descriptor = (
+            descriptor
+            or existing_descriptor
+            or _descriptor_from_definition(
+                normalized_definition,
+                registered=resolved_handler is not None,
+            )
         )
         normalized_descriptor = replace(
             base_descriptor,

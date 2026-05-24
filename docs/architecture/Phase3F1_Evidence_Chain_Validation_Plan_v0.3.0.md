@@ -1,6 +1,6 @@
 # Phase 3F1 - Evidence Chain Validation Plan v0.3.0
 
-**Status:** Proposed execution plan
+**Status:** Baseline delivered in-repository (`meta_harness/evidence_chain.py` + structured ``analysis_card.evidence_chain.validation``); broader logic-prover scope remains backlog.
 **Authority:** `docs/Project_Development_and_Release_Governance.md`
 **Parent roadmap:** `docs/architecture/Phase3F_Retrieval_MetaFramework_Strengthening_Plan_v0.3.0.md`
 **Goal:** Add a general-purpose evidence-chain verification layer that improves multi-source convergence, chain-level traceability, contradiction handling, logic-fallacy detection, and temporal consistency checks in grounded product outputs.

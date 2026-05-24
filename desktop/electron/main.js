@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron')
+const { app, BrowserWindow, ipcMain, shell } = require('electron')
 const { join } = require('path')
 
 let autoUpdater = null
@@ -144,6 +144,14 @@ ipcMain.handle('sidecar:set-runtime-config', async (_event, partial) => {
 ipcMain.handle('sidecar:restart', async () => {
   await refreshSidecarRuntime({ allowLaunch: true })
   return runtimeStatus
+})
+
+/** Best-effort open of an absolute file path from the renderer (exported artifacts). */
+ipcMain.handle('shell:open-path', async (_event, filepath) => {
+  const fp = typeof filepath === 'string' ? filepath.trim() : ''
+  if (!fp) return { ok: false, error: 'empty_path' }
+  const err = await shell.openPath(fp)
+  return { ok: !err, error: err || null }
 })
 
 function initAutoUpdater() {

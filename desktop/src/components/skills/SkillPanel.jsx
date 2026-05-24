@@ -1,11 +1,16 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import useSkillStore from '../../store/skillStore'
+import { saveUserSkill } from '../../services/sidecarClient'
 import SkillCard from './SkillCard'
 
 export default function SkillPanel({ expanded, onToggle }) {
   const skills = useSkillStore((s) => s.skills)
   const loading = useSkillStore((s) => s.loading)
   const fetchSkills = useSkillStore((s) => s.fetchSkills)
+  const [pubId, setPubId] = useState('')
+  const [pubMd, setPubMd] = useState('---\nname: user-skill\ndescription: User-authored SKILL\n---\n\n### Scope\n')
+  const [pubBusy, setPubBusy] = useState(false)
+  const [pubMsg, setPubMsg] = useState('')
 
   useEffect(() => {
     if (!expanded) return
@@ -31,7 +36,7 @@ export default function SkillPanel({ expanded, onToggle }) {
       </button>
 
       {expanded && (
-        <div className="mt-1 max-h-60 overflow-y-auto">
+        <div className="mt-1 max-h-[32rem] overflow-y-auto">
           {lastFetchError && (
             <p className="text-xs text-red-500 dark:text-red-400 px-3 py-2" title={lastFetchError}>
               Skills unavailable ({lastFetchError.slice(0, 80)})
@@ -66,6 +71,56 @@ export default function SkillPanel({ expanded, onToggle }) {
               )}
             </>
           )}
+
+          <details className="px-3 py-2 border-t border-gray-100 dark:border-gray-800 mt-1">
+            <summary className="text-[11px] text-gray-500 dark:text-gray-400 cursor-pointer select-none">
+              发布用户 SKILL 到运行时 (POST /skills/user)
+            </summary>
+            <form
+              className="mt-2 space-y-2"
+              onSubmit={async (e) => {
+                e.preventDefault()
+                const slug = pubId.trim()
+                if (!slug) {
+                  setPubMsg('填写 skill id（slug）')
+                  return
+                }
+                setPubBusy(true)
+                setPubMsg('')
+                try {
+                  await saveUserSkill(slug, pubMd)
+                  setPubMsg('已保存并重载列表')
+                  await fetchSkills()
+                } catch (err) {
+                  setPubMsg(err?.message || String(err))
+                } finally {
+                  setPubBusy(false)
+                }
+              }}
+            >
+              <input
+                type="text"
+                placeholder="skill_id（slug）"
+                value={pubId}
+                onChange={(e) => setPubId(e.target.value)}
+                className="w-full text-[11px] rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-2 py-1"
+              />
+              <textarea
+                rows={8}
+                value={pubMd}
+                onChange={(e) => setPubMd(e.target.value)}
+                className="w-full text-[11px] font-mono rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-2 py-1"
+              />
+              <button
+                type="submit"
+                disabled={pubBusy || loading}
+                className="w-full text-xs py-1 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {pubBusy ? '保存中…' : '保存 SKILL.md'}
+              </button>
+            </form>
+            {pubMsg ? <p className="text-[10px] mt-1 text-gray-600 dark:text-gray-300">{pubMsg}</p> : null}
+          </details>
         </div>
       )}
     </div>

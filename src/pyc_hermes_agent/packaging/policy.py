@@ -26,13 +26,10 @@ def validate_runtime_paths_outside_install(paths: RuntimePaths, install_dir: Pat
         candidate = getattr(paths, name).resolve()
         if candidate == inst:
             raise RuntimeError(
-                f"Packaging violation: {name} equals install_dir {inst}. "
-                "Configuration and data must live under APPDATA / LOCALAPPDATA (or XDG on POSIX)."
+                f"Packaging violation: {name} equals install_dir {inst}. Configuration and data must live under APPDATA / LOCALAPPDATA (or XDG on POSIX)."
             )
         try:
             candidate.relative_to(inst)
         except ValueError:
             continue
-        raise RuntimeError(
-            f"Packaging violation: {name}={candidate} is inside read-only install_dir {inst}."
-        )
+        raise RuntimeError(f"Packaging violation: {name}={candidate} is inside read-only install_dir {inst}.")

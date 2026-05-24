@@ -29,19 +29,13 @@ class SkillAuditor:
         return datetime.now(timezone.utc).isoformat()
 
     def record_activation(self, skill_id: str, session_id: str = "") -> None:
-        self._entries.append(
-            SkillAuditEntry(skill_id=skill_id, action="activated", timestamp=self._now(), session_id=session_id)
-        )
+        self._entries.append(SkillAuditEntry(skill_id=skill_id, action="activated", timestamp=self._now(), session_id=session_id))
 
     def record_deactivation(self, skill_id: str, session_id: str = "") -> None:
-        self._entries.append(
-            SkillAuditEntry(skill_id=skill_id, action="deactivated", timestamp=self._now(), session_id=session_id)
-        )
+        self._entries.append(SkillAuditEntry(skill_id=skill_id, action="deactivated", timestamp=self._now(), session_id=session_id))
 
     def record_usage(self, skill_id: str, session_id: str = "") -> None:
-        self._entries.append(
-            SkillAuditEntry(skill_id=skill_id, action="used", timestamp=self._now(), session_id=session_id)
-        )
+        self._entries.append(SkillAuditEntry(skill_id=skill_id, action="used", timestamp=self._now(), session_id=session_id))
         self._usage_counts[skill_id] = self._usage_counts.get(skill_id, 0) + 1
 
     def get_usage_counts(self) -> dict[str, int]:

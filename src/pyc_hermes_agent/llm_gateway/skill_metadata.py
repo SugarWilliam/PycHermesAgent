@@ -15,6 +15,7 @@ class SkillMetadata:
     license: Optional[str] = None
     compatibility: Optional[str] = None
     metadata: Dict[str, str] = field(default_factory=dict)
+    skill_origin: str = "project"
 
 
 def parse_skill_metadata(path: Path) -> SkillMetadata:

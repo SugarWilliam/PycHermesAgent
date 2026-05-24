@@ -34,11 +34,13 @@ def test_sqlite_store_create_and_insert(db_path: Path) -> None:
 
 def test_sqlite_store_fts5_search(db_path: Path) -> None:
     with SQLiteChunkStore(db_path) as store:
-        store.insert_chunks([
-            ChunkRecord("c1", "d1", "Python is a programming language", "", 0, "{}"),
-            ChunkRecord("c2", "d1", "SQLite provides full-text search", "", 1, "{}"),
-            ChunkRecord("c3", "d1", "Java is another programming language", "", 2, "{}"),
-        ])
+        store.insert_chunks(
+            [
+                ChunkRecord("c1", "d1", "Python is a programming language", "", 0, "{}"),
+                ChunkRecord("c2", "d1", "SQLite provides full-text search", "", 1, "{}"),
+                ChunkRecord("c3", "d1", "Java is another programming language", "", 2, "{}"),
+            ]
+        )
         results = store.search("programming language")
         assert len(results) >= 1
         ids = [r.chunk_id for r in results]
@@ -47,11 +49,13 @@ def test_sqlite_store_fts5_search(db_path: Path) -> None:
 
 def test_sqlite_store_delete_document(db_path: Path) -> None:
     with SQLiteChunkStore(db_path) as store:
-        store.insert_chunks([
-            ChunkRecord("c1", "doc-a", "alpha content", "", 0, "{}"),
-            ChunkRecord("c2", "doc-a", "beta content", "", 1, "{}"),
-            ChunkRecord("c3", "doc-b", "gamma content", "", 0, "{}"),
-        ])
+        store.insert_chunks(
+            [
+                ChunkRecord("c1", "doc-a", "alpha content", "", 0, "{}"),
+                ChunkRecord("c2", "doc-a", "beta content", "", 1, "{}"),
+                ChunkRecord("c3", "doc-b", "gamma content", "", 0, "{}"),
+            ]
+        )
         deleted = store.delete_document("doc-a")
         assert deleted == 2
         assert store.count() == 1
@@ -69,9 +73,7 @@ def test_sqlite_store_empty_query(db_path: Path) -> None:
 
 def test_sqlite_store_schema_version(db_path: Path) -> None:
     with SQLiteChunkStore(db_path) as store:
-        cur = store._conn.execute(
-            "SELECT value FROM schema_meta WHERE key = 'schema_version'"
-        )
+        cur = store._conn.execute("SELECT value FROM schema_meta WHERE key = 'schema_version'")
         row = cur.fetchone()
         assert row is not None
         assert row[0] == str(SQLiteChunkStore.SCHEMA_VERSION)

@@ -5,6 +5,8 @@ from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
+import pytest
+
 from pyc_hermes_agent import SidecarClient
 from pyc_hermes_agent.asset_manager import AssetManager, calculate_asset_checksum
 from pyc_hermes_agent.artifact_engine import ArtifactEngine
@@ -1374,3 +1376,40 @@ def test_sidecar_http_server_streams_terminal_error_event_on_agent_loop_failure(
     assert events[0]["session_id"] == "session-error"
     assert events[0]["error"]["code"] == "AGENT_LOOP_STREAM_FAILED"
     assert events[0]["error"]["domain"] == "agent"
+
+
+def test_http_post_artifacts_office_creates_structured_spreadsheet(tmp_path: Path) -> None:
+    pytest.importorskip("openpyxl")
+    server, thread = _start_server(root=tmp_path)
+    base_url = f"http://127.0.0.1:{server.server_address[1]}"
+
+    payload = {
+        "task_id": "office-http-1",
+        "format": "xlsx",
+        "spec": {
+            "sheets": [
+                {"name": "Report", "rows": [["Metric", "Q1"], ["Revenue", 42]]},
+            ],
+        },
+        "filename": "proof.xlsx",
+    }
+
+    try:
+        status, body = _post_json(f"{base_url}/artifacts/office", payload)
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+    assert status == 201
+    assert body["format"] == "xlsx"
+    art_path = Path(body["artifact"]["path"])
+    assert art_path.is_file()
+    assert art_path.suffix.lower() == ".xlsx"
+
+    from openpyxl import load_workbook
+
+    wb = load_workbook(art_path)
+    ws = wb["Report"]
+    assert ws.cell(row=1, column=1).value == "Metric"
+    assert ws.cell(row=2, column=2).value == 42

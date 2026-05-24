@@ -43,27 +43,17 @@ def _make_fake_hermes_checkout(root: Path, *, missing: set[str] | None = None) -
             "}\n"
         ),
         "tools/registry.py": (
-            "class Registry:\n"
-            "    def register(self, **kwargs):\n        return None\n\n"
-            "registry = Registry()\n\n"
-            "def discover_builtin_tools():\n    return []\n"
+            "class Registry:\n    def register(self, **kwargs):\n        return None\n\nregistry = Registry()\n\ndef discover_builtin_tools():\n    return []\n"
         ),
         "toolsets.py": (
-            "def resolve_toolset(name):\n    return ['demo_tool']\n\n"
-            "def validate_toolset(name):\n    return True\n\n"
-            "TOOLSETS = {'safe': ['demo_tool']}\n"
+            "def resolve_toolset(name):\n    return ['demo_tool']\n\ndef validate_toolset(name):\n    return True\n\nTOOLSETS = {'safe': ['demo_tool']}\n"
         ),
-        "hermes_constants.py": (
-            "import os\n"
-            "from pathlib import Path\n\n"
-            "def get_hermes_home() -> Path:\n"
-            "    return Path(os.environ.get('HERMES_HOME', '.'))\n"
-        ),
+        "hermes_constants.py": ("import os\nfrom pathlib import Path\n\ndef get_hermes_home() -> Path:\n    return Path(os.environ.get('HERMES_HOME', '.'))\n"),
         "hermes_state.py": (
             "from hermes_constants import get_hermes_home\n\n"
             "DEFAULT_DB_PATH = get_hermes_home() / 'state.db'\n"
             "SCHEMA_VERSION = 11\n"
-            "SCHEMA_SQL = \"\"\"\n"
+            'SCHEMA_SQL = """\n'
             "CREATE TABLE IF NOT EXISTS sessions (\n"
             "    id TEXT PRIMARY KEY,\n"
             "    parent_session_id TEXT,\n"
@@ -77,13 +67,13 @@ def _make_fake_hermes_checkout(root: Path, *, missing: set[str] | None = None) -
             "    key TEXT PRIMARY KEY\n"
             ");\n"
             "CREATE INDEX IF NOT EXISTS idx_sessions_started ON sessions(id);\n"
-            "\"\"\"\n"
-            "FTS_SQL = \"\"\"\n"
+            '"""\n'
+            'FTS_SQL = """\n'
             "CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(content);\n"
-            "\"\"\"\n"
-            "FTS_TRIGRAM_SQL = \"\"\"\n"
+            '"""\n'
+            'FTS_TRIGRAM_SQL = """\n'
             "CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts_trigram USING fts5(content, tokenize='trigram');\n"
-            "\"\"\"\n"
+            '"""\n'
             "def format_session_db_unavailable(prefix='Session database not available'):\n"
             "    return prefix\n\n"
             "class SessionDB:\n"
@@ -148,9 +138,7 @@ def _make_fake_hermes_checkout(root: Path, *, missing: set[str] | None = None) -
             "    def save_config(self, values, hermes_home: str) -> None:\n        return None\n"
         ),
         "agent/skill_commands.py": (
-            "def _load_skill_payload(skill_identifier: str, task_id: str | None = None):\n"
-            "    return None\n\n"
-            "def get_skill_commands():\n    return {}\n"
+            "def _load_skill_payload(skill_identifier: str, task_id: str | None = None):\n    return None\n\ndef get_skill_commands():\n    return {}\n"
         ),
         "tools/skills_tool.py": (
             "import json\n\n"

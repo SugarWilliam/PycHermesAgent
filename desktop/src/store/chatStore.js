@@ -15,7 +15,10 @@ function analysisCardToContextData(card) {
     citations: Array.isArray(card.citations) ? card.citations : [],
     risks: Array.isArray(card.risks) ? card.risks : [],
     assumptions: Array.isArray(card.assumptions) ? card.assumptions : [],
-    degraded: Boolean(card.degraded)
+    degraded: Boolean(card.degraded),
+    evidenceChain: card.evidence_chain ?? card.evidenceChain ?? null,
+    networkRefs: Array.isArray(card.network_refs) ? card.network_refs : [],
+    formalGroundingRefs: Array.isArray(card.formal_grounding_refs) ? card.formal_grounding_refs : [],
   }
 }
 

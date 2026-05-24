@@ -183,9 +183,7 @@ class MethodRoutingPolicy:
 
     def data_shape_score(self, capability_id: str, data_keys: set[str]) -> int:
         base = default_data_shape_bonus(capability_id, data_keys) + self.data_shape_bonus.get(capability_id, 0)
-        rules_pts = sum(
-            rule.points for rule in self.data_shape_rules if rule.capability_id == capability_id and rule.matches(data_keys)
-        )
+        rules_pts = sum(rule.points for rule in self.data_shape_rules if rule.capability_id == capability_id and rule.matches(data_keys))
         return base + rules_pts
 
     def language_bonus(self, capability_id: str, text_lower: str) -> int:

@@ -158,9 +158,7 @@ class MetaFramework:
                 notes.append(f"Formal dependency '{dependency}' is unavailable: {err}")
         return notes
 
-    def _execute_selected_method(
-        self, request: MetaAnalysisRequest, selected: Optional[CapabilityDescriptor]
-    ) -> dict:
+    def _execute_selected_method(self, request: MetaAnalysisRequest, selected: Optional[CapabilityDescriptor]) -> dict:
         if selected is None:
             return {"status": "not_run", "reason": "No method selected."}
         if not request.data:

@@ -2,7 +2,7 @@
 
 **Status:** Living checklist（随实现更新）  
 **Authority:** `docs/architecture/Phase3_Phase4_Productization_Roadmap_v0.3.0.md` §2  
-**Last reviewed:** 2026-05-24  
+**Last reviewed:** 2026-05-24（Windows CI：`win-unpacked` + electron layout smoke；`icon.ico` 入库）  
 
 **三态定义**
 
@@ -18,32 +18,32 @@
 
 ## 1. Phase 3 退出条件（Roadmap §2 第一段）
 
-**蓝图原文要义：**桌面连真实 Sidecar（无 mock）· 实时网络检索工具 + 桌面证据链路 · MRAG 多格式摄取 · 客户加载的 skills/rules 显式审计参与运行时 · **PPT/XLSX 导出级生成** · **混合检索在约定基准集上强于纯词法**。
+**蓝图原文要义：**桌面连真实 Sidecar（无 mock）· **实时网络与本地 MRAG 检索**工具 + 桌面证据链路 · MRAG 多格式摄取 · 客户加载的 skills/rules 显式审计参与运行时 · **PPT/XLSX 导出级生成** · **混合检索在约定基准集上强于纯词法**。
 
 ### 1.1 桌面启动并连接真实本地 Sidecar（无 mock）
 
 | 状态 | 说明 | 代码 / 交付依据 |
 |------|------|-----------------|
-| **部分实现** | Electron 侧 `sidecarRuntime` attach-first、配置与健康探针已实现；路线图仍要求装机级、干净环境等 **产品化验证**（接近 Track A / Phase 4）。 | `desktop/electron/sidecarRuntime.js`（及 main/preload）、`desktop/README.md` 启动契约；Sidecar `GET /health` |
+| **部分实现** | Electron 侧 `sidecarRuntime` attach-first、配置与健康探针已实现；路线图仍要求装机级、干净环境等 **产品化验证**（接近 Track A / Phase 4）。补充：**CI** `desktop-windows-unpacked` + `electron_dist_layout_smoke` 已门禁化 Win 解压布局（非交互安装冒烟）。 | `desktop/electron/sidecarRuntime.js`（及 main/preload）、`desktop/README.md` 启动契约；Sidecar `GET /health`；`.github/workflows/ci.yml` |
 
-### 1.2 实时网络检索作为工具，且在桌面证据流中可见
+### 1.2 实时网络与地面（MRAG）检索作为工具，且在桌面证据流中可见
 
 | 状态 | 说明 | 代码 / 交付依据 |
 |------|------|-----------------|
-| **部分实现** | `web_search` 已注册于默认 ToolRegistry，返回 `citations[]`；桌面 `extractCitationsFromToolContent` 消费根级 `citations`。路由图 **B5（Formal 消费网络证据不绕开 MetaFramework）**、更强 provider 等仍属缺口。 | `src/pyc_hermes_agent/hermes_engine/web_search.py`、`agent_loop.py`；`desktop/src/services/sidecarClient.js`；`tests/contract/test_web_search.py` |
+| **已实现（基线）** | **`web_search`** 与 **`knowledge_retrieve`**（调用 `sidecar_api.services.mrag_service` JSON 运行时）均注册于默认 ToolRegistry；工具返回的根级 **`citations[]`** 可被桌面侧 `extractCitationsFromToolContent` 消费。**Formal** 路径将本轮 `tool_results` 汇入 `MetaAnalysisRequest.data_refs` 与 JSON **`analysis_card`**：HTTP 可走 **`http`** 道，`knowledge_retrieve` 归为 **`kb`** 道（仍全程经 `MetaFramework.execute()`）。更强检索 provider、配额 / 观测性、离线缓存等仍为后续（Track B 等）。 | `hermes_engine/web_search.py`、`hermes_engine/knowledge_retrieve_tool.py`、`agent_loop.py`；`sidecar_api/services/chat_service.py`；`desktop/src/services/sidecarClient.js`；`tests/contract/test_web_search.py`、`tests/contract/test_hermes_agent_loop.py` |
 
 ### 1.3 MRAG 支持 `text` / `url` / `html` / `pdf` / `docx` / `xlsx` / `pptx` / `image` 摄取
 
 | 格式 | 状态 | 代码 / 交付依据 |
 |------|------|-----------------|
 | `text` / `markdown` / 泛读文本 | **已实现** | `parse_file_document` 对 `.md` / `.txt` 等 · `mrag_core/parse.py` |
-| `html` / `htm` | **已实现** | `parse_file_document` 映射 `source_type="html"` · `mrag_core/parse.py` |
+| `html` / `htm` | **已实现（基线）** | ``mrag_core/html_extractor.py``（`<title>` + 跳过 ``script/style/…``，可见正文）· ``parse_file_document`` · ``tests/contract/test_mrag_core.py`` |
 | `url` | **已实现** | `ingest_url_text` / `parse_url_document` · `mrag_core/service.py` |
 | `pdf` | **已实现** | 专用 PDF 摄取（非 `parse_file` 后缀表）· `mrag_core/pdf_extractor.py`、`sidecar_api/services/mrag_service.py`（`ingest_pdf_document`） |
 | `docx` | **已实现（基线）** | `mrag_core/docx_extractor.py` + `parse_file_document` · 路线图承认 heading/table 细粒度仍为后续 |
 | `xlsx` | **已实现（基线）** | `mrag_core/xlsx_extractor.py` + `parse_file_document` · 路线图承认 per-cell 引用等为后续 |
-| `pptx` | **未见** | `src/` 下无 `pptx` 摄取路径；`parse.py` 无 `.pptx` 分支 |
-| `image`（OCR 等） | **未见** | `mrag_core` 无 image/OCR 摄取实现 |
+| `pptx` | **已实现（基线）** | `pptx_extractor.py`：幻灯片正文 + **`ppt/slides/_rels/slide*.xml.rels`** 解析 `notesSlide` 关系，`Target` 相对于 ``ppt/slides/`` 解析到 ``notesSlides/…``；**`[Notes N]` 的 N 等于 `presentation.xml` 放映序号**，与文件名后缀解耦；`chunk.py` 分块见 `slide-*` / `notes-*` · `tests/contract/test_pptx_extractor_rels.py`、`test_mrag_core.py` |
+| `image`（OCR 等） | **已实现（可选）** | `mrag_core/image_extractor.py`（Pillow + pytesseract + 主机 `tesseract`）；缺依赖时报错指引 · `parse_file_document` 常见后缀 · `tests/contract/test_mrag_core.py`（mock OCR） |
 
 **存储侧注记：** 另存在 **SQLite/FTS5** 路径（`mrag_core/sqlite_store.py`、迁移工具），与 JSON `MRAGService` 并行；退出条件按「能力」计，不限定唯一后端。
 
@@ -51,19 +51,19 @@
 
 | 状态 | 说明 | 代码 / 交付依据 |
 |------|------|-----------------|
-| **部分实现** | **Skills：** 内置技能可激活并进入 `AgentLoop`；项目下 `.opencode/skills` 可走发现/列表，与 Track D「用户目录 / 审计 / 规则优先级全面模型」仍有距离。**Rules：** `llm_gateway.rules` 可做文件发现；**未见**与 `AgentLoop` 系统拼装强绑定的确定性优先级管道（路线图 D4）。 | `skill_service.py`、`hermes_engine/skill_context.py`、`llm_gateway/skills.py`、`llm_gateway/rules.py` |
+| **已实现（基线）** | **Skills：** ``PYC_HERMES_USER_SKILLS_HOME`` 下 `**/SKILL.md` 与用户/项目同名合并（项目优先）；元数据 ``skill_origin``；激活技能与策略进入 `extra_system_messages`。**Rules：** 根→叶有序收集 `AGENTS.md`/`CLAUDE.md`，经 `build_rule_context_messages` 注入；`start` 事件与 `AgentLoopResult.audit`（含 ``rule_sources``、激活技能、运行时策略摘要）可追溯。**HTTP：** `GET /rules/manifest`（摘要指纹）、`POST /skills/user`（落盘运行时 user skill）。**桌面：** Context → Sidecar runtime 可复制 manifest JSON；侧栏 Skills 内嵌发布表单调用 `saveUserSkill`。远端同步 / 优先级可视化 / 全流程「技能即代码」仍为后续。 | `llm_gateway/rules.py`、`llm_gateway/skill_metadata.py`、`llm_gateway/skills.py`；`hermes_engine/rule_context.py`、`hermes_engine/skill_context.py`、`hermes_engine/agent_loop.py`；`sidecar_api/services/skill_service.py`、`rules_manifest.py`、`user_skill_publish.py`；`desktop/src/components/layout/ContextPanel.jsx`、`desktop/src/components/skills/SkillPanel.jsx` |
 
 ### 1.5 基础 **PPT 与 XLSX 生成**（导出产物，非仅摄取）
 
 | 状态 | 说明 | 代码 / 交付依据 |
 |------|------|-----------------|
-| **部分实现** | **通用产物落盘与列举**（`ArtifactEngine`、HTTP `/artifacts`）存在；路线图 Track E 所指的 **结构化 PPTX / XLSX 生成 MVP**（幻灯片与工作表语义）**未见**专用生成器。 | `src/pyc_hermes_agent/artifact_engine/__init__.py`、`sidecar_api/http_server.py` |
+| **已实现（基线）** | `artifact_engine/office_export.py` 生成结构化 ``.xlsx`` / `.pptx`（openpyxl / python-pptx）；`ArtifactEngine.export_bytes` 落盘；HTTP **`POST /artifacts/office`** · `tests/contract/test_sidecar_http.py`。**桌面：** Context 枚举 **`GET /artifacts`**（可按 task 过滤）并由 **`shell:open-path`** 打开落盘文件（`desktopHost.openPath`）；**`/retrieve`** 的目标 KB 可在同面板选择（否则列表首项）。复杂版式（母版、图表、分页打印）仍为后续。 | `artifact_engine/office_export.py`、`sidecar_api/services/office_artifacts.py`、`sidecar_api/http_server.py`；`desktop/src/components/layout/ContextPanel.jsx`、`desktop/electron/main.js`、`desktop/src/services/sidecarClient.js` |
 
 ### 1.6 混合检索强于纯词法 — **在已定基准子集上可证明**
 
 | 状态 | 说明 | 代码 / 交付依据 |
 |------|------|-----------------|
-| **未达标** | 已实现 `lexical` / `semantic`（字符 trigram 向量）/ `hybrid` 及权重 · **无**路线图所要求的「在代表性子集上的对比基准 + hybrid 胜出」闭环 | `mrag_core/retrieve.py`、`mrag_core/embeddings.py`、`contracts/schemas.py`（`RetrievalRequest`）；`benchmarks/` 现有为 **MetaHarness 15-case**，**非** MRAG hybrid vs lexical |
+| **已实现（确定性子集）** | ``lexical`` / ``semantic``（字符 trigram）/ ``hybrid`` + 语义权重已实现；仓库内 **固定文档对 + 查询** 上可复现「hybrid 与 lexical 的首条命中不一致」（证明混合项改变排序）；扩展基准见 **`benchmarks/mrag/run_expanded_hybrid_benchmark.py`**（CI / production gates）。Formal 模式下 `analysis_card.evidence_chain` 汇总 **`web_search` / `knowledge_retrieve`** grounding 提示；并嵌 **Phase 3F1 baseline** ``evidence_chain.validation``（归一化条目、显式冲突骨架、非因果链边、逻辑/时间词汇级扫描、策略提示与人工核对清单；不改变 CE/SR、非定理证明器）。神经网络编码器仍为后续。**与路线图「代表性业务基准集胜出」的全面证明**可作 Phase 3F 加强。 | `mrag_core/retrieve.py`、`mrag_core/embeddings.py`；`benchmarks/mrag/run_lexical_hybrid_proof.py`、`benchmarks/mrag/run_expanded_hybrid_benchmark.py`；`tests/contract/test_mrag_core.py`；`meta_harness/evidence_hints.py`、`meta_harness/evidence_chain.py`、`meta_harness/consistency.py`、`meta_harness/source_policy.py`、`sidecar_api/services/chat_service.py`；`tests/contract/test_evidence_chain_validation.py` |
 
 ---
 
@@ -73,20 +73,19 @@
 
 | 条目 | 状态 | 说明与依据 |
 |------|------|------------|
-| Windows 打包 / 升级 / 更新器在干净环境验证 | **部分实现** | CI 已有 `desktop-windows-unpacked`（`dist:win-unpacked`）；**升级器与干净机长验**仍以文档/人工为主，见 `Production_Release_Gates.md`「Honest scope」 |
-| CI 构建并验证 Python sidecar + 桌面产物 | **部分实现** | Ubuntu：`contract-tests` + `production-gates`（含桌面 `dist:dir`）；Windows：`desktop-windows-unpacked`；与「全流程 sidecar 安装包同上屏验证」可作加强 |
-| 门禁覆盖打包、安装不可变、升级、桌面冒烟 | **部分实现** | `scripts/release_gates.py`、`pyc-hermes-packaging-probe`、SBOM、`npm audit` 等已接；**签名、更新频道、装机矩阵**明示为下一层 (`Production_Release_Gates.md`) |
-| 产品可被可信描述为 RC（非仅剩工程预览） | **未见** | 需 Phase 3 未闭合项 + Phase 4 验证与发布叙事共同到位；`AGENTS.md` 仍以 Phase 1/2 「非 production」为约束表述 |
+| Windows 打包 / 升级 / 更新器在干净环境验证 | **部分实现** | **GitHub Actions** 已门禁化 **Windows `win-unpacked`** 构建 + **`electron_dist_layout_smoke.py --prefer-unpacked win`**；`desktop/build/icon.ico` 已由 `scripts/write_min_icon_ico.py` 生成入库。真正 **干净机交互安装 / 在线升级 / 回滚矩阵** 仍须人工或专属测试机（非本仓库可单方证伪）。签名与发布渠道见 `Production_Release_Gates.md`。 |
+| CI 构建并验证 Python sidecar + 桌面产物 | **已实现（基线）** | `contract-tests`（多版本 Python + MRAG 基准 + 包装探针 + `release_gates.py`）、**`production-gates`**（`RELEASE_GATES_PRODUCTION=1`）、**`desktop-windows-unpacked`**（Windows 解压布局 + audit）共同覆盖；**单个 job 内同时产出 PyInstaller sidecar + 安装包的「同屏一体机」**仍可作加强项。 |
+| 门禁覆盖打包、安装不可变、升级、桌面冒烟 | **大部分自动化** | Ubuntu：`release_gates` 含 lockfile、SBOM、MRAG migrate、`dist:dir`、`electron_dist_layout_smoke`；Windows：见上。**代码签名、商店策略、升级通道在线验证**仍为下一层 (`Production_Release_Gates.md` Honest scope)。 |
+| 产品可被可信描述为 RC（非仅剩工程预览） | **部分实现（工程侧）** | 自动化与契约已显著收敛到 **「RC 候选工程线」**形态，但 **叙事/法务/签名/渠道** 仍未满足 **GA/商店级** 发布；`README` 仍声明非 production。是否对外称 RC 由发布治理单独决议。 |
 
 ---
 
 ## 3. 建议的下一轮封闭顺序（仅占位）
 
-1. 补齐蓝图 **硬性清单缺口**：`pptx` / `image` 摄取 **或** 调整路线图退出条件措辞（若范围收缩需走治理文档）。  
-2. **Artifact Track E**：PPTX/XLSX **生成** MVP，与现有 `ArtifactEngine` 衔接。  
-3. **MRAG 混合检索**：新增 `benchmarks/mrag/`（或等价）与 CI/门禁挂钩，满足「hybrid > lexical on subset」。  
-4. **Track D**：rules 拼装顺序 + 用户 skill 加载与审计字段。  
-5. **Phase 4**：干净 Windows 安装与升级/downgrade 用例门禁化。
+1. **Phase 3F**：扩展基准已在 CI/production gates。**Phase 3F1（baseline）** 已实现结构化 ``analysis_card.evidence_chain.validation``（`meta_harness/evidence_chain.py`、`meta_harness/consistency.py`、`meta_harness/source_policy.py`；契约见 `tests/contract/test_evidence_chain_validation.py` / `tests/contract/test_logic_temporal_consistency.py`）。更广义的自动逻辑证明 / 全量 temporal 消解仍为后续 backlog。  
+2. **Track B**：`web_search` 离线缓存 / 配额与可观测性（multi-provider 已有基线）。  
+3. **Track D**：规则与技能的优先级可视化、远端同步、「技能即代码」评审流（HTTP manifest + desktop 导出 + user skill POST 已基线就绪）。  
+4. **Phase 4**：Windows 干净机安装 / 升级 / downgrade 门禁化。
 
 ---
 

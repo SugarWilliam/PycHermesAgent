@@ -84,9 +84,7 @@ def _resolve_provider_execution(resolved: ResolvedLLMConfig, model_id: str) -> t
         raise ValueError(f"Model id must use provider/model format: {model_id}")
     provider_id, _model_name = model_id.split("/", 1)
     if provider_id not in _SUPPORTED_EXECUTION_PROVIDERS:
-        raise ValueError(
-            f"Provider '{provider_id}' is not enabled for runtime execution. Supported providers: {sorted(_SUPPORTED_EXECUTION_PROVIDERS)}"
-        )
+        raise ValueError(f"Provider '{provider_id}' is not enabled for runtime execution. Supported providers: {sorted(_SUPPORTED_EXECUTION_PROVIDERS)}")
     provider_config = resolved.provider_configs.get(provider_id)
     base_url = _resolve_base_url(provider_id, provider_config)
     headers = _normalize_headers(provider_config.headers if provider_config is not None else {})
@@ -157,9 +155,7 @@ def _resolve_github_copilot_token(provider_config: ProviderConfig | None, config
     if gh_token:
         return _validate_github_copilot_token(gh_token, source="gh auth token")
 
-    raise ValueError(
-        "Provider 'github-copilot' requires a supported GitHub token in COPILOT_GITHUB_TOKEN, GH_TOKEN, GITHUB_TOKEN, or `gh auth token`."
-    )
+    raise ValueError("Provider 'github-copilot' requires a supported GitHub token in COPILOT_GITHUB_TOKEN, GH_TOKEN, GITHUB_TOKEN, or `gh auth token`.")
 
 
 def _validate_github_copilot_token(token: str, *, source: str) -> str:
@@ -167,10 +163,7 @@ def _validate_github_copilot_token(token: str, *, source: str) -> str:
     if not normalized:
         raise ValueError(f"Provider 'github-copilot' received an empty token from {source}.")
     if normalized.startswith(_COPILOT_CLASSIC_PAT_PREFIX):
-        raise ValueError(
-            "Provider 'github-copilot' does not support classic GitHub PATs (ghp_*). "
-            f"Got an unsupported token from {source}."
-        )
+        raise ValueError(f"Provider 'github-copilot' does not support classic GitHub PATs (ghp_*). Got an unsupported token from {source}.")
     return normalized
 
 
@@ -512,11 +505,7 @@ def _parse_chat_response(raw_response: dict[str, Any], *, model_id: str, provide
     tool_calls = _parse_tool_calls(message.get("tool_calls"))
     if not isinstance(content, str):
         if isinstance(content, list):
-            content = "".join(
-                part.get("text", "")
-                for part in content
-                if isinstance(part, dict)
-            )
+            content = "".join(part.get("text", "") for part in content if isinstance(part, dict))
         else:
             content = str(content)
     return LLMChatResponse(

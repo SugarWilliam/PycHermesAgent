@@ -25,10 +25,7 @@ def capability_preconditions_met(capability_id: str, request: MetaAnalysisReques
         return False
 
     if capability_id == "A-12-SCM":
-        if any(
-            token in text
-            for token in ("causal", "因果", "instrument", "backdoor", "did", "scm", "结构因果", "identification")
-        ):
+        if any(token in text for token in ("causal", "因果", "instrument", "backdoor", "did", "scm", "结构因果", "identification")):
             return True
         if {"cause", "effect", "df", "treatment", "outcome", "dag", "confounders"} & keys:
             return True

@@ -26,6 +26,20 @@ class _FakeResponse:
         return self._raw
 
 
+class _FakeBytesResp:
+    def __init__(self, data: bytes) -> None:
+        self._data = data
+
+    def __enter__(self) -> _FakeBytesResp:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        return None
+
+    def read(self) -> bytes:
+        return self._data
+
+
 def _fake_payload() -> dict:
     return {
         "Abstract": "Forecast evidence snippet.",
@@ -46,6 +60,7 @@ def test_web_search_normalized_maps_instant_answer_to_citations(monkeypatch: pyt
     assert len(cites) >= 1
     assert cites[0]["source_type"] == "web"
     assert cites[0]["source_uri"] == "https://example.com/page"
+    assert cites[0]["provider"] == "duckduckgo"
 
 
 def test_web_search_respects_disable_env(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -89,4 +104,41 @@ def test_tool_registry_dispatches_web_search(monkeypatch: pytest.MonkeyPatch) ->
 def test_meta_harness_registry_includes_formal_and_web() -> None:
     registry = create_meta_harness_tool_registry()
     names = {d.name for d in registry.list_descriptors()}
-    assert names == {"formal_analysis", "web_search"}
+    assert names == {"formal_analysis", "knowledge_retrieve", "web_search"}
+
+
+def test_web_search_wikipedia_provider_normalized(monkeypatch: pytest.MonkeyPatch) -> None:
+    wiki = json.dumps(["q", ["Title A"], ["Summary line"], ["https://en.wikipedia.org/wiki/A"]]).encode()
+
+    def _open(req: object, **_k: object) -> _FakeBytesResp:
+        url = getattr(req, "full_url", None) or getattr(req, "get_full_url", lambda: "")()
+        assert "wikipedia.org" in url
+        return _FakeBytesResp(wiki)
+
+    monkeypatch.setattr(web_search_mod, "urlopen", _open)
+
+    out = web_search_normalized("anything", provider="wikipedia")
+    assert out["ok"] is True
+    assert out["provider"] == "wikipedia"
+    assert out["citations"] and out["citations"][0]["source_uri"].endswith("/wiki/A")
+
+
+def test_web_search_chain_uses_wikipedia_when_ddg_empty(monkeypatch: pytest.MonkeyPatch) -> None:
+    wiki = json.dumps(["q", ["T"], ["s"], ["https://en.wikipedia.org/wiki/Topic"]]).encode()
+    dq = [_FakeResponse({}), _FakeBytesResp(wiki)]
+
+    def _open(req: object, **_k: object):
+        url = getattr(req, "full_url", None) or getattr(req, "get_full_url", lambda: "")()
+        if "duckduckgo.com" in url:
+            return dq[0]
+        if "wikipedia.org" in url:
+            return dq[1]
+        raise AssertionError(url)
+
+    monkeypatch.setattr(web_search_mod, "urlopen", _open)
+
+    out = web_search_normalized("alpha", provider="chain")
+    assert out["provider"] == "chain"
+    assert any("wikipedia" in (c.get("provider") or "") for c in out["citations"])
+    assert isinstance(out.get("meta"), dict)
+

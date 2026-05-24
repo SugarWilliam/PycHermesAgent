@@ -183,10 +183,7 @@ def _read_artifact_record(metadata_path: Path) -> ArtifactRecord:
 
     format_version = int(payload["artifact_format_version"])
     if format_version != _ARTIFACT_FORMAT_VERSION:
-        raise ValueError(
-            f"Unsupported artifact format version in {metadata_path}: "
-            f"expected {_ARTIFACT_FORMAT_VERSION}, got {format_version}"
-        )
+        raise ValueError(f"Unsupported artifact format version in {metadata_path}: expected {_ARTIFACT_FORMAT_VERSION}, got {format_version}")
 
     relative_payload_path = Path(str(payload["path"]))
     if relative_payload_path.is_absolute():
@@ -202,16 +199,12 @@ def _read_artifact_record(metadata_path: Path) -> ArtifactRecord:
     size_bytes = int(payload["size_bytes"])
     actual_size = payload_path.stat().st_size
     if actual_size != size_bytes:
-        raise ValueError(
-            f"Artifact metadata payload size mismatch for {payload_path}: expected {size_bytes}, got {actual_size}"
-        )
+        raise ValueError(f"Artifact metadata payload size mismatch for {payload_path}: expected {size_bytes}, got {actual_size}")
 
     checksum = str(payload["checksum"])
     actual_checksum = _calculate_file_checksum(payload_path)
     if actual_checksum != checksum:
-        raise ValueError(
-            f"Artifact metadata payload checksum mismatch for {payload_path}: expected {checksum}, got {actual_checksum}"
-        )
+        raise ValueError(f"Artifact metadata payload checksum mismatch for {payload_path}: expected {checksum}, got {actual_checksum}")
 
     return ArtifactRecord(
         artifact_id=str(payload["artifact_id"]),

@@ -65,10 +65,7 @@ class MethodJudge:
                 f"has ceiling {grade} which can only claim: {self._GRADE_CLAIMS[grade]['can_claim']}."
             )
         if _INTERVENTION_WORDS.search(problem) and grade_rank < 3:
-            findings.append(
-                f"OVERCLAIM: Intervention-grade language detected but {grade} cannot claim "
-                f"intervention effect. Minimum CE-C3 required."
-            )
+            findings.append(f"OVERCLAIM: Intervention-grade language detected but {grade} cannot claim intervention effect. Minimum CE-C3 required.")
 
         # 2. Data shape adequacy
         method_id = selected.id or ""
@@ -77,23 +74,14 @@ class MethodJudge:
             required_keys = shape_spec.get("required", [])
             data_keys = set(data.keys()) | set(params.keys())
             if not any(k in data_keys for k in required_keys):
-                findings.append(
-                    f"DATA MISSING: Method {method_id} requires at least one of "
-                    f"{required_keys} in request data; none found."
-                )
+                findings.append(f"DATA MISSING: Method {method_id} requires at least one of {required_keys} in request data; none found.")
             id_keys = shape_spec.get("identification")
             if id_keys and not any(k in data_keys for k in id_keys):
-                findings.append(
-                    f"IDENTIFICATION MISSING: Method {method_id} requires identification "
-                    f"strategy via one of {id_keys}; none found."
-                )
+                findings.append(f"IDENTIFICATION MISSING: Method {method_id} requires identification strategy via one of {id_keys}; none found.")
 
         # 3. CE/SR separation
         if grade_rank >= 3:
-            findings.append(
-                "CE/SR BOUNDARY: CE-grade outputs describe methodological support only; "
-                "SR certification requires a separate grading path."
-            )
+            findings.append("CE/SR BOUNDARY: CE-grade outputs describe methodological support only; SR certification requires a separate grading path.")
 
         # 4. Evidence ceiling annotation
         findings.append(
@@ -129,27 +117,20 @@ class MethodJudge:
                         pass
                     break
             if n is not None and n < min_n:
-                findings.append(
-                    f"SAMPLE SIZE: Method {method_id} recommends n>={min_n} "
-                    f"but data indicates n={n}. Results may be unreliable."
-                )
+                findings.append(f"SAMPLE SIZE: Method {method_id} recommends n>={min_n} but data indicates n={n}. Results may be unreliable.")
             elif n is None:
                 # Check array-like data lengths
                 for key in ("series", "time_series", "values", "agents", "states"):
                     val = data.get(key) or params.get(key)
                     if isinstance(val, (list, tuple)) and len(val) < min_n:
-                        findings.append(
-                            f"SAMPLE SIZE: {key} has {len(val)} elements; "
-                            f"method {method_id} recommends >={min_n}."
-                        )
+                        findings.append(f"SAMPLE SIZE: {key} has {len(val)} elements; method {method_id} recommends >={min_n}.")
                         break
 
         # 2. Predictive escalation guard
         grade_rank = self._GRADE_RANK.get(grade, 1)
         if grade_rank <= 2:
             findings.append(
-                f"ESCALATION GUARD: {grade} outputs are predictive/observational. "
-                "Must not be escalated to intervention-grade claims without CE-C3+ evidence."
+                f"ESCALATION GUARD: {grade} outputs are predictive/observational. Must not be escalated to intervention-grade claims without CE-C3+ evidence."
             )
 
         # 3. Domain applicability heuristic
@@ -158,24 +139,13 @@ class MethodJudge:
             analysis = params.get("analysis_type") or data.get("analysis_type")
             valid_types = shape_spec["analysis_types"]
             if analysis and analysis not in valid_types:
-                findings.append(
-                    f"DOMAIN: analysis_type '{analysis}' not in recognized set "
-                    f"{valid_types} for method {method_id}."
-                )
+                findings.append(f"DOMAIN: analysis_type '{analysis}' not in recognized set {valid_types} for method {method_id}.")
 
         # 4. Effect magnitude warning for causal methods
-        if grade_rank >= 3 and not any(
-            k in (set(data.keys()) | set(params.keys()))
-            for k in ("effect_size", "confidence_interval", "p_value", "ate")
-        ):
-            findings.append(
-                f"REASONABLENESS: Causal method {method_id} should report effect size "
-                "and confidence intervals for result interpretation."
-            )
+        if grade_rank >= 3 and not any(k in (set(data.keys()) | set(params.keys())) for k in ("effect_size", "confidence_interval", "p_value", "ate")):
+            findings.append(f"REASONABLENESS: Causal method {method_id} should report effect size and confidence intervals for result interpretation.")
 
         if not findings:
-            findings.append(
-                f"Method {method_id} appears reasonable for the stated problem given available data."
-            )
+            findings.append(f"Method {method_id} appears reasonable for the stated problem given available data.")
 
         return findings

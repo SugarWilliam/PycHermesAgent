@@ -100,10 +100,7 @@ def retrieve(knowledge_base: KnowledgeBase, request: RetrievalRequest) -> Retrie
             "(semantic uses deterministic character trigram vectors, not a neural encoder)."
         )
     elif mode == "semantic":
-        warnings.append(
-            "Semantic retrieval uses deterministic character trigram vectors (local-first); "
-            "for neural embeddings use a future pluggable encoder."
-        )
+        warnings.append("Semantic retrieval uses deterministic character trigram vectors (local-first); for neural embeddings use a future pluggable encoder.")
     return RetrievalResult(hits=top_hits, citations=citations, coverage=coverage, confidence=confidence, warnings=warnings)
 
 

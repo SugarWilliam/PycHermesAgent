@@ -7,6 +7,7 @@
 - Phase 1 (engineering preview): **roadmap complete** for declared scope — see `docs/architecture/Phase1_Roadmap_v0.2.0.md` §10 (not production).
 - Phase 2 (usable workbench): **complete** — see `docs/architecture/Phase2_Toward_GA_v0.2.1.md` (not production).
 - Phase 3 → 4 **exit criteria vs code** (living checklist): see `docs/architecture/Phase3_Phase4_Exit_Checklist_v0.3.0.md` (maps Roadmap §2 to 已实现 / 部分 / 未见).
+- Phase 4 **automation tier (engineering)**: `.github/workflows/ci.yml` jobs `production-gates` + `desktop-windows-unpacked` (Windows `win-unpacked` + `electron_dist_layout_smoke.py --prefer-unpacked win`); not store-ready signing/GA without separate release governance.
 
 ## Project Identity
 - Product name: `PycHermesAgent`

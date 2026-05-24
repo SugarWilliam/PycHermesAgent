@@ -25,3 +25,8 @@ contextBridge.exposeInMainWorld('updater', {
   install: () => ipcRenderer.invoke('updater:install'),
   onStatus: (callback) => ipcRenderer.on('updater:status', (_, data) => callback(data)),
 })
+
+/** Host OS integration — only available inside Electron preload. */
+contextBridge.exposeInMainWorld('desktopHost', {
+  openPath: (absolutePath) => ipcRenderer.invoke('shell:open-path', absolutePath),
+})

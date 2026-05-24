@@ -137,9 +137,7 @@ def test_desktop_packaging_commands_align_with_release_gates() -> None:
     assert "npm run dist:dir" in desktop_readme
     assert "dist:linux" not in desktop_readme
 
-    production_gates = (root / "docs" / "deployment" / "Production_Release_Gates.md").read_text(
-        encoding="utf-8"
-    )
+    production_gates = (root / "docs" / "deployment" / "Production_Release_Gates.md").read_text(encoding="utf-8")
     assert "npm run dist:dir" in production_gates
     assert "dist:linux" not in production_gates
 

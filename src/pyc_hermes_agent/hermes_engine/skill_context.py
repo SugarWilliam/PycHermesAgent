@@ -37,6 +37,7 @@ def build_skill_context_messages(root: Path, skill_names: list[str] | None) -> l
             [
                 _SKILL_OPEN_TAG,
                 f"Active skill: {metadata.name}",
+                f"Origin: {metadata.skill_origin}",
                 f"Description: {metadata.description}",
                 f"Source: {metadata.path}",
                 "Runtime policy: Script execution is disabled in this phase.",

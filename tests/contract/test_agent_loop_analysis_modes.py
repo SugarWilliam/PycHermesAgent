@@ -60,8 +60,10 @@ class TestAnalysisModeStructured:
         def capturing_executor(request: LLMChatRequest, root: Path) -> LLMChatResponse:
             captured_requests.append(request)
             return LLMChatResponse(
-                model="test-model", provider_id="test",
-                content="## Summary\nDone.", finish_reason="stop",
+                model="test-model",
+                provider_id="test",
+                content="## Summary\nDone.",
+                finish_reason="stop",
             )
 
         loop = AgentLoop(root=tmp_path, storage_root=tmp_path, llm_executor=capturing_executor)
@@ -81,6 +83,20 @@ class TestAnalysisModeStructured:
         assert start_event.payload["analysis_mode"] == "structured"
 
 
+class TestAgentLoopAudit:
+    """Agent loop should attach a stable audit envelope for skills, rules, and mode."""
+
+    def test_result_audit_includes_rule_sources_and_runtime_policy(self, tmp_path: Path) -> None:
+        loop = AgentLoop(root=tmp_path, storage_root=tmp_path, llm_executor=_make_echo_executor())
+        request = ChatCompletionRequest(messages=[ChatMessage(content="ping")])
+        result = loop.run(request, analysis_mode="structured")
+        assert result.audit.get("analysis_mode") == "structured"
+        assert result.audit.get("activated_skills") == []
+        assert isinstance(result.audit.get("rule_sources"), list)
+        assert all("path" in item for item in result.audit["rule_sources"])
+        assert isinstance(result.audit.get("skills_runtime_policy"), dict)
+
+
 class TestAnalysisModeFormal:
     """Formal mode should auto-inject formal_analysis tool call when LLM doesn't call it."""
 
@@ -91,8 +107,10 @@ class TestAnalysisModeFormal:
             nonlocal call_count
             call_count += 1
             return LLMChatResponse(
-                model="test-model", provider_id="test",
-                content=f"Response {call_count}", finish_reason="stop",
+                model="test-model",
+                provider_id="test",
+                content=f"Response {call_count}",
+                finish_reason="stop",
             )
 
         loop = AgentLoop(root=tmp_path, storage_root=tmp_path, llm_executor=counting_executor)

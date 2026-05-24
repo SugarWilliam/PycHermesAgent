@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from pyc_hermes_agent.contracts import ChatCompletionRequest, ChatMessage, ToolCall
@@ -110,7 +111,41 @@ def test_meta_harness_tool_registry_exposes_formal_analysis() -> None:
 
     names = {d.name for d in registry.list_descriptors()}
     assert "formal_analysis" in names
+    assert "web_search" in names
+    assert "knowledge_retrieve" in names
     assert registry.has_tool("formal_analysis") is True
+    assert registry.has_tool("knowledge_retrieve") is True
+
+
+def test_knowledge_retrieve_tool_calls_mrag_service(monkeypatch, tmp_path: Path) -> None:
+    from pyc_hermes_agent.sidecar_api.services import mrag_service as msvc
+
+    calls: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        msvc,
+        "list_knowledge_bases",
+        lambda root=None: [{"knowledge_base_id": "kb-demo", "name": "demo", "documents": 1, "chunks": 4}],
+    )
+
+    def _fake_search(kb_id: str, request, *, root=None):
+        calls["kb_id"] = kb_id
+        calls["query"] = request.query
+        calls["passed_root"] = root
+        return {"hits": [], "coverage": 0.0, "confidence": 0.0, "warnings": [], "schema_version": "1.0"}
+
+    monkeypatch.setattr(msvc, "search_knowledge_base", _fake_search)
+
+    harness = create_meta_harness_tool_registry(workspace_root=tmp_path)
+    result = harness.dispatch(
+        ToolCall(id="kc1", name="knowledge_retrieve", arguments=json.dumps({"query": "alpha omega"})),
+    )
+
+    assert not result.is_error
+    assert calls["kb_id"] == "kb-demo"
+    assert calls["query"] == "alpha omega"
+    assert calls["passed_root"] == tmp_path.resolve()
+    assert isinstance(result.structured_content, dict)
 
 
 def test_agent_loop_rejects_unknown_requested_tool(tmp_path: Path) -> None:
