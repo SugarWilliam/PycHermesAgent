@@ -96,9 +96,9 @@ jobs:
         run: python scripts/electron_dist_layout_smoke.py desktop --require-unpacked-resources --prefer-unpacked win
 
   desktop-windows-nsis-silent:
-    name: Windows NSIS silent install + reinstall smoke
+    name: Windows NSIS silent dual-semver upgrade smoke
     needs: contract-tests
-    timeout-minutes: 45
+    timeout-minutes: 55
     # When you introduce a self-hosted Windows runner pool, duplicate this job replacing `runs-on` with labels
     # like `[self-hosted, windows-nsis]` and keep tooling versions aligned (`actions/setup-node` node-version).
     runs-on: windows-latest
@@ -118,16 +118,49 @@ jobs:
           cache: npm
           cache-dependency-path: desktop/package-lock.json
 
-      - name: npm ci + audit + electron-builder Win (NSIS)
+      - name: Install deps + build NSIS (semver prev)
         run: |
           npm ci
           npm audit --omit=dev --audit-level=critical
+          npm pkg set version="0.99.0-ci.prev" --no-git-tag-version
           npm run dist:win
 
-      - name: NSIS silent install / reinstall / uninstall smoke
+      - name: Stash prev installer
         working-directory: ${{ github.workspace }}
         shell: pwsh
-        run: ./scripts/windows_nsis_silent_upgrade_smoke.ps1 -DistDir desktop/dist-installer
+        run: |
+          New-Item -ItemType Directory -Force _nsis_ci | Out-Null
+          $exe = @(Get-ChildItem desktop/dist-installer -Filter *.exe -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -notmatch '(?i)unpacked' })[0]
+          if (-not $exe) { throw "Prev NSIS exe not found under desktop/dist-installer" }
+          Copy-Item -LiteralPath $exe.FullName -Destination (Join-Path "_nsis_ci" "prev-setup.exe")
+          Write-Host "Stashed prev:" $exe.Name
+
+      - name: Clean unpacked outputs before next semver
+        working-directory: ${{ github.workspace }}
+        shell: pwsh
+        run: |
+          Remove-Item desktop/dist-installer -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item desktop/out -Recurse -Force -ErrorAction SilentlyContinue
+
+      - name: Build NSIS (semver next)
+        run: |
+          npm pkg set version="0.99.1-ci.next" --no-git-tag-version
+          npm run dist:win
+
+      - name: Dual-semver silent upgrade + uninstall smoke
+        working-directory: ${{ github.workspace }}
+        shell: pwsh
+        run: |
+          $exe = @(Get-ChildItem desktop/dist-installer -Filter *.exe -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -notmatch '(?i)unpacked' })[0]
+          if (-not $exe) { throw "Next NSIS exe not found under desktop/dist-installer" }
+          Copy-Item -LiteralPath $exe.FullName -Destination (Join-Path "_nsis_ci" "next-setup.exe")
+
+          ./scripts/windows_nsis_silent_upgrade_smoke.ps1 `
+            -PreviousInstaller (Join-Path $PWD "_nsis_ci/prev-setup.exe") `
+            -UpgradeInstaller (Join-Path $PWD "_nsis_ci/next-setup.exe") `
+            -ExpectedVersionSubstringAfterUpgrade "ci.next"
 
   production-gates:
     name: Production packaging gates (lockfile, MRAG migrate, desktop dir pack)

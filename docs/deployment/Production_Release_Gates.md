@@ -21,14 +21,13 @@ Align automation with `docs/architecture/Execution_Blueprint_v0.2.0.md` and `doc
 | Expanded MRAG benchmark | `uv run python benchmarks/mrag/run_expanded_hybrid_benchmark.py` (also runs in `RELEASE_GATES_PRODUCTION=1` path) |
 | Desktop pack | `cd desktop && npm ci && npm audit --omit=dev --audit-level=critical && npm run dist:dir` |
 | Electron unpacked layout smoke | `python scripts/electron_dist_layout_smoke.py desktop --require-unpacked-resources` (after dist; pass `--prefer-unpacked win` or `linux`; verifies `desktop/out/` and unpacked `dist-installer/*unpacked/resources/`) |
-| Windows NSIS headless reinstall smoke | `pwsh scripts/windows_nsis_silent_upgrade_smoke.ps1 -DistDir desktop/dist-installer` (after ``npm run dist:win``; CI job **`desktop-windows-nsis-silent**`; second `/S /D=` pass covers maintenance/update-style reinstall without a separate semver feed) |
+| Windows NSIS headless smoke | **From dir:** `pwsh scripts/windows_nsis_silent_upgrade_smoke.ps1 -DistDir desktop/dist-installer`; **dual semver (CI):** `-PreviousInstaller` + `-UpgradeInstaller` (+ `-ExpectedVersionSubstringAfterUpgrade`) — see **`desktop-windows-nsis-silent`**. |
 
 **Linux vs Windows unpacked:** CI **contract-tests** exercises Linux `dist-installer/*-unpacked` via `production-gates`.
 The dedicated **`desktop-windows-unpacked`** workflow job (``windows-latest``) runs ``npm run dist:win-unpacked`` **and**
 **`scripts/electron_dist_layout_smoke.py ... --require-unpacked win`** so Windows
-artifacts get the same structural checks as Linux. **`desktop-windows-nsis-silent`** builds the Setup EXE (`npm run dist:win`)
-and runs **`windows_nsis_silent_upgrade_smoke.ps1`** (silent install → silent reinstall prefix → uninstaller `/S`).
-**electron-updater** requires a staged feed with two binaries to prove binary delta upgrades — gate that separately once a release bucket exists.
+artifacts get the same structural checks as Linux. **`desktop-windows-nsis-silent`** builds **two sequential Setups** (`0.99.0-ci.prev` then `0.99.1-ci.next`), runs **`windows_nsis_silent_upgrade_smoke.ps1`** in **dual-upgrade** mode (silent prefix install → silent upgrades → PE version sanity → uninstaller `/S`).
+**electron-updater** integration (HTTP feed + delta download) stays a separate gate once a publish URL exists.
 Installer signing and store uploads remain manual.
 
 Production gates also honour **`RELEASE_GATES_PYINSTALLER=1`** (runs **`uv sync --frozen --extra dev --extra ga`** then verifies **`PyInstaller`** imports; **`frozen`** avoids unexpected lock churn).
