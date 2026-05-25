@@ -11,6 +11,9 @@ from pyc_hermes_agent.llm_gateway.catalog import BUILTIN_MODELS, BUILTIN_PROVIDE
 from pyc_hermes_agent.llm_gateway.types import ModelSpec, ModelVariantSpec, ProviderConfig, ProviderSpec, ResolvedLLMConfig
 
 
+_EXECUTABLE_PROVIDERS = {"github-copilot", "openai-compatible", "openrouter"}
+
+
 def sort_models_free_first(models: Iterable[ModelSpec]) -> list[ModelSpec]:
     return sorted(
         models,
@@ -90,7 +93,18 @@ def resolve_llm_config(raw_config: Dict[str, Any], config_path: Optional[Path] =
             )
 
     sorted_models = sort_models_free_first(model for model in models.values() if not model.disabled)
-    default_model = raw_config.get("model") or (sorted_models[0].id if sorted_models else "")
+    configured_model = raw_config.get("model")
+    if configured_model:
+        default_model = configured_model
+    else:
+        # Prefer models from providers that have runtime execution support.
+        executable_models = [m for m in sorted_models if m.provider_id in _EXECUTABLE_PROVIDERS]
+        if executable_models:
+            default_model = executable_models[0].id
+        elif sorted_models:
+            default_model = sorted_models[0].id
+        else:
+            default_model = ""
     small_model = raw_config.get("small_model")
     if small_model is None:
         default_provider_id = default_model.split("/", 1)[0] if "/" in default_model else None

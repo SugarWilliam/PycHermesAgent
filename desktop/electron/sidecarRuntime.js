@@ -101,7 +101,17 @@ function readSidecarUrlOverride(userDataDir, fsImpl = fs) {
   return fsImpl.readFileSync(filePath, 'utf8').trim()
 }
 
-function resolveSidecarRuntimeConfig({ env = process.env, userDataDir, fsImpl = fs } = {}) {
+function detectBundledSidecar(resourcesPath, fsImpl = fs) {
+  if (!resourcesPath) return ''
+  const candidate = join(resourcesPath, 'sidecar', 'pyc-hermes-sidecar.exe')
+  if (fsImpl.existsSync(candidate)) return candidate
+  // Fallback for non-Windows or dev builds without .exe extension
+  const candidateNoExt = join(resourcesPath, 'sidecar', 'pyc-hermes-sidecar')
+  if (fsImpl.existsSync(candidateNoExt)) return candidateNoExt
+  return ''
+}
+
+function resolveSidecarRuntimeConfig({ env = process.env, userDataDir, resourcesPath = '', fsImpl = fs } = {}) {
   const persisted = loadPersistedSidecarConfig(userDataDir, fsImpl)
   const fileUrl = readSidecarUrlOverride(userDataDir, fsImpl)
   const envUrl = String(env.PYC_HERMES_SIDECAR_URL || '').trim()
@@ -110,9 +120,20 @@ function resolveSidecarRuntimeConfig({ env = process.env, userDataDir, fsImpl = 
 
   const resolvedUrl = envUrl || fileUrl || persisted.sidecar_url || DEFAULT_SIDECAR_URL
   const resolvedUrlSource = envUrl ? 'env' : fileUrl ? 'file' : persisted.sidecar_url ? 'desktop_config' : 'default'
-  const launchCommand = envCommand[0] || persisted.sidecar_command || ''
-  const launchArgs = envCommand.length ? envCommand.slice(1) : persisted.sidecar_args
-  const launchCommandSource = envCommand.length ? 'env' : persisted.sidecar_command ? 'desktop_config' : 'none'
+
+  // Launch command priority: env > persisted config > bundled sidecar exe
+  let launchCommand = envCommand[0] || persisted.sidecar_command || ''
+  let launchArgs = envCommand.length ? envCommand.slice(1) : persisted.sidecar_args
+  let launchCommandSource = envCommand.length ? 'env' : persisted.sidecar_command ? 'desktop_config' : 'none'
+
+  if (!launchCommand) {
+    const bundled = detectBundledSidecar(resourcesPath, fsImpl)
+    if (bundled) {
+      launchCommand = bundled
+      launchArgs = ['--host', '127.0.0.1', '--port', '8765']
+      launchCommandSource = 'bundled'
+    }
+  }
 
   return {
     resolved_url: resolvedUrl,
@@ -243,7 +264,7 @@ async function attachFirstStartup(runtime, deps = {}) {
   let earlyExit = null
   let launchError = null
   try {
-    child = spawnImpl(runtime.launch_command, runtime.launch_args, { shell: false, stdio: 'ignore', windowsHide: true })
+    child = spawnImpl(runtime.launch_command, runtime.launch_args, { shell: false, stdio: 'ignore', windowsHide: true, env: { ...process.env } })
     status.managed_process = true
     if (typeof child?.once === 'function') {
       child.once('exit', (code, signal) => {
@@ -321,6 +342,7 @@ module.exports = {
   loadPersistedSidecarConfig,
   savePersistedSidecarConfig,
   readSidecarUrlOverride,
+  detectBundledSidecar,
   resolveSidecarRuntimeConfig,
   buildSidecarStatus,
   runtimeTargetsDiffer,

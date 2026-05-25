@@ -92,7 +92,7 @@ class LLMChatRequest:
     tools: List[ToolDefinition] = field(default_factory=list)
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
-    timeout_seconds: float = 30.0
+    timeout_seconds: float = 120.0
     retry_attempts: int = 1
 
 

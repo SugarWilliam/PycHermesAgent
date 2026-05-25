@@ -435,3 +435,93 @@ export async function exportOfficeArtifact(payload) {
   }
   return res.json()
 }
+
+// ─── Provider / Model / Config ──────────────────────────────────────────────────
+
+/**
+ * Fetch available LLM providers.
+ * @returns {Promise<{items: Array}>}
+ */
+export async function fetchProviders() {
+  const res = await fetch(`${await getBaseUrl()}/providers`)
+  if (!res.ok) throw new Error(`Fetch providers failed: ${res.status}`)
+  return res.json()
+}
+
+/**
+ * Fetch available LLM models.
+ * @returns {Promise<{items: Array}>}
+ */
+export async function fetchModels() {
+  const res = await fetch(`${await getBaseUrl()}/models`)
+  if (!res.ok) throw new Error(`Fetch models failed: ${res.status}`)
+  return res.json()
+}
+
+/**
+ * Fetch sidecar config (default model, mrag runtime etc).
+ * @returns {Promise<object>}
+ */
+export async function fetchConfig() {
+  const res = await fetch(`${await getBaseUrl()}/config`)
+  if (!res.ok) throw new Error(`Fetch config failed: ${res.status}`)
+  return res.json()
+}
+
+// ─── Knowledge Base File Ingest ─────────────────────────────────────────────────
+
+/**
+ * Ingest a local file into a knowledge base.
+ * @param {string} knowledgeBaseId
+ * @param {string} filePath - absolute filesystem path
+ * @returns {Promise<object>} KnowledgeDocument
+ */
+export async function ingestFileToKnowledgeBase(knowledgeBaseId, filePath) {
+  const res = await fetch(`${await getBaseUrl()}${sidecarKnowledgeBasePath(knowledgeBaseId, 'documents/file')}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: filePath })
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(err.error?.message || err.message || `File ingest failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+/**
+ * Ingest a PDF file into a knowledge base (separate endpoint).
+ * @param {string} knowledgeBaseId
+ * @param {string} filePath - absolute filesystem path to .pdf
+ * @returns {Promise<object>} KnowledgeDocument
+ */
+export async function ingestPdfToKnowledgeBase(knowledgeBaseId, filePath) {
+  const res = await fetch(`${await getBaseUrl()}${sidecarKnowledgeBasePath(knowledgeBaseId, 'documents/pdf')}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: filePath })
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(err.error?.message || err.message || `PDF ingest failed: ${res.status}`)
+  }
+  return res.json()
+}
+
+/**
+ * Create a new knowledge base.
+ * @param {{ name: string, description?: string }} params
+ * @returns {Promise<object>}
+ */
+export async function createKnowledgeBase(params) {
+  const res = await fetch(`${await getBaseUrl()}${SIDECAR_PATHS.KNOWLEDGE_BASES}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params)
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(err.error?.message || err.message || `Create KB failed: ${res.status}`)
+  }
+  return res.json()
+}

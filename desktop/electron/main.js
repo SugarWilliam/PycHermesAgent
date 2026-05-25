@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell } = require('electron')
+const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron')
 const { join } = require('path')
 
 let autoUpdater = null
@@ -91,7 +91,7 @@ function bindManagedSidecar(child, runtime) {
 }
 
 async function refreshSidecarRuntime({ allowLaunch }) {
-  const nextRuntimeConfig = resolveSidecarRuntimeConfig({ env: process.env, userDataDir: app.getPath('userData') })
+  const nextRuntimeConfig = resolveSidecarRuntimeConfig({ env: process.env, userDataDir: app.getPath('userData'), resourcesPath: process.resourcesPath || '' })
 
   if (managedSidecar && runtimeTargetsDiffer(runtimeConfig, nextRuntimeConfig)) {
     stopManagedSidecar()
@@ -154,6 +154,93 @@ ipcMain.handle('shell:open-path', async (_event, filepath) => {
   return { ok: !err, error: err || null }
 })
 
+/** Open a native file-picker dialog and return selected file paths. */
+ipcMain.handle('dialog:open-file', async (_event, options) => {
+  const win = BrowserWindow.getAllWindows()[0]
+  const result = await dialog.showOpenDialog(win, {
+    title: options?.title || 'Select files',
+    properties: ['openFile', ...(options?.multiple ? ['multiSelections'] : [])],
+    filters: options?.filters || [
+      { name: 'Documents', extensions: ['md', 'txt', 'pdf', 'docx', 'xlsx', 'pptx', 'html', 'htm'] },
+      { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'tif', 'tiff', 'bmp'] },
+      { name: 'All Files', extensions: ['*'] }
+    ]
+  })
+  return { canceled: result.canceled, filePaths: result.filePaths || [] }
+})
+
+/** Store provider environment variables and pass them to managed sidecar on next restart. */
+let providerEnvOverrides = {}
+ipcMain.handle('sidecar:set-provider-env', async (_event, vars) => {
+  if (vars && typeof vars === 'object') {
+    providerEnvOverrides = { ...providerEnvOverrides, ...vars }
+    // Persist to userData for next launch
+    const fs = require('fs')
+    const path = require('path')
+    const envFile = path.join(app.getPath('userData'), 'provider-env.json')
+    try { fs.writeFileSync(envFile, JSON.stringify(providerEnvOverrides, null, 2)) } catch {}
+    // Also inject into current process env so sidecar can pick up on restart
+    for (const [k, v] of Object.entries(vars)) {
+      if (v) process.env[k] = v
+      else delete process.env[k]
+    }
+  }
+  return { ok: true }
+})
+
+// === Filesystem IPC for file explorer ===
+ipcMain.handle('fs:read-dir', async (_event, dirPath) => {
+  const fs = require('fs')
+  const path = require('path')
+  try {
+    const entries = fs.readdirSync(dirPath, { withFileTypes: true })
+    const items = entries.map(e => ({
+      name: e.name,
+      path: path.join(dirPath, e.name),
+      isDirectory: e.isDirectory(),
+    })).sort((a, b) => {
+      if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1
+      return a.name.localeCompare(b.name)
+    })
+    return { ok: true, items }
+  } catch (err) {
+    return { ok: false, error: err.message }
+  }
+})
+
+ipcMain.handle('fs:read-file', async (_event, filePath) => {
+  const fs = require('fs')
+  try {
+    const stat = fs.statSync(filePath)
+    if (stat.size > 5 * 1024 * 1024) {
+      return { ok: false, error: 'File too large (>5MB)' }
+    }
+    const content = fs.readFileSync(filePath, 'utf-8')
+    return { ok: true, content, size: stat.size }
+  } catch (err) {
+    return { ok: false, error: err.message }
+  }
+})
+
+ipcMain.handle('fs:write-file', async (_event, { filePath, content }) => {
+  const fs = require('fs')
+  try {
+    fs.writeFileSync(filePath, content, 'utf-8')
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err.message }
+  }
+})
+
+ipcMain.handle('dialog:open-folder', async () => {
+  const win = BrowserWindow.getAllWindows()[0]
+  const result = await dialog.showOpenDialog(win, {
+    title: '选择文件夹',
+    properties: ['openDirectory']
+  })
+  return { canceled: result.canceled, filePaths: result.filePaths || [] }
+})
+
 function initAutoUpdater() {
   if (!autoUpdater) return
   autoUpdater.autoDownload = false
@@ -179,6 +266,20 @@ function initAutoUpdater() {
 }
 
 app.whenReady().then(async () => {
+  // Load persisted provider env vars (API keys etc.)
+  try {
+    const fs = require('fs')
+    const path = require('path')
+    const envFile = path.join(app.getPath('userData'), 'provider-env.json')
+    if (fs.existsSync(envFile)) {
+      const saved = JSON.parse(fs.readFileSync(envFile, 'utf-8'))
+      for (const [k, v] of Object.entries(saved)) {
+        if (v && !process.env[k]) process.env[k] = v
+      }
+      providerEnvOverrides = saved
+    }
+  } catch {}
+
   await refreshSidecarRuntime({ allowLaunch: true })
   initAutoUpdater()
   const win = createWindow()
@@ -199,4 +300,103 @@ app.on('before-quit', stopManagedSidecar)
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
+})
+
+// ============================================================
+// GitHub Copilot Device Code OAuth Flow
+// ============================================================
+const https = require('https')
+
+const GITHUB_DEVICE_CODE_CLIENT_ID = 'Iv1.b507a08c87ecfe98'
+const GITHUB_DEVICE_CODE_URL = 'https://github.com/login/device/code'
+const GITHUB_TOKEN_URL = 'https://github.com/login/oauth/access_token'
+
+function httpsPost(url, body, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(url)
+    const postData = typeof body === 'string' ? body : JSON.stringify(body)
+    const options = {
+      hostname: parsed.hostname,
+      port: 443,
+      path: parsed.pathname + parsed.search,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'Content-Length': Buffer.byteLength(postData),
+        ...headers,
+      },
+    }
+    const req = https.request(options, (res) => {
+      let data = ''
+      res.on('data', (chunk) => { data += chunk })
+      res.on('end', () => {
+        try { resolve({ status: res.statusCode, body: JSON.parse(data) }) }
+        catch { resolve({ status: res.statusCode, body: data }) }
+      })
+    })
+    req.on('error', reject)
+    req.setTimeout(15000, () => { req.destroy(); reject(new Error('timeout')) })
+    req.write(postData)
+    req.end()
+  })
+}
+
+/** Start device code flow: returns { user_code, verification_uri, device_code, interval, expires_in } */
+ipcMain.handle('auth:github-device-code-start', async () => {
+  try {
+    const res = await httpsPost(GITHUB_DEVICE_CODE_URL, {
+      client_id: GITHUB_DEVICE_CODE_CLIENT_ID,
+      scope: 'read:user',
+    })
+    if (res.status !== 200 || !res.body?.user_code) {
+      return { ok: false, error: res.body?.error_description || res.body?.error || 'Failed to get device code' }
+    }
+    return { ok: true, ...res.body }
+  } catch (err) {
+    return { ok: false, error: err.message }
+  }
+})
+
+/** Poll for token: pass device_code. Returns { ok, token } or { ok: false, status: 'pending'|'error', error } */
+ipcMain.handle('auth:github-device-code-poll', async (_event, { device_code }) => {
+  try {
+    const res = await httpsPost(GITHUB_TOKEN_URL, {
+      client_id: GITHUB_DEVICE_CODE_CLIENT_ID,
+      device_code,
+      grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+    })
+    const body = res.body
+    if (body?.access_token) {
+      // Store the token
+      providerEnvOverrides.GITHUB_TOKEN = body.access_token
+      process.env.GITHUB_TOKEN = body.access_token
+      const fs = require('fs')
+      const path = require('path')
+      const envFile = path.join(app.getPath('userData'), 'provider-env.json')
+      try { fs.writeFileSync(envFile, JSON.stringify(providerEnvOverrides, null, 2)) } catch {}
+      return { ok: true, token: body.access_token }
+    }
+    if (body?.error === 'authorization_pending') {
+      return { ok: false, status: 'pending' }
+    }
+    if (body?.error === 'slow_down') {
+      return { ok: false, status: 'slow_down' }
+    }
+    if (body?.error === 'expired_token') {
+      return { ok: false, status: 'expired', error: 'Device code expired. Please start again.' }
+    }
+    return { ok: false, status: 'error', error: body?.error_description || body?.error || 'Unknown error' }
+  } catch (err) {
+    return { ok: false, status: 'error', error: err.message }
+  }
+})
+
+/** Open URL in default browser */
+ipcMain.handle('auth:open-external', async (_event, url) => {
+  if (url && typeof url === 'string' && url.startsWith('https://')) {
+    await shell.openExternal(url)
+    return { ok: true }
+  }
+  return { ok: false, error: 'Invalid URL' }
 })

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- PycHermesAgent placeholder icon - hexagonal design -->
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4F46E5;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#7C3AED;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <polygon points="256,32 458,144 458,368 256,480 54,368 54,144" fill="url(#grad)" />
+  <polygon points="256,80 420,172 420,348 256,440 92,348 92,172" fill="none" stroke="#fff" stroke-width="4" opacity="0.6" />
+  <text x="256" y="280" text-anchor="middle" font-family="sans-serif" font-size="120" font-weight="bold" fill="#fff">PH</text>
+</svg>

@@ -90,8 +90,9 @@ const useChatStore = create((set, get) => ({
    * Send a user message and stream the assistant response.
    * @param {string} text - user message content
    * @param {string} analysisMode - 'casual' | 'structured' | 'formal'
+   * @param {string} [model] - optional model override (e.g. 'github-copilot/gpt-4.1')
    */
-  sendMessage: (text, analysisMode = 'casual') => {
+  sendMessage: (text, analysisMode = 'casual', model) => {
     const state = get()
     if (state.isStreaming) return
 
@@ -131,7 +132,8 @@ const useChatStore = create((set, get) => ({
       analysis_mode: analysisMode,
       planning_enabled: analysisMode !== 'casual',
       max_iterations: analysisMode === 'formal' ? 12 : 8,
-      activated_skills
+      activated_skills,
+      ...(model ? { model } : {})
     }
 
     const controller = streamAgent(request, {

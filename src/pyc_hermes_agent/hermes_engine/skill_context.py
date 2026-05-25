@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Final
 
 from pyc_hermes_agent.contracts import ChatMessage
+from pyc_hermes_agent.hermes_engine.skills.builtin_skills import BUILTIN_SKILLS
 from pyc_hermes_agent.llm_gateway import load_skill_metadata
 
 # Canonical Phase 1 skill runtime policy (sidecar listings, AgentLoop `start` payload). Deferrals: ADR.
@@ -26,29 +27,61 @@ def build_skill_context_messages(root: Path, skill_names: list[str] | None) -> l
     if not requested:
         return []
 
+    # Merge project-scoped skills (from .opencode/skills/) with builtin skills.
     skills = {skill.name: skill for skill in load_skill_metadata(root)}
     messages: list[ChatMessage] = []
     for name in requested:
         metadata = skills.get(name)
-        if metadata is None:
-            raise ValueError(f"Unknown activated skill: {name}")
-        body = _extract_skill_body(metadata.path)
-        content = "\n".join(
-            [
-                _SKILL_OPEN_TAG,
-                f"Active skill: {metadata.name}",
-                f"Origin: {metadata.skill_origin}",
-                f"Description: {metadata.description}",
-                f"Source: {metadata.path}",
-                "Runtime policy: Script execution is disabled in this phase.",
-                "",
-                "Instructions:",
-                body,
-                _SKILL_CLOSE_TAG,
-            ]
-        )
-        messages.append(ChatMessage(role="system", content=content))
+        if metadata is not None:
+            # Project-scoped skill: inject SKILL.md content.
+            body = _extract_skill_body(metadata.path)
+            content = "\n".join(
+                [
+                    _SKILL_OPEN_TAG,
+                    f"Active skill: {metadata.name}",
+                    f"Origin: {metadata.skill_origin}",
+                    f"Description: {metadata.description}",
+                    f"Source: {metadata.path}",
+                    "Runtime policy: Script execution is disabled in this phase.",
+                    "",
+                    "Instructions:",
+                    body,
+                    _SKILL_CLOSE_TAG,
+                ]
+            )
+            messages.append(ChatMessage(role="system", content=content))
+            continue
+
+        # Check builtin skills by name.
+        builtin = _find_builtin_skill(name)
+        if builtin is not None:
+            content = "\n".join(
+                [
+                    _SKILL_OPEN_TAG,
+                    f"Active skill: {builtin.name}",
+                    f"Origin: builtin",
+                    f"Category: {builtin.category}",
+                    f"Description: {builtin.description}",
+                    "",
+                    "Instructions:",
+                    builtin.system_prompt_fragment,
+                    _SKILL_CLOSE_TAG,
+                ]
+            )
+            messages.append(ChatMessage(role="system", content=content))
+            continue
+
+        raise ValueError(f"Unknown activated skill: {name}")
     return messages
+
+
+def _find_builtin_skill(name: str):
+    """Find a builtin skill by name (case-insensitive match)."""
+    name_lower = name.lower()
+    for skill in BUILTIN_SKILLS:
+        if skill.name.lower() == name_lower:
+            return skill
+    return None
 
 
 def _extract_skill_body(path: Path) -> str:

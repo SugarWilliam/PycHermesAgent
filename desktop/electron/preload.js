@@ -29,4 +29,16 @@ contextBridge.exposeInMainWorld('updater', {
 /** Host OS integration — only available inside Electron preload. */
 contextBridge.exposeInMainWorld('desktopHost', {
   openPath: (absolutePath) => ipcRenderer.invoke('shell:open-path', absolutePath),
+  pickFiles: (options) => ipcRenderer.invoke('dialog:open-file', options),
+  setProviderEnv: (vars) => ipcRenderer.invoke('sidecar:set-provider-env', vars),
+  openExternal: (url) => ipcRenderer.invoke('auth:open-external', url),
+  githubDeviceCodeStart: () => ipcRenderer.invoke('auth:github-device-code-start'),
+  githubDeviceCodePoll: (deviceCode) => ipcRenderer.invoke('auth:github-device-code-poll', { device_code: deviceCode }),
+})
+
+contextBridge.exposeInMainWorld('fileSystem', {
+  readDir: (dirPath) => ipcRenderer.invoke('fs:read-dir', dirPath),
+  readFile: (filePath) => ipcRenderer.invoke('fs:read-file', filePath),
+  writeFile: (filePath, content) => ipcRenderer.invoke('fs:write-file', { filePath, content }),
+  pickFolder: () => ipcRenderer.invoke('dialog:open-folder'),
 })

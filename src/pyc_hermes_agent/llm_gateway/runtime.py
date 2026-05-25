@@ -14,10 +14,11 @@ from urllib.request import Request, urlopen
 
 from pyc_hermes_agent.contracts import ToolCall
 from pyc_hermes_agent.llm_gateway.config import resolve_opencode_like_config
+from pyc_hermes_agent.llm_gateway.resolver import _EXECUTABLE_PROVIDERS
 from pyc_hermes_agent.llm_gateway.types import LLMChatChunk, LLMChatRequest, LLMChatResponse, LLMMessage, ProviderConfig, ResolvedLLMConfig
 
 
-_SUPPORTED_EXECUTION_PROVIDERS = {"github-copilot", "openai-compatible", "openrouter"}
+_SUPPORTED_EXECUTION_PROVIDERS = _EXECUTABLE_PROVIDERS
 _API_KEY_OPTION_KEYS = (
     "apiKey",
     "api_key",

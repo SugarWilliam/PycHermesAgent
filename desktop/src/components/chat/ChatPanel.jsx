@@ -1,5 +1,6 @@
 import MessageList from './MessageList'
 import ChatInput from './ChatInput'
+import WelcomeScreen from './WelcomeScreen'
 import useChatStore from '../../store/chatStore'
 import useUiStore from '../../store/uiStore'
 
@@ -8,8 +9,15 @@ export default function ChatPanel() {
   const conversations = useChatStore((s) => s.conversations)
   const toggleSidebar = useUiStore((s) => s.toggleSidebar)
   const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed)
+  const sendMessage = useChatStore((s) => s.sendMessage)
+  const createConversation = useChatStore((s) => s.createConversation)
 
   const activeConversation = conversations.find((c) => c.id === activeConversationId)
+
+  const handleQuickAction = (text) => {
+    if (!activeConversationId) createConversation()
+    setTimeout(() => sendMessage(text, 'casual'), 50)
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -21,10 +29,10 @@ export default function ChatPanel() {
             className="mr-3 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"
             title="Show sidebar"
           >
-            ☰
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M3 4h12M3 9h12M3 14h12" /></svg>
           </button>
         )}
-        <h2 className="text-sm font-medium truncate">
+        <h2 className="text-sm font-medium truncate text-gray-900 dark:text-gray-100">
           {activeConversation ? activeConversation.title : 'PycHermesAgent'}
         </h2>
       </div>
@@ -34,9 +42,7 @@ export default function ChatPanel() {
         {activeConversation ? (
           <MessageList messages={activeConversation.messages} />
         ) : (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-gray-400 text-sm">Start a new conversation</p>
-          </div>
+          <WelcomeScreen onQuickAction={handleQuickAction} />
         )}
       </div>
 

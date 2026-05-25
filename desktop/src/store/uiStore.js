@@ -3,10 +3,15 @@ import { create } from 'zustand'
 const useUiStore = create((set) => ({
   sidebarCollapsed: false,
   contextPanelCollapsed: true,
+  explorerPanelOpen: false,
+  explorerOpenFile: null, // path of file currently open in viewer
   theme: 'dark',
 
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
   toggleContextPanel: () => set((s) => ({ contextPanelCollapsed: !s.contextPanelCollapsed })),
+  toggleExplorerPanel: () => set((s) => ({ explorerPanelOpen: !s.explorerPanelOpen })),
+  openFileInViewer: (filePath) => set({ explorerOpenFile: filePath }),
+  closeFileViewer: () => set({ explorerOpenFile: null }),
   setTheme: (theme) => set({ theme }),
 
   // Context panel content (Formal/Meta snapshot; chat may refresh via setFormalContextSnapshot)

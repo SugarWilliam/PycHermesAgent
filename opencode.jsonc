@@ -1,5 +1,11 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "model": "github-copilot/gpt-4.1",
+  "provider": {
+    "github-copilot": {
+      "name": "GitHub Copilot"
+    }
+  },
   "instructions": [
     "docs/Project_Development_and_Release_Governance.md",
     "docs/architecture/PycHermesAgent_Architecture_v0.2.0.md",

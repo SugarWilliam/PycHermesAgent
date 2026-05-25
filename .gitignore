@@ -32,3 +32,6 @@ id_dsa
 id_ed25519
 
 upstream/hermes-agent/.git/
+
+# Local PyInstaller / drop-in sidecar previews (releases ship via CI artifacts).
+packaging/windows/*.exe

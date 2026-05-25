@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import useSettingsStore from '../store/settingsStore'
 
 export default function useTheme() {
-  const theme = useSettingsStore((s) => s.theme)
+  const theme = useSettingsStore((s) => s.settings?.theme)
 
   useEffect(() => {
     const root = document.documentElement

@@ -39,7 +39,7 @@ class ChatCompletionRequest:
     tools: List[ToolDefinition] = field(default_factory=list)
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
-    timeout_seconds: float = 30.0
+    timeout_seconds: float = 120.0
     retry_attempts: int = 1
 
 
@@ -103,7 +103,7 @@ class AgentLoopRequest:
     retry_budget: int = 1
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
-    timeout_seconds: float = 30.0
+    timeout_seconds: float = 120.0
     retry_attempts: int = 1
     max_iterations: int = 8
     analysis_mode: str = "casual"
